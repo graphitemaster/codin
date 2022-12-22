@@ -116,7 +116,7 @@ static void dump_assignment_statement(const Leaf *leaf, int MAYBE_UNUSED depth) 
 	const Uint64 n_lhs = array_size(leaf->as_assignment_statement.lhs);
 	const Uint64 n_rhs = array_size(leaf->as_assignment_statement.rhs);
 	assert(n_lhs == n_rhs);
-	printf("(assignments\n");
+	printf("(assign\n");
 	for (Uint64 i = 0; i < n_lhs; i++) {
 		const Leaf *lhs = leaf->as_assignment_statement.lhs[i];
 		const Leaf *rhs = leaf->as_assignment_statement.rhs[i];
@@ -191,6 +191,23 @@ static void dump_compound_literal(const Leaf *leaf, int depth) {
 	printf(")");
 }
 
+static void dump_value_declaration(const Leaf *leaf, int depth) {
+	if (!leaf) return;
+	printf("(decl\n");
+	// dump_leaf(leaf->as_value_declaration.type, depth + 1, true);
+	const Uint64 n_elements = array_size(leaf->as_value_declaration.names);
+	for (Uint64 i = 0; i < n_elements; i++) {
+		const Leaf *name = leaf->as_value_declaration.names[i];
+		const Leaf *value = leaf->as_value_declaration.values[i];
+		dump_leaf(name, depth, true);
+		if (value) {
+			printf(" ");
+			dump_leaf(value, 0, i == n_elements - 1);
+		}
+	}
+	printf(")");
+}
+
 static void dump_leaf(const Leaf *leaf, int depth, Bool last) {
 	if (!leaf) return;
 	pad(depth);
@@ -242,6 +259,9 @@ static void dump_leaf(const Leaf *leaf, int depth, Bool last) {
 		break;
 	case NODE_COMPOUND_LITERAL:
 		dump_compound_literal(leaf, depth + 1);
+		break;
+	case NODE_VALUE_DECLARATION:
+		dump_value_declaration(leaf, depth + 1);
 		break;
 	}
 	if (!last) {

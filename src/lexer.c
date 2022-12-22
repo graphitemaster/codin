@@ -269,7 +269,7 @@ Token lexer_next(Lexer *lexer) {
 		case '.':
 			token.kind = KIND_OPERATOR;
 			token.as_operator = OPERATOR_PERIOD;
-			if (lexer->rune >= '0' && rune <= '9') {
+			if (lexer->rune >= '0' && lexer->rune <= '9') {
 				token = scan_numeric(lexer, true);
 			} else if (lexer->rune == '.') {
 				advance(lexer);

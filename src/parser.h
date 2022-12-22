@@ -27,6 +27,8 @@ enum Node {
 	NODE_FIELD_VALUE,
 	NODE_LITERAL,
 	NODE_COMPOUND_LITERAL,
+
+	NODE_VALUE_DECLARATION,
 };
 
 struct Tree {
@@ -93,6 +95,12 @@ struct Leaf {
 			Leaf *type;
 			Array(Leaf*) elements;
 		} as_compound_literal;
+		struct {
+			Leaf *type;
+			Array(Leaf*) names;
+			Array(Leaf*) values;
+			Bool constant;
+		} as_value_declaration;
 	};
 };
 

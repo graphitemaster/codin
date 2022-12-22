@@ -28,7 +28,7 @@ KIND(ATTRIBUTE,    "attribute")     // '@' is a attribute (not an operator)
 KIND(SEMICOLON,    "semicolon")     // ';' is a terminator
 KIND(LBRACE,       "left brace")    // '{' is not an operator
 KIND(RBRACE,       "right brace")   // '}' is not an operator
-KIND(EQ,           "assign")        // '=' is n ot an operator
+KIND(EQ,           "assign-eq")     // '=' is n ot an operator
 KIND(ADDEQ,        "assign-add")    // '+=' is not an operator
 KIND(SUBEQ,        "assign-sub")    // '-=' is not an operator
 KIND(MULEQ,        "assign-mul")    // '*=' is not an operator

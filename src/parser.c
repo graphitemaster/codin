@@ -206,6 +206,15 @@ static Leaf *leaf_new_binary_expression(Tree *tree, Operator op, Leaf *lhs, Leaf
 	return leaf;
 }
 
+static Leaf *leaf_new_value_declaration(Tree *tree, Leaf *type, Array(Leaf*) names, Array(Leaf*) values, Bool constant) {
+	Leaf *leaf = leaf_new(tree, NODE_VALUE_DECLARATION);
+	leaf->as_value_declaration.type = type;
+	leaf->as_value_declaration.names = names;
+	leaf->as_value_declaration.values = values;
+	leaf->as_value_declaration.constant = constant;
+	return leaf;
+}
+
 static Token expect_semicolon(Parser *parser) {
 	// TODO(dweiler): Implement.
 	(void)parser;
@@ -327,9 +336,9 @@ static Leaf *parse_operand(Parser *parser, Bool lhs) {
 	case KIND_OPERATOR:
 		switch (token.as_operator) {
 		case OPERATOR_OPENPAREN:
-			UNIMPLEMENTED("OPERNPAREN");
+			UNIMPLEMENTED("(");
 		case OPERATOR_POINTER:
-			UNIMPLEMENTED("Pointer");
+			UNIMPLEMENTED("^");
 		case OPERATOR_OPENBRACKET:
 			UNIMPLEMENTED("[");
 		default:
@@ -338,10 +347,6 @@ static Leaf *parse_operand(Parser *parser, Bool lhs) {
 		break;
 	default:
 		break;
-		// String string = token_to_string(token);
-		// ICE("Unexpected '%.*s'",
-		// 	CAST(int,         string.size),
-		// 	CAST(const char*, string.data));
 	}
 
 	TRACE_LEAVE();
@@ -427,6 +432,7 @@ static Leaf *parse_literal_value(Parser *parser, Leaf *type) {
 static Leaf *parse_atom_expression(Parser *parser, Leaf *operand, Bool lhs) {
 	TRACE_ENTER("parse_atom_expression");
 	if (!operand) {
+		// if (allow_type) return 0
 		// ERROR("Expected an operand");
 		TRACE_LEAVE();
 		return 0;
@@ -468,7 +474,7 @@ static Leaf *parse_atom_expression(Parser *parser, Leaf *operand, Bool lhs) {
 					break;
 				}
 				break;
-	
+
 			case OPERATOR_ARROW:
 				advance(parser);
 				leaf = parse_identifier(parser);
@@ -666,7 +672,7 @@ static Leaf *parse_statement(Parser *parser);
 
 static Array(Leaf*) parse_statement_list(Parser *parser) {
 	TRACE_ENTER("parse_statement_list");
-	(void)parser;
+
 	Array(Leaf*) statements = 0;
 	const Token token = parser->token;
 
@@ -708,11 +714,32 @@ static Leaf *parse_block_statement(Parser *parser, Bool when) {
 	return body;
 }
 
+static Leaf *parse_type_or_identifier(Parser *parser) {
+	TRACE_ENTER("parse_type_or_identifier");
+	Leaf *operand = parse_operand(parser, true);
+	Leaf *type = parse_atom_expression(parser, operand, true);
+	TRACE_LEAVE();
+	return type;
+}
+
 static Leaf *parse_value_declaration(Parser *parser, Array(Leaf*) names) {
-	(void)parser;
-	(void)names;
-	UNIMPLEMENTED("parse_value_declaration");
-	return 0;
+	TRACE_ENTER("parse_value_declaration");
+	Array(Leaf*) values = 0;
+	Leaf *type = parse_type_or_identifier(parser);
+	const Token token = parser->token;
+	Bool constant = false;
+	// Check for ':='
+	// Check for '::'
+	if (is_kind(token, KIND_EQ) || is_operator(token, OPERATOR_COLON)) {
+		const Token seperator = advance(parser);
+		constant = is_operator(seperator, OPERATOR_COLON);
+		values = parse_rhs_expression_list(parser);
+		// TODO(dweiler): Assert the count.
+	}
+	// TODO(dweiler): Robustness
+	Leaf *leaf = leaf_new_value_declaration(parser->tree, type, names, values, constant);
+	TRACE_LEAVE();
+	return leaf;
 }
 
 static Leaf *parse_simple_statement(Parser* parser) {
@@ -720,18 +747,6 @@ static Leaf *parse_simple_statement(Parser* parser) {
 	Array(Leaf*) lhs = parse_lhs_expression_list(parser);
 	const Token token = parser->token;
 	switch (token.kind) {
-	case KIND_OPERATOR:
-		switch (token.as_operator) {
-		case OPERATOR_IN:
-			UNIMPLEMENTED("in");
-		case OPERATOR_COLON:
-			// TODO(dweiler): Label on block/if/for/range/switch
-			// UNIMPLEMENTED("colon");
-			return parse_value_declaration(parser, lhs);
-		default:
-			ICE("Unexpected operator");
-		}
-		break;
 	case KIND_EQ:
 		FALLTHROUGH();
 	case KIND_ADDEQ:
@@ -766,16 +781,35 @@ static Leaf *parse_simple_statement(Parser* parser) {
 		Array(Leaf*) rhs = parse_rhs_expression_list(parser);
 		if (array_size(rhs) == 0) {
 			// ERROR(dweiler): Missing right hand side in assignment.
+			ERROR("Missing right-hand side in assignment");
+			return 0;
 		}
 		Leaf *leaf = leaf_new_assignment_statement(parser->tree, token.kind, lhs, rhs);
 		TRACE_LEAVE();
 		return leaf;
+	case KIND_OPERATOR:
+		switch (token.as_operator) {
+		case OPERATOR_IN:
+			UNIMPLEMENTED("in");
+		case OPERATOR_COLON:
+			expect_operator(parser, OPERATOR_COLON);
+			// TODO(dweiler): Label check.
+			return parse_value_declaration(parser, lhs);
+		default:
+			ICE("Unexpected operator");
+		}
+		break;
 	default:
+		// const String string = token_to_string(token);
+		// ERROR("Unexpected '%.*s'",
+		// 	CAST(int,          string.size),
+		// 	CAST(const char *, string.data));
 		break;
 	}
 
 	if (array_size(lhs) > 1) {
-		ICE("Too many");
+		ERROR("Expected one expression on the left-hand side");
+		return 0;
 	}
 
 	Leaf *leaf = leaf_new_expression_statement(parser->tree, lhs[0]);
@@ -939,7 +973,7 @@ static Leaf *parse_statement(Parser *parser) {
 			}
 			break;
 		case KIND_LBRACE:
-			Leaf *block = parse_block_statement(parser, true);
+			Leaf *block = parse_block_statement(parser, false);
 			TRACE_LEAVE();
 			return block;
 		default:
