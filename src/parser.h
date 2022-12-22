@@ -67,7 +67,7 @@ struct Leaf {
 			Array(Leaf*) statements;
 		} as_block_statement;
 		struct {
-			Operator op;
+			Kind kind;
 			Array(Leaf*) lhs;
 			Array(Leaf*) rhs;
 		} as_assignment_statement;

@@ -19,6 +19,8 @@ enum Kind {
 	KIND_COUNT,
 };
 
+String kind_to_string(Kind kind);
+
 #define LITERAL(kind, ...) LITERAL_ ## kind,
 enum Literal {
 	#include "lexemes.h"

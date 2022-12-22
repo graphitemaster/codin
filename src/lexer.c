@@ -340,14 +340,14 @@ Token lexer_next(Lexer *lexer) {
 			switch (lexer->rune) {
 			case '=':
 				advance(lexer);
-				token.as_operator = OPERATOR_MODEQ;
+				token.kind = KIND_EQ;
 				break;
 			case '%':
 				advance(lexer);
 				token.as_operator = OPERATOR_MODMOD;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.as_operator = OPERATOR_MODMODEQ;
+					token.kind = KIND_MODMODEQ;
 				}
 				break;
 			}
@@ -357,14 +357,14 @@ Token lexer_next(Lexer *lexer) {
 			token.as_operator = OPERATOR_MUL;
 			if (lexer->rune == '=') {
 				advance(lexer);
-				token.as_operator = OPERATOR_MULEQ;
+				token.kind = KIND_MULEQ;
 			}
 			break;
 		case '=':
-			token.kind = KIND_OPERATOR;
-			token.as_operator = OPERATOR_EQ;
+			token.kind = KIND_EQ;
 			if (lexer->rune == '=') {
 				advance(lexer);
+				token.kind = KIND_OPERATOR;
 				token.as_operator = OPERATOR_CMPEQ;
 			}
 			break;
@@ -373,7 +373,7 @@ Token lexer_next(Lexer *lexer) {
 			token.as_operator = OPERATOR_XOR;
 			if (lexer->rune == '=') {
 				advance(lexer);
-				token.as_operator = OPERATOR_XOREQ;
+				token.kind = KIND_XOREQ;
 			}
 			break;
 		case '!':
@@ -389,7 +389,7 @@ Token lexer_next(Lexer *lexer) {
 			token.as_operator = OPERATOR_ADD;
 			if (lexer->rune == '=') {
 				advance(lexer);
-				token.as_operator = OPERATOR_ADDEQ;
+				token.kind = KIND_ADDEQ;
 			}
 			break;
 		case '-':
@@ -398,7 +398,7 @@ Token lexer_next(Lexer *lexer) {
 			switch (lexer->rune) {
 			case '=':
 				advance(lexer);
-				token.as_operator = OPERATOR_SUBEQ;
+				token.kind = KIND_SUBEQ;
 				break;
 			case '>':
 				advance(lexer);
@@ -415,7 +415,7 @@ Token lexer_next(Lexer *lexer) {
 			switch (lexer->rune) {
 			case '=':
 				advance(lexer);
-				token.as_operator = OPERATOR_QUOEQ;
+				token.kind = KIND_QUOEQ;
 				break;
 			// Line comment.
 			case '/':
@@ -465,7 +465,7 @@ Token lexer_next(Lexer *lexer) {
 				token.as_operator = OPERATOR_SHL;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.as_operator = OPERATOR_SHLEQ;
+					token.kind = KIND_SHLEQ;
 				}
 				break;
 			}
@@ -483,7 +483,7 @@ Token lexer_next(Lexer *lexer) {
 				token.as_operator = OPERATOR_SHR;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.as_operator = OPERATOR_SHREQ;
+					token.kind = KIND_SHREQ;
 				}
 				break;
 			}
@@ -497,19 +497,19 @@ Token lexer_next(Lexer *lexer) {
 				token.as_operator = OPERATOR_ANDNOT;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.as_operator = OPERATOR_ANDNOTEQ;
+					token.kind = KIND_ANDNOTEQ;
 				}
 				break;
 			case '=':
 				advance(lexer);
-				token.as_operator = OPERATOR_ANDEQ;
+				token.kind = KIND_ANDEQ;
 				break;
 			case '&':
 				advance(lexer);
 				token.as_operator = OPERATOR_CMPAND;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.as_operator = OPERATOR_CMPANDEQ;
+					token.kind = KIND_ANDEQ;
 				}
 				break;
 			}
@@ -520,14 +520,14 @@ Token lexer_next(Lexer *lexer) {
 			switch (lexer->rune) {
 			case '=':
 				advance(lexer);
-				token.as_operator = OPERATOR_OREQ;
+				token.kind = KIND_OREQ;
 				break;
 			case '|':
 				advance(lexer);
 				token.as_operator = OPERATOR_CMPOR;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.as_operator = OPERATOR_CMPOREQ;
+					token.kind = KIND_CMPOREQ;
 				}
 				break;
 			}
@@ -538,6 +538,14 @@ Token lexer_next(Lexer *lexer) {
 }
 
 // Simple helper routines
+String kind_to_string(Kind kind) {
+	#define KIND(enumerator, name) SLIT(name),
+	static const String KINDS[] = {
+		#include "lexemes.h"
+	};
+	return KINDS[kind];
+}
+
 String keyword_to_string(Keyword keyword) {
 	#define KEYWORD(ident, string) SLIT(string),
 	static const String KEYWORDS[] = {
@@ -555,33 +563,23 @@ String operator_to_string(Operator op) {
 }
 
 String token_to_string(Token token) {
+	#define KIND(enumerator, kind) SLIT(#enumerator),
+	static const String STRINGS[] = {
+		#include "lexemes.h"
+	};
 	switch (token.kind) {
 	case KIND_COMMENT:
-		return token.string;
-	case KIND_EOF:
-		return SLIT("EOF");
+		FALLTHROUGH();
 	case KIND_IDENTIFIER:
 		return token.string;
-	case KIND_INVALID:
-		return SLIT("INVALID");
 	case KIND_KEYWORD:
 		return keyword_to_string(token.as_keyword);
 	case KIND_LITERAL:
 		return token.string;
 	case KIND_OPERATOR:
 		return operator_to_string(token.as_operator);
-	case KIND_HASH:
-		return SLIT("HASH");
-	case KIND_ATTRIBUTE:
-		return SLIT("ATTRIBUTE");
-	case KIND_SEMICOLON:
-		return SLIT("SEMICOLON");
-	case KIND_LBRACE:
-		return SLIT("LBRACE");
-	case KIND_RBRACE:
-		return SLIT("RBRACE");
-	case KIND_COUNT:
-		break;
+	default:
+		return STRINGS[token.kind];
 	}
 	UNREACHABLE();
 }

@@ -22,12 +22,27 @@ KIND(COMMENT,      "comment")
 KIND(IDENTIFIER,   "identifier")
 KIND(LITERAL,      "literal")
 KIND(OPERATOR,     "operator")
-KIND(KEYWORD,      "keyword") 
-KIND(HASH,         "directive")   // '#' is a directive (not an operator)
-KIND(ATTRIBUTE,    "attribute")   // '@' is a attribute (not an operator)
-KIND(SEMICOLON,    "semicolon")   // ';' is a terminator
-KIND(LBRACE,       "left brace")  // '{' is not an operator
-KIND(RBRACE,       "right brace") // '}' is not an operator
+KIND(KEYWORD,      "keyword")
+KIND(HASH,         "directive")     // '#' is a directive (not an operator)
+KIND(ATTRIBUTE,    "attribute")     // '@' is a attribute (not an operator)
+KIND(SEMICOLON,    "semicolon")     // ';' is a terminator
+KIND(LBRACE,       "left brace")    // '{' is not an operator
+KIND(RBRACE,       "right brace")   // '}' is not an operator
+KIND(EQ,           "assign")        // '=' is n ot an operator
+KIND(ADDEQ,        "assign-add")    // '+=' is not an operator
+KIND(SUBEQ,        "assign-sub")    // '-=' is not an operator
+KIND(MULEQ,        "assign-mul")    // '*=' is not an operator
+KIND(QUOEQ,        "assign-quot")   // '/=' is not an operator
+KIND(MODEQ,        "assign-mod")    // '%=' is not an operator
+KIND(MODMODEQ,     "assign-rem")    // '%%=' is not an operator
+KIND(ANDEQ,        "assign-and")    // '&=' is not an operator
+KIND(OREQ,         "assign-or")     // '|=' is not an operator
+KIND(XOREQ,        "assign-xor")    // '~=' is not an operator
+KIND(ANDNOTEQ,     "assign-andnot") // '&~=' is not an operator
+KIND(SHLEQ,        "assign-lshift") // '<<=' is not an operator
+KIND(SHREQ,        "assign-rshift") // '>>=' is not an operator
+KIND(CMPANDEQ,     "assign-andeq")  // '&&=' is not an operator
+KIND(CMPOREQ,      "assign-oreq")   // '||=' is not an operator
 
 // Literal kinds
 //      ENUM,      NAME
@@ -38,54 +53,9 @@ LITERAL(RUNE,      "rune")
 LITERAL(STRING,    "string")
 
 // Operators
-//       ENUM,         MATCH, PRECEDENCE
-//
-// Should '=' be an operator? Maybe make it a NODE_ASSIGNMENT_STATEMENT since
-// it does not produce a value.
-OPERATOR(EQ,           "=",   0)
-OPERATOR(NOT,          "!",   0)
-OPERATOR(POINTER,      "^",   0)
-OPERATOR(QUESTION,     "?",   1)
-OPERATOR(ELLIPSIS,     "..",  2)
-OPERATOR(RANGEFULL,    "..=", 2)
-OPERATOR(RANGEHALF,    "..<", 2)
-OPERATOR(CMPOR,        "||",  3)
-OPERATOR(CMPAND,       "&&",  4)
-OPERATOR(CMPEQ,        "==",  5)
-OPERATOR(NOTEQ,        "!=",  5)
-OPERATOR(LT,           "<",   5)
-OPERATOR(GT,           ">",   5)
-OPERATOR(LTEQ,         "<=",  5)
-OPERATOR(GTEQ,         ">=",  5)
-OPERATOR(ADD,          "+",   6)
-OPERATOR(SUB,          "-",   6)
-OPERATOR(OR,           "|",   6)
-OPERATOR(XOR,          "~",   6)
-OPERATOR(MUL,          "*",   7)
-OPERATOR(QUO,          "/",   7)
-OPERATOR(MOD,          "%",   7)
-OPERATOR(MODMOD,       "%%",  7)
-OPERATOR(AND,          "&",   7)
-OPERATOR(ANDNOT,       "&~",  7)
-OPERATOR(SHL,          "<<",  7)
-OPERATOR(SHR,          ">>",  7)
-// Compound operator precedence doesn't matter since these do not produce values,
-// should these be made into a special NODE_COMPONENT_ASSIGNMENT_STATEMENT.
-OPERATOR(ADDEQ,        "+=",        0)
-OPERATOR(SUBEQ,        "-=",        0)
-OPERATOR(MULEQ,        "*=",        0)
-OPERATOR(QUOEQ,        "/=",        0)
-OPERATOR(MODEQ,        "%=",        0)
-OPERATOR(MODMODEQ,     "%%=",       0)
-OPERATOR(ANDEQ,        "&=",        0)
-OPERATOR(OREQ,         "|=",        0)
-OPERATOR(XOREQ,        "~=",        0)
-OPERATOR(ANDNOTEQ,     "&~=",       0)
-OPERATOR(SHLEQ,        "<<=",       0)
-OPERATOR(SHREQ,        ">>=",       0)
-OPERATOR(CMPANDEQ,     "&&=",       0)
-OPERATOR(CMPOREQ,      "||=",       0)
-// These should all have precedence 0.
+//       ENUM,         MATCH,       PRECEDENCE
+OPERATOR(NOT,          "!",         0)
+OPERATOR(POINTER,      "^",         0)
 OPERATOR(ARROW,        "->",        0)
 OPERATOR(OPENPAREN,    "(",         0)
 OPERATOR(CLOSEPAREN,   ")",         0)
@@ -101,6 +71,30 @@ OPERATOR(CAST,         "cast",      0) // Produces a value, therefor an operator
 OPERATOR(TRANSMUTE,    "transmute", 0) // Produces a value, therefor an operator.
 OPERATOR(OR_ELSE,      "or_else",   0) // Produces a value, therefor an operator.
 OPERATOR(OR_RETURN,    "or_return", 0) // Produces a value, therefor an operator.
+OPERATOR(QUESTION,     "?",         1)
+OPERATOR(ELLIPSIS,     "..",        2)
+OPERATOR(RANGEFULL,    "..=",       2)
+OPERATOR(RANGEHALF,    "..<",       2)
+OPERATOR(CMPOR,        "||",        3)
+OPERATOR(CMPAND,       "&&",        4)
+OPERATOR(CMPEQ,        "==",        5)
+OPERATOR(NOTEQ,        "!=",        5)
+OPERATOR(LT,           "<",         5)
+OPERATOR(GT,           ">",         5)
+OPERATOR(LTEQ,         "<=",        5)
+OPERATOR(GTEQ,         ">=",        5)
+OPERATOR(ADD,          "+",         6)
+OPERATOR(SUB,          "-",         6)
+OPERATOR(OR,           "|",         6)
+OPERATOR(XOR,          "~",         6)
+OPERATOR(QUO,          "/",         7)
+OPERATOR(MUL,          "*",         7)
+OPERATOR(MOD,          "%",         7)
+OPERATOR(MODMOD,       "%%",        7)
+OPERATOR(AND,          "&",         7)
+OPERATOR(ANDNOT,       "&~",        7)
+OPERATOR(SHL,          "<<",        7)
+OPERATOR(SHR,          ">>",        7)
 
 // Keywords
 //      ENUM,        MATCH

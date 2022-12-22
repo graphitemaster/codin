@@ -131,9 +131,9 @@ static Leaf* leaf_new_auto_cast_expression(Tree *tree, Leaf *expression) {
 	return leaf;
 }
 
-static Leaf* leaf_new_assignment_statement(Tree *tree, Operator op, Array(Leaf*) lhs, Array(Leaf*) rhs) {
+static Leaf* leaf_new_assignment_statement(Tree *tree, Kind kind, Array(Leaf*) lhs, Array(Leaf*) rhs) {
 	Leaf *leaf = leaf_new(tree, NODE_ASSIGNMENT_STATEMENT);
-	leaf->as_assignment_statement.op = op;
+	leaf->as_assignment_statement.kind = kind;
 	leaf->as_assignment_statement.lhs = lhs;
 	leaf->as_assignment_statement.rhs = rhs;
 	return leaf;
@@ -367,7 +367,7 @@ static Leaf *parse_call_expression(Parser *parser, Leaf *operand) {
 	while (!is_operator(parser->token, OPERATOR_CLOSEPAREN) && !is_kind(parser->token, KIND_EOF)) {
 		if (is_operator(parser->token, OPERATOR_COMMA)) {
 			ERROR("Expected an expression");
-		} else if (is_operator(parser->token, OPERATOR_EQ)) {
+		} else if (is_kind(parser->token, KIND_EQ)) {
 			ERROR("Expected an expression");
 		}
 	
@@ -378,8 +378,8 @@ static Leaf *parse_call_expression(Parser *parser, Leaf *operand) {
 		}
 
 		Leaf *arg = parse_expression(parser, false);
-		if (is_operator(parser->token, OPERATOR_EQ)) {
-			expect_operator(parser, OPERATOR_EQ);
+		if (is_kind(parser->token, KIND_EQ)) {
+			expect_kind(parser, KIND_EQ);
 			if (has_ellipsis) {
 				ERROR("Cannot apply '..' to field");
 			}
@@ -400,8 +400,8 @@ static Array(Leaf*) parse_element_list(Parser *parser) {
 	Array(Leaf*) elements = 0;
 	while (!is_kind(parser->token, KIND_RBRACE) && !is_kind(parser->token, KIND_EOF)) {
 		Leaf *element = parse_value(parser);
-		if (is_operator(parser->token, OPERATOR_EQ)) {
-			expect_operator(parser, OPERATOR_EQ);
+		if (is_kind(parser->token, KIND_EQ)) {
+			expect_kind(parser, KIND_EQ);
 			Leaf *value = parse_value(parser);
 			element = leaf_new_field_value(parser->tree, element, value);
 		}
@@ -722,44 +722,6 @@ static Leaf *parse_simple_statement(Parser* parser) {
 	switch (token.kind) {
 	case KIND_OPERATOR:
 		switch (token.as_operator) {
-		case OPERATOR_EQ:
-			FALLTHROUGH();
-		case OPERATOR_ADDEQ:
-			FALLTHROUGH();
-		case OPERATOR_SUBEQ:
-			FALLTHROUGH();
-		case OPERATOR_MULEQ:
-			FALLTHROUGH();
-		case OPERATOR_QUOEQ:
-			FALLTHROUGH();
-		case OPERATOR_MODEQ:
-			FALLTHROUGH();
-		case OPERATOR_MODMODEQ:
-			FALLTHROUGH();
-		case OPERATOR_ANDEQ:
-			FALLTHROUGH();
-		case OPERATOR_OREQ:
-			FALLTHROUGH();
-		case OPERATOR_XOREQ:
-			FALLTHROUGH();
-		case OPERATOR_SHLEQ:
-			FALLTHROUGH();
-		case OPERATOR_SHREQ:
-			FALLTHROUGH();
-		case OPERATOR_ANDNOTEQ:
-			FALLTHROUGH();
-		case OPERATOR_CMPANDEQ:
-			FALLTHROUGH();
-		case OPERATOR_CMPOREQ:
-			// TODO(dweiler): Ensure we're inside a procedure.
-			advance(parser);
-			Array(Leaf*) rhs = parse_rhs_expression_list(parser);
-			if (array_size(rhs) == 0) {
-				// ERROR(dweiler): Missing right hand side in assignment.
-			}
-			Leaf *leaf = leaf_new_assignment_statement(parser->tree, token.as_operator, lhs, rhs);
-			TRACE_LEAVE();
-			return leaf;
 		case OPERATOR_IN:
 			UNIMPLEMENTED("in");
 		case OPERATOR_COLON:
@@ -770,6 +732,44 @@ static Leaf *parse_simple_statement(Parser* parser) {
 			ICE("Unexpected operator");
 		}
 		break;
+	case KIND_EQ:
+		FALLTHROUGH();
+	case KIND_ADDEQ:
+		FALLTHROUGH();
+	case KIND_SUBEQ:
+		FALLTHROUGH();
+	case KIND_MULEQ:
+		FALLTHROUGH();
+	case KIND_QUOEQ:
+		FALLTHROUGH();
+	case KIND_MODEQ:
+		FALLTHROUGH();
+	case KIND_MODMODEQ:
+		FALLTHROUGH();
+	case KIND_ANDEQ:
+		FALLTHROUGH();
+	case KIND_OREQ:
+		FALLTHROUGH();
+	case KIND_XOREQ:
+		FALLTHROUGH();
+	case KIND_SHLEQ:
+		FALLTHROUGH();
+	case KIND_SHREQ:
+		FALLTHROUGH();
+	case KIND_ANDNOTEQ:
+		FALLTHROUGH();
+	case KIND_CMPANDEQ:
+		FALLTHROUGH();
+	case KIND_CMPOREQ:
+		// TODO(dweiler): Ensure we're inside a procedure.
+		advance(parser);
+		Array(Leaf*) rhs = parse_rhs_expression_list(parser);
+		if (array_size(rhs) == 0) {
+			// ERROR(dweiler): Missing right hand side in assignment.
+		}
+		Leaf *leaf = leaf_new_assignment_statement(parser->tree, token.kind, lhs, rhs);
+		TRACE_LEAVE();
+		return leaf;
 	default:
 		break;
 	}
@@ -916,8 +916,8 @@ static Leaf *parse_statement(Parser *parser) {
 		// ICE("Unexpected '}' in statement");
 	case KIND_COMMENT:
 		// ICE("Unexpected comment in statement");
-	case KIND_COUNT:
-		UNREACHABLE();
+	default:
+		ICE("Unexpected token in statement");
 	}
 
 	if (is_keyword(token, KEYWORD_ELSE)) {

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <assert.h>
 
 #include "dump.h"
 
@@ -111,8 +112,22 @@ static void dump_expression_statement(const Leaf *leaf, int MAYBE_UNUSED depth) 
 
 static void dump_assignment_statement(const Leaf *leaf, int MAYBE_UNUSED depth) {
 	if (!leaf) return;
-	printf("(assignment");
-	// TODO(dweiler): Implement
+	const String string = kind_to_string(leaf->as_assignment_statement.kind);
+	const Uint64 n_lhs = array_size(leaf->as_assignment_statement.lhs);
+	const Uint64 n_rhs = array_size(leaf->as_assignment_statement.rhs);
+	assert(n_lhs == n_rhs);
+	printf("(assignments\n");
+	for (Uint64 i = 0; i < n_lhs; i++) {
+		const Leaf *lhs = leaf->as_assignment_statement.lhs[i];
+		const Leaf *rhs = leaf->as_assignment_statement.rhs[i];
+		pad(depth);
+		printf("(%.*s ",
+			CAST(int,          string.size),
+			CAST(const char *, string.data));
+		dump_leaf(lhs, 0, true);
+		printf(" ");
+		dump_leaf(rhs, 0, i == n_lhs - 1);
+	}
 	printf(")");
 }
 
