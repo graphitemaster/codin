@@ -6,6 +6,10 @@
 #include "support.h"
 #include "report.h"
 
+#ifdef ERROR
+#undef ERROR
+#endif
+
 #define ERROR(...) \
 	do { \
 		report_error(lexer->input.source, &lexer->location, __VA_ARGS__); \

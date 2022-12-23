@@ -7,6 +7,10 @@
 #include "report.h"
 #include "tree.h"
 
+#ifdef ERROR
+#undef ERROR
+#endif
+
 #define ERROR(...) \
 	report_error(&parser->source, &parser->lexer.location, __VA_ARGS__); \
 	exit(1)
