@@ -321,6 +321,7 @@ static Bool gen_c0_binary_prelude(Generator *generator, const char *name, const 
 
 static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 	strbuf_put_string(strbuf, SLIT("typedef int i32;\n"));
+	strbuf_put_string(strbuf, SLIT("typedef const char *string;\n"));
 	strbuf_put_rune(strbuf, '\n');
 	strbuf_put_string(strbuf, SLIT("#if defined(_MSC_VER)\n"));
 	strbuf_put_string(strbuf, SLIT("	#define FORCE_INLINE __forceinline\n"));
