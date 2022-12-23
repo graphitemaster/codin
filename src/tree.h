@@ -106,7 +106,7 @@ struct Expression {
 };
 
 struct EmptyStatement {
-	// Empty, shocker.
+	Sint32 : 32;
 };
 
 struct ImportStatement {
