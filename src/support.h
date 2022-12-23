@@ -2,6 +2,7 @@
 #define CODIN_SUPPORT_H
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdnoreturn.h>
 
 #if defined(_MSC_VER)
 #define FORCE_INLINE __forceinline
@@ -17,13 +18,10 @@
 
 #if defined(__cplusplus)
 	#define FALLTHROUGH() [[fallthrough]]
-	#define MAYBE_UNUSED  [[maybe_unused]]
 #elif defined(_MSC_VER)
 	#define FALLTHROUGH()
-	#define MAYBE_UNUSED
 #else
 	#define FALLTHROUGH() __attribute__((fallthrough))
-	#define MAYBE_UNUSED  __attribute__((unused))
 #endif
 
 typedef int8_t Sint8;
@@ -61,5 +59,10 @@ Bool string_compare(const String *lhs, const String *rhs);
 #define RUNE_MAX CAST(Rune, 0x0010ffff)
 #define RUNE_BOM CAST(Rune, 0xfeff)
 #define RUNE_EOF CAST(Rune, -1)
+
+noreturn void report_assertion(const char *expression, const char *file, int line);
+
+#define ASSERT(expression) \
+  ((void)((expression) ? (void)0 : report_assertion(#expression, __FILE__, __LINE__)))
 
 #endif // CODIN_SUPPORT_H

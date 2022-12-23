@@ -215,6 +215,7 @@ Bool lexer_init(Lexer *lexer, const Source *source) {
 
 static Bool unescape(Lexer *lexer) {
 	// TODO(dweiler): Implement.
+	(void)lexer;
 	return false;
 }
 

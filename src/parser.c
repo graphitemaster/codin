@@ -89,13 +89,6 @@ static Bool parser_init(Parser *parser, const char *filename) {
 	return false;
 }
 
-static Token advance(Parser *parser) {
-	const Token last = parser->this_token;
-	parser->last_token = last;
-	parser->this_token = lexer_next(&parser->lexer);
-	return last;
-}
-
 static FORCE_INLINE Bool is_kind(Token token, Kind kind) {
 	return token.kind == kind;
 }
@@ -110,6 +103,16 @@ static FORCE_INLINE Bool is_assignment(Token token, Assignment assignment) {
 }
 static FORCE_INLINE Bool is_literal(Token token, Literal literal) {
 	return is_kind(token, KIND_LITERAL) && token.as_literal == literal;
+}
+
+static Token advance(Parser *parser) {
+	const Token last = parser->this_token;
+	parser->last_token = last;
+	parser->this_token = lexer_next(&parser->lexer);
+	while (is_kind(parser->this_token, KIND_COMMENT)) {
+		parser->this_token = lexer_next(&parser->lexer);
+	}
+	return last;
 }
 
 static Token expect_kind(Parser *parser, Kind kind) {
@@ -993,12 +996,6 @@ static Node *parse_statement(Parser *parser) {
 		expect_semicolon(parser);
 		TRACE_LEAVE();
 		return node;
-	case KIND_INVALID:
-		ICE("Unexpected token in statement");
-	case KIND_RBRACE:
-		// ICE("Unexpected '}' in statement");
-	case KIND_COMMENT:
-		// ICE("Unexpected comment in statement");
 	default:
 		ICE("Unexpected token in statement");
 	}
@@ -1049,8 +1046,11 @@ Tree *parse(const char *filename) {
 	advance(&parser);
 	while (!is_kind(parser.this_token, KIND_EOF)) {
 		Node *statement = parse_statement(&parser);
-		if (statement) { // && statement->statement.kind != STATEMENT_EMPTY) {
-			array_push(tree->statements, statement);
+		if (statement) {
+			ASSERT(statement->kind = NODE_STATEMENT);
+			if (statement->statement.kind != STATEMENT_EMPTY) {
+				array_push(tree->statements, statement);
+			}
 		}
 	}
 

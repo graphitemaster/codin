@@ -43,7 +43,6 @@ Node *tree_new_binary_expression(Tree *tree, Operator operation, Node *lhs, Node
 Node *tree_new_cast_expression(Tree *tree, Node *type, Node *expr) {
 	Node *node = new_expression(tree, EXPRESSION_CAST);
 	CastExpression *expression = &node->expression.cast;
-	assert(expr->kind == NODE_EXPRESSION);
 	expression->expression = expr;
 	expression->type = type;
 	return node;
@@ -52,7 +51,7 @@ Node *tree_new_cast_expression(Tree *tree, Node *type, Node *expr) {
 Node *tree_new_selector_expression(Tree *tree, Node *operand, Node *identifier) {
 	Node *node = new_expression(tree, EXPRESSION_SELECTOR);
 	SelectorExpression *expression = &node->expression.selector;
-	assert(identifier->kind == NODE_IDENTIFIER);
+	ASSERT(identifier->kind == NODE_IDENTIFIER);
 	expression->operand = operand;
 	expression->identifier = identifier;
 	return node;
@@ -378,9 +377,16 @@ static void tree_dump_literal_value(const LiteralValue *literal_value, Sint32 de
 
 static void tree_dump_compound_literal(const CompoundLiteral *compound_literal, Sint32 depth) {
 	printf("(compound ");
-	tree_dump_node(compound_literal->type, 0, false);
-	putchar(' ');
+	if (compound_literal->type) {
+		tree_dump_node(compound_literal->type, 0, false);
+		putchar(' ');
+	} else {
+		printf("<unknown>");
+	}
 	const Uint64 n_elements = array_size(compound_literal->elements);
+	if (n_elements != 0) {
+			putchar('\n');
+	}
 	for (Uint64 i = 0; i < n_elements; i++) {
 		const Node *const element = compound_literal->elements[i];
 		tree_dump_node(element, depth + 1, i != n_elements - 1);
