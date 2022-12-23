@@ -151,12 +151,6 @@ static Leaf* leaf_new_import_statement(Tree *tree, String import) {
 	return leaf;
 }
 
-static Leaf* leaf_new_implicit_selector_expression(Tree *tree, Leaf *identifier) {
-	Leaf *leaf = leaf_new(tree, NODE_IMPLICIT_SELECTOR_EXPRESSION);
-	leaf->as_implicit_selector_expression.identifier = identifier;
-	return leaf;
-}
-
 static Leaf* leaf_new_selector_expression(Tree *tree, Leaf *operand, Leaf *identifier) {
 	Leaf *leaf = leaf_new(tree, NODE_SELECTOR_EXPRESSION);
 	leaf->as_selector_expression.operand = operand;
@@ -594,7 +588,7 @@ static Leaf *parse_unary_expression(Parser *parser, Bool lhs) {
 			{
 				expect_operator(parser, OPERATOR_PERIOD);
 				Leaf *ident = parse_identifier(parser);
-				Leaf *leaf = leaf_new_implicit_selector_expression(parser->tree, ident);
+				Leaf *leaf = leaf_new_selector_expression(parser->tree, 0, ident);
 				TRACE_LEAVE();
 				return leaf;
 			}

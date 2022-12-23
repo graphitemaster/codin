@@ -12,8 +12,7 @@ enum Node {
 	NODE_UNARY_EXPRESSION,             // -expr, +expr, !expr
 	NODE_BINARY_EXPRESSION,            // x op y
 	NODE_CAST_EXPRESSION,              // cast(T)expr
-	NODE_SELECTOR_EXPRESSION,          // a.b
-	NODE_IMPLICIT_SELECTOR_EXPRESSION, // .A
+	NODE_SELECTOR_EXPRESSION,          // a.b or .B
 	NODE_AUTO_CAST_EXPRESSION,         // auto_cast expr
 	NODE_CALL_EXPRESSION,              // a()
 
@@ -53,12 +52,9 @@ struct Leaf {
 			Leaf *expression;
 		} as_cast_expression;
 		struct {
-			Leaf *operand;
+			Leaf *operand; // when nil an implicit selector expression.
 			Leaf *identifier;
 		} as_selector_expression;
-		struct {
-			Leaf *identifier;
-		} as_implicit_selector_expression;
 		struct {
 			Leaf *expression;
 		} as_auto_cast_expression;
