@@ -598,7 +598,7 @@ Token lexer_next(Lexer *lexer) {
 // Simple helper routines
 String kind_to_string(Kind kind) {
 	#define KIND(enumerator, name) SLIT(name),
-	static const String KINDS[] = {
+	const String KINDS[] = {
 		#include "lexemes.h"
 	};
 	return KINDS[kind];
@@ -606,7 +606,7 @@ String kind_to_string(Kind kind) {
 
 String literal_to_string(Literal literal) {
 	#define LITERAL(enumerator, name) SLIT(name),
-	static const String LITERALS[] = {
+	const String LITERALS[] = {
 		#include "lexemes.h"
 	};
 	return LITERALS[literal];
@@ -614,7 +614,7 @@ String literal_to_string(Literal literal) {
 
 String keyword_to_string(Keyword keyword) {
 	#define KEYWORD(ident, string) SLIT(string),
-	static const String KEYWORDS[] = {
+	const String KEYWORDS[] = {
 		#include "lexemes.h"
 	};
 	return KEYWORDS[keyword];
@@ -622,7 +622,7 @@ String keyword_to_string(Keyword keyword) {
 
 String operator_to_string(Operator op) {
 	#define OPERATOR(ident, string, ...) SLIT(string),
-	static const String OPERATORS[] = {
+	const String OPERATORS[] = {
 		#include "lexemes.h"
 	};
 	return OPERATORS[op];
@@ -630,7 +630,7 @@ String operator_to_string(Operator op) {
 
 String assignment_to_string(Assignment assignment) {
 	#define ASSIGNMENT(ident, string) SLIT(string),
-	static const String ASSIGNMENTS[] = {
+	const String ASSIGNMENTS[] = {
 		#include "lexemes.h"
 	};
 	return ASSIGNMENTS[assignment];
@@ -638,7 +638,7 @@ String assignment_to_string(Assignment assignment) {
 
 String token_to_string(Token token) {
 	#define KIND(enumerator, kind) SLIT(#enumerator),
-	static const String STRINGS[] = {
+	const String STRINGS[] = {
 		#include "lexemes.h"
 	};
 	switch (token.kind) {
