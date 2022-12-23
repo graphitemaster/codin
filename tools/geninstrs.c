@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
       long space = max - printf("%s%d", upper(FLT_INSTR[i]), FLT_SIZES[j]);
       printf(",%*c\"%s%d\")\n", (int)space, ' ',  FLT_INSTR[i], FLT_SIZES[j]);
     }
-  printf("INSTRUCTION(UNDEF, \"undef\")\n");
+  printf("INSTRUCTION(UNDEF,%*c\"undef\")\n", (int)max - (sizeof("UNDEF") - 1), ' ');
   printf("\n");
   printf("#undef INSTRUCTION\n");
   return 0;

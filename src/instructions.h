@@ -293,6 +293,6 @@ INSTRUCTION(LTEQF64,       "lteqf64")
 INSTRUCTION(GTEQF16,       "gteqf16")
 INSTRUCTION(GTEQF32,       "gteqf32")
 INSTRUCTION(GTEQF64,       "gteqf64")
-INSTRUCTION(UNDEF, "undef")
+INSTRUCTION(UNDEF,         "undef")
 
 #undef INSTRUCTION
