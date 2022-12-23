@@ -34,6 +34,10 @@ static void dump_binary_expression(const Leaf *leaf, int MAYBE_UNUSED depth) {
 static void dump_cast_expression(const Leaf *leaf, int MAYBE_UNUSED depth) {
 	if (!leaf) return;
 	printf("(cast ");
+	if (leaf->as_cast_expression.type) {
+		dump_leaf(leaf->as_cast_expression.type, 0, true);
+		printf(" ");
+	}
 	dump_leaf(leaf->as_cast_expression.expression, 0, true);
 	printf(")");
 }
@@ -46,13 +50,6 @@ static void dump_selector_expression(const Leaf *leaf, int MAYBE_UNUSED depth) {
 		printf(" ");
 	}
 	dump_leaf(leaf->as_selector_expression.identifier, 0, true);
-	printf(")");
-}
-
-static void dump_auto_cast_expression(const Leaf *leaf, int MAYBE_UNUSED depth) {
-	if (!leaf) return;
-	printf("(autocast ");
-	dump_leaf(leaf->as_auto_cast_expression.expression, depth, true);
 	printf(")");
 }
 
@@ -218,9 +215,6 @@ static void dump_leaf(const Leaf *leaf, int depth, Bool last) {
 		break;
 	case NODE_SELECTOR_EXPRESSION:
 		dump_selector_expression(leaf, depth + 1);
-		break;
-	case NODE_AUTO_CAST_EXPRESSION:
-		dump_auto_cast_expression(leaf, depth + 1);
 		break;
 	case NODE_CALL_EXPRESSION:
 		dump_call_expression(leaf, depth + 1);

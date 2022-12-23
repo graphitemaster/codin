@@ -11,9 +11,8 @@ typedef enum Node Node;
 enum Node {
 	NODE_UNARY_EXPRESSION,             // -expr, +expr, !expr
 	NODE_BINARY_EXPRESSION,            // x op y
-	NODE_CAST_EXPRESSION,              // cast(T)expr
+	NODE_CAST_EXPRESSION,              // cast(T)expr or auto_cast
 	NODE_SELECTOR_EXPRESSION,          // a.b or .B
-	NODE_AUTO_CAST_EXPRESSION,         // auto_cast expr
 	NODE_CALL_EXPRESSION,              // a()
 
 	NODE_EMPTY_STATEMENT,              // _

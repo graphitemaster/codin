@@ -125,12 +125,6 @@ static Leaf* leaf_new_cast_expression(Tree *tree, Leaf *type, Leaf *expression) 
 	return leaf;
 }
 
-static Leaf* leaf_new_auto_cast_expression(Tree *tree, Leaf *expression) {
-	Leaf *leaf = leaf_new(tree, NODE_AUTO_CAST_EXPRESSION);
-	leaf->as_auto_cast_expression.expression = expression;
-	return leaf;
-}
-
 static Leaf* leaf_new_assignment_statement(Tree *tree, Assignment assignment, Array(Leaf*) lhs, Array(Leaf*) rhs) {
 	Leaf *leaf = leaf_new(tree, NODE_ASSIGNMENT_STATEMENT);
 	leaf->as_assignment_statement.assignment = assignment;
@@ -562,7 +556,7 @@ static Leaf *parse_unary_expression(Parser *parser, Bool lhs) {
 			{
 				advance(parser);
 				Leaf *expr = parse_unary_expression(parser, lhs);
-				Leaf *leaf = leaf_new_auto_cast_expression(parser->tree, expr);
+				Leaf *leaf = leaf_new_cast_expression(parser->tree, 0, expr);
 				TRACE_LEAVE();
 				return leaf;
 			}
