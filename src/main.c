@@ -14,7 +14,10 @@ int main(int argc, char **argv) {
 
 	// tree_dump(tree);
 
-	gen(tree, &strbuf);
+	Generator gen;
+	gen_init(&gen, tree);
+	gen_run(&gen, &strbuf);
+
 	const String string = strbuf_result(&strbuf);
 	printf("%.*s\n",
 		CAST(Sint32,       string.size),
