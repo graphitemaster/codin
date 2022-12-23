@@ -9,7 +9,7 @@ struct StrBuf {
   Array(Uint8) contents;
 };
 
-void strbug_init(StrBuf *strbuf);
+void strbuf_init(StrBuf *strbuf);
 void strbuf_free(StrBuf *strbuf);
 Bool strbuf_put_rune(StrBuf *strbuf, Rune ch);
 Bool strbuf_put_string(StrBuf *strbuf, String string);
