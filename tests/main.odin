@@ -37,3 +37,6 @@ x,y:=1,2;
 x=1;
 x,y:int=1,1;
 x,y:=1,1;
+main :: proc() -> int {
+  fmt.printf("hello world\n");
+}

@@ -155,6 +155,14 @@ Node *tree_new_field_list(Tree *tree, Array(Node*) fields) {
 	return node;
 }
 
+Node *tree_new_procedure(Tree *tree, Node *type, Node *body) {
+	Node *node = new_node(tree, NODE_PROCEDURE);
+	Procedure *procedure = &node->procedure;
+	procedure->type = type;
+	procedure->body = body;
+	return node;
+}
+
 void tree_init(Tree *tree) {
 	tree->nodes = 0;
 	tree->statements = 0;
@@ -409,6 +417,15 @@ static void tree_dump_field_list(const FieldList* field_list, Sint32 depth) {
 	putchar(')');
 }
 
+static void tree_dump_procedure(const Procedure *procedure, Sint32 depth) {
+	(void)depth;
+	printf("(proc\n");
+	tree_dump_node(procedure->type, depth + 1, false);
+	putchar(' ');
+	tree_dump_node(procedure->body, depth + 1, false);
+	putchar(')');
+}
+
 void tree_dump_node(const Node *node, Sint32 depth, Bool nl) {
 	tree_dump_pad(depth);
 	switch (node->kind) {
@@ -432,6 +449,9 @@ void tree_dump_node(const Node *node, Sint32 depth, Bool nl) {
 		break;
 	case NODE_FIELD_LIST:
 		tree_dump_field_list(&node->field_list, depth);
+		break;
+	case NODE_PROCEDURE:
+		tree_dump_procedure(&node->procedure, depth);
 		break;
 	}
 	if (nl) {

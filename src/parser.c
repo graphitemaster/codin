@@ -71,6 +71,7 @@ struct Parser {
 	Tree *tree;
 	Token this_token; // This token is being processed
 	Token last_token; // Last token processed
+	Node *this_procedure;
 };
 
 void parser_free(Parser *parser) {
@@ -253,11 +254,20 @@ static Bool accepted_operator(Parser *parser, Operator op) {
 	return false;
 }
 
+static Bool accepted_kind(Parser *parser, Kind kind) {
+	if (is_kind(parser->this_token, kind)) {
+		advance(parser);
+		return true;
+	}
+	return false;
+}
+
 static Node *parse_literal_value(Parser *parser, Node *type);
 
 static Node *parse_result_list(Parser *parser) {
 	(void)parser;
 	TRACE_ENTER("parse_result_list");
+	UNIMPLEMENTED("parse_result_list not implemented");
 	TRACE_LEAVE();
 	return 0;
 }
@@ -266,6 +276,7 @@ static Node *parse_results(Parser *parser) {
 	TRACE_ENTER("parse_results");
 	if (!accepted_operator(parser, OPERATOR_ARROW)) {
 		TRACE_LEAVE();
+		ASSERT(false && "no arrow");
 		return 0;
 	}
 
@@ -289,6 +300,7 @@ static Node *parse_results(Parser *parser) {
 	}
 
 	TRACE_LEAVE();
+	ASSERT(list);
 	return list;
 }
 
@@ -310,19 +322,39 @@ static Node *parse_procedure_type(Parser *parser) {
 	}
 
 	expect_operator(parser, OPERATOR_OPENPAREN);
-	// TODO(dweiler): Parse parameter list
-	//Node *params = parse_parameters(parser);
+	// Node *params = parse_parameters(parser);
 	expect_operator(parser, OPERATOR_CLOSEPAREN);
 
 	Node *results = parse_results(parser);
 
 	TRACE_LEAVE();
+	ASSERT(results);
 	return results;
 }
 
+static Node *parse_body(Parser *parser);
+
 static Node *parse_procedure(Parser *parser) {
 	Node *type = parse_procedure_type(parser);
+	if (is_keyword(parser->this_token, KEYWORD_WHERE)) {
+		expect_keyword(parser, KEYWORD_WHERE);
+		UNIMPLEMENTED("where specialization for procedures");
+	}
 
+	// TODO(dweiler): Check for procedure directives like "#no_bounds_check"
+
+	if (accepted_kind(parser, KIND_UNDEFINED)) {
+		UNIMPLEMENTED("Undefined procedure literal");
+	} else if (is_kind(parser->this_token, KIND_LBRACE)) {
+		Node *last_procedure = parser->this_procedure;
+		parser->this_procedure = type;
+		Node *body = parse_body(parser);
+		parser->this_procedure = last_procedure;
+		ASSERT(type);
+		return tree_new_procedure(parser->tree, type, body);
+	}
+
+	ASSERT("WTF!?");
 	return type;
 }
 
@@ -466,6 +498,7 @@ static Node *parse_call_expression(Parser *parser, Node *operand) {
 		}
 		array_push(arguments, argument);
 	}
+	expect_operator(parser, OPERATOR_CLOSEPAREN);
 
 	Node *node = tree_new_call_expression(parser->tree, operand, arguments);
 	TRACE_LEAVE();
@@ -848,7 +881,12 @@ static Node *parse_simple_statement(Parser* parser) {
 			TRACE_LEAVE();
 			return parse_declaration_statement(parser, lhs);
 		default:
-			ICE("Unexpected operator");
+			{
+				const String string = operator_to_string(token.as_operator);
+				ICE("Unexpected operator '%.*s' in statement",
+					CAST(int,         string.size),
+					CAST(const char*, string.data));
+			}
 		}
 		break;
 	default:

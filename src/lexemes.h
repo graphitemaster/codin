@@ -33,6 +33,7 @@ KIND(ATTRIBUTE,    "attribute")     // '@' is a attribute (not an operator)
 KIND(SEMICOLON,    "semicolon")     // ';' is a terminator
 KIND(LBRACE,       "left brace")    // '{' is not an operator
 KIND(RBRACE,       "right brace")   // '}' is not an operator
+KIND(UNDEFINED,    "undefined")     // '---' is not an operator
 
 // Assignment tokens.
 //

@@ -435,6 +435,15 @@ Token lexer_next(Lexer *lexer) {
 				token.kind = KIND_ASSIGNMENT;
 				token.as_assignment = ASSIGNMENT_SUBEQ;
 				break;
+			case '-':
+				advance(lexer);
+				if (lexer->rune == '-') {
+					advance(lexer);
+					token.kind = KIND_UNDEFINED;
+				} else {
+					ERROR("The decrement operator '--' does not exist");
+				}
+				break;
 			case '>':
 				advance(lexer);
 				token.as_operator = OPERATOR_ARROW;

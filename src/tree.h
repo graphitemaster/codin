@@ -31,6 +31,7 @@ typedef struct Value Value;
 typedef struct LiteralValue LiteralValue;
 typedef struct CompoundLiteral CompoundLiteral;
 typedef struct FieldList FieldList;
+typedef struct Procedure Procedure;
 
 enum NodeKind {
 	NODE_EXPRESSION,
@@ -40,6 +41,7 @@ enum NodeKind {
 	NODE_LITERAL_VALUE,
 	NODE_COMPOUND_LITERAL,
 	NODE_FIELD_LIST,
+	NODE_PROCEDURE,
 };
 
 enum ExpressionKind {
@@ -166,6 +168,11 @@ struct FieldList {
 	Array(Node*) fields;
 };
 
+struct Procedure {
+	Node *type;
+	Node *body;
+};
+
 struct Node {
 	NodeKind kind;
 	union {
@@ -176,6 +183,7 @@ struct Node {
 		LiteralValue    literal_value;
 		CompoundLiteral compound_literal;
 		FieldList       field_list;
+		Procedure       procedure;
 	};
 };
 
@@ -217,6 +225,7 @@ Node *tree_new_value(Tree *tree, Node *field, Node *val);
 Node *tree_new_literal_value(Tree *tree, Literal literal, String value);
 Node *tree_new_compound_literal(Tree *tree, Node *type, Array(Node*) elements);
 Node *tree_new_field_list(Tree *tree, Array(Node*) list);
+Node *tree_new_procedure(Tree *tree, Node *type, Node *body);
 
 void tree_init(Tree *tree);
 void tree_free(Tree *tree);
