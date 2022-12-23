@@ -5,6 +5,7 @@
 #include "parser.h"
 #include "lexer.h"
 #include "report.h"
+#include "tree.h"
 
 #define ERROR(...) \
 	report_error(&parser->source, &parser->lexer.location, __VA_ARGS__); \
@@ -92,123 +93,6 @@ static Token advance(Parser *parser) {
 	return prev;
 }
 
-static Leaf *leaf_new_unary_expression(Tree *tree, Operator op, Leaf *expr) {
-	Leaf *leaf = malloc(sizeof *leaf);
-	leaf->node = NODE_UNARY_EXPRESSION;
-	leaf->as_unary_expression.op = op;
-	leaf->as_unary_expression.expression = expr;
-	array_push(tree->leafs, leaf);
-	return leaf;
-}
-
-static Leaf* leaf_new(Tree *tree, Node node) {
-	Leaf *leaf = malloc(sizeof *leaf);
-	leaf->node = node;
-	array_push(tree->leafs, leaf);
-	return leaf;
-}
-
-static Leaf* leaf_new_empty_statement(Tree *tree) {
-	return leaf_new(tree, NODE_EMPTY_STATEMENT);
-}
-
-static Leaf* leaf_new_block_statement(Tree *tree, Array(Leaf*) statements) {
-	Leaf *leaf = leaf_new(tree, NODE_BLOCK_STATEMENT);
-	leaf->as_block_statement.statements = statements;
-	return leaf;
-}
-
-static Leaf* leaf_new_cast_expression(Tree *tree, Leaf *type, Leaf *expression) {
-	Leaf *leaf = leaf_new(tree, NODE_CAST_EXPRESSION);
-	leaf->as_cast_expression.type = type;
-	leaf->as_cast_expression.expression = expression;
-	return leaf;
-}
-
-static Leaf* leaf_new_assignment_statement(Tree *tree, Assignment assignment, Array(Leaf*) lhs, Array(Leaf*) rhs) {
-	Leaf *leaf = leaf_new(tree, NODE_ASSIGNMENT_STATEMENT);
-	leaf->as_assignment_statement.assignment = assignment;
-	leaf->as_assignment_statement.lhs = lhs;
-	leaf->as_assignment_statement.rhs = rhs;
-	return leaf;
-}
-
-static Leaf* leaf_new_identifier(Tree *tree, String contents) {
-	Leaf *leaf = leaf_new(tree, NODE_IDENTIFIER);
-	leaf->as_identifier.contents = contents;
-	return leaf;
-}
-
-static Leaf* leaf_new_import_statement(Tree *tree, String import) {
-	Leaf *leaf = leaf_new(tree, NODE_IMPORT_STATEMENT);
-	leaf->as_import_statement.import = import;
-	return leaf;
-}
-
-static Leaf* leaf_new_selector_expression(Tree *tree, Leaf *operand, Leaf *identifier) {
-	Leaf *leaf = leaf_new(tree, NODE_SELECTOR_EXPRESSION);
-	leaf->as_selector_expression.operand = operand;
-	leaf->as_selector_expression.identifier = identifier;
-	return leaf;
-}
-
-static Leaf* leaf_new_expression_statement(Tree *tree, Leaf *expression) {
-	Leaf *leaf = leaf_new(tree, NODE_EXPRESSION_STATEMENT);
-	leaf->as_expression_statement.expression = expression;
-	return leaf;
-}
-
-static Leaf *leaf_new_call_expression(Tree *tree, Leaf *operand, Array(Leaf*) args) {
-	Leaf *leaf = leaf_new(tree, NODE_CALL_EXPRESSION);
-	leaf->as_call_expression.operand = operand;
-	leaf->as_call_expression.args = args;
-	return leaf;
-}
-
-static Leaf *leaf_new_field_value(Tree *tree, Leaf *field, Leaf *value) {
-	Leaf *leaf = leaf_new(tree, NODE_FIELD_VALUE);
-	leaf->as_field_value.field = field;
-	leaf->as_field_value.value = value;
-	return leaf;
-}
-
-static Leaf *leaf_new_literal(Tree *tree, Token token) {
-	Leaf *leaf = leaf_new(tree, NODE_LITERAL);
-	leaf->as_literal.literal = token.as_literal;
-	leaf->as_literal.contents = token.string;
-	return leaf;
-}
-
-static Leaf *leaf_new_compound_literal(Tree *tree, Leaf *type, Array(Leaf*) elements) {
-	Leaf *leaf = leaf_new(tree, NODE_COMPOUND_LITERAL);
-	leaf->as_compound_literal.type = type;
-	leaf->as_compound_literal.elements = elements;
-	return leaf;
-}
-
-static Leaf *leaf_new_binary_expression(Tree *tree, Operator op, Leaf *lhs, Leaf *rhs) {
-	Leaf *leaf = leaf_new(tree, NODE_BINARY_EXPRESSION);
-	leaf->as_binary_expression.op = op;
-	leaf->as_binary_expression.lhs = lhs;
-	leaf->as_binary_expression.rhs = rhs;
-	return leaf;
-}
-
-static Leaf *leaf_new_value_declaration(Tree *tree, Leaf *type, Array(Leaf*) names, Array(Leaf*) values, Bool constant) {
-	Leaf *leaf = leaf_new(tree, NODE_VALUE_DECLARATION);
-	leaf->as_value_declaration.type = type;
-	leaf->as_value_declaration.names = names;
-	leaf->as_value_declaration.values = values;
-	leaf->as_value_declaration.constant = constant;
-	return leaf;
-}
-
-static Token expect_semicolon(Parser *parser) {
-	// TODO(dweiler): Implement.
-	(void)parser;
-	return advance(parser);
-}
-
 static FORCE_INLINE Bool is_kind(Token token, Kind kind) {
 	return token.kind == kind;
 }
@@ -278,25 +162,31 @@ static Token expect_assignment(Parser *parser, Assignment assignment) {
 	return advance(parser);
 }
 
-static Leaf *parse_identifier(Parser *parser) {
+static FORCE_INLINE Token expect_semicolon(Parser *parser) {
+	// TODO(dweiler): Odin's ridicolous ASI
+	return advance(parser);
+	// return expect_kind(parser, KIND_SEMICOLON);
+}
+
+static Node *parse_identifier(Parser *parser) {
 	const Token token = parser->token;
 	if (is_kind(token, KIND_IDENTIFIER)) {
 		advance(parser);
 	}
-	return leaf_new_identifier(parser->tree, token.string);
+	return tree_new_identifier(parser->tree, token.string);
 }
 
-static Leaf *parse_literal_value(Parser *parser, Leaf *type);
+static Node *parse_literal_value(Parser *parser, Node *type);
 
-static Leaf *parse_operand(Parser *parser, Bool lhs) {
+static Node *parse_operand(Parser *parser, Bool lhs) {
 	TRACE_ENTER("parse_operand");
 	const Token token = parser->token;
-	Leaf *leaf = 0;
+	Node *node = 0;
 	switch (token.kind) {
 	case KIND_IDENTIFIER:
-		leaf = parse_identifier(parser);
+		node = parse_identifier(parser);
 		TRACE_LEAVE();
-		return leaf;
+		return node;
 	case KIND_LITERAL:
 		switch (token.as_literal) {
 		case LITERAL_INTEGER:
@@ -308,18 +198,19 @@ static Leaf *parse_operand(Parser *parser, Bool lhs) {
 		case LITERAL_RUNE:
 			FALLTHROUGH();
 		case LITERAL_STRING:
-			leaf = leaf_new_literal(parser->tree, advance(parser));
+			const Token token = advance(parser);
+			node = tree_new_literal_value(parser->tree, token.as_literal, token.string);
 			TRACE_LEAVE();
-			return leaf;
+			return node;
 		case LITERAL_COUNT:
 			UNREACHABLE();
 		}
 		break;
 	case KIND_LBRACE:
 		if (!lhs) {
-			leaf = parse_literal_value(parser, 0);
+			node = parse_literal_value(parser, 0);
 			TRACE_LEAVE();
-			return leaf;
+			return node;
 		}
 		break;
 	case KIND_HASH:
@@ -372,21 +263,21 @@ static Leaf *parse_operand(Parser *parser, Bool lhs) {
 	return 0;
 }
 
-static Leaf *parse_expression(Parser *parser, Bool lhs);
+static Node *parse_expression(Parser *parser, Bool lhs);
 
-static Leaf *parse_value(Parser *parser) {
+static Node *parse_value(Parser *parser) {
 	TRACE_ENTER("parse_value");
 	if (is_kind(parser->token, KIND_LBRACE)) {
 		UNIMPLEMENTED("Literal value");
 	}
-	Leaf *leaf = parse_expression(parser, false);
+	Node *node = parse_expression(parser, false);
 	TRACE_LEAVE();
-	return leaf;
+	return node;
 }
 
-static Leaf *parse_call_expression(Parser *parser, Leaf *operand) {
+static Node *parse_call_expression(Parser *parser, Node *operand) {
 	TRACE_ENTER("parse_call_expression");
-	Array(Leaf*) args = 0;
+	Array(Node*) arguments = 0;
 	expect_operator(parser, OPERATOR_OPENPAREN);
 	while (!is_operator(parser->token, OPERATOR_CLOSEPAREN) && !is_kind(parser->token, KIND_EOF)) {
 		if (is_operator(parser->token, OPERATOR_COMMA)) {
@@ -401,33 +292,33 @@ static Leaf *parse_call_expression(Parser *parser, Leaf *operand) {
 			expect_operator(parser, OPERATOR_ELLIPSIS);
 		}
 
-		Leaf *arg = parse_expression(parser, false);
+		Node *argument = parse_expression(parser, false);
 		if (is_assignment(parser->token, ASSIGNMENT_EQ)) {
 			expect_assignment(parser, ASSIGNMENT_EQ);
 			if (has_ellipsis) {
 				ERROR("Cannot apply '..' to field");
 			}
 
-			Leaf *value = parse_value(parser);
-			arg = leaf_new_field_value(parser->tree, arg, value);
+			Node *value = parse_value(parser);
+			argument = tree_new_value(parser->tree, argument, value);
 		}
-		array_push(args, arg);
+		array_push(arguments, argument);
 	}
 
-	Leaf *call = leaf_new_call_expression(parser->tree, operand, args);
+	Node *node = tree_new_call_expression(parser->tree, operand, arguments);
 	TRACE_LEAVE();
-	return call;
+	return node;
 }
 
-static Array(Leaf*) parse_element_list(Parser *parser) {
+static Array(Node*) parse_element_list(Parser *parser) {
 	TRACE_ENTER("parse_element_list");
-	Array(Leaf*) elements = 0;
+	Array(Node*) elements = 0;
 	while (!is_kind(parser->token, KIND_RBRACE) && !is_kind(parser->token, KIND_EOF)) {
-		Leaf *element = parse_value(parser);
+		Node *element = parse_value(parser);
 		if (is_assignment(parser->token, ASSIGNMENT_EQ)) {
 			expect_assignment(parser, ASSIGNMENT_EQ);
-			Leaf *value = parse_value(parser);
-			element = leaf_new_field_value(parser->tree, element, value);
+			Node *value = parse_value(parser);
+			element = tree_new_value(parser->tree, element, value);
 		}
 		array_push(elements, element);
 		// TODO(dweiler): Handle field separators.
@@ -436,19 +327,19 @@ static Array(Leaf*) parse_element_list(Parser *parser) {
 	return elements;
 }
 
-static Leaf *parse_literal_value(Parser *parser, Leaf *type) {
+static Node *parse_literal_value(Parser *parser, Node *type) {
 	TRACE_ENTER("parse_literal_value");
-	Array(Leaf*) elements = 0;
+	Array(Node*) elements = 0;
 	expect_kind(parser, KIND_LBRACE);
 	if (!is_kind(parser->token, KIND_RBRACE)) {
 		elements = parse_element_list(parser);
 	}
 	expect_kind(parser, KIND_RBRACE);
 	TRACE_LEAVE();
-	return leaf_new_compound_literal(parser->tree, type, elements);
+	return tree_new_compound_literal(parser->tree, type, elements);
 }
 
-static Leaf *parse_atom_expression(Parser *parser, Leaf *operand, Bool lhs) {
+static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
 	TRACE_ENTER("parse_atom_expression");
 	if (!operand) {
 		// if (allow_type) return 0
@@ -457,7 +348,7 @@ static Leaf *parse_atom_expression(Parser *parser, Leaf *operand, Bool lhs) {
 		return 0;
 	}
 	// ERROR("Unimplemented atom expression");
-	Leaf *leaf = 0;
+	Node *node = 0;
 	for (;;) {
 		Token token = parser->token;
 		switch (token.kind) {
@@ -474,8 +365,8 @@ static Leaf *parse_atom_expression(Parser *parser, Leaf *operand, Bool lhs) {
 				token = advance(parser);
 				switch (parser->token.kind) {
 				case KIND_IDENTIFIER:
-					leaf = parse_identifier(parser);
-					operand = leaf_new_selector_expression(parser->tree, operand, leaf);
+					node = parse_identifier(parser);
+					operand = tree_new_selector_expression(parser->tree, operand, node);
 					break;
 				case KIND_OPERATOR:
 					switch (token.as_operator) {
@@ -496,8 +387,8 @@ static Leaf *parse_atom_expression(Parser *parser, Leaf *operand, Bool lhs) {
 
 			case OPERATOR_ARROW:
 				advance(parser);
-				leaf = parse_identifier(parser);
-				operand = leaf_new_selector_expression(parser->tree, operand, leaf);
+				node = parse_identifier(parser);
+				operand = tree_new_selector_expression(parser->tree, operand, node);
 				break;
 	
 			case OPERATOR_OPENBRACKET:
@@ -532,7 +423,7 @@ static Leaf *parse_atom_expression(Parser *parser, Leaf *operand, Bool lhs) {
 	return operand;
 }
 
-static Leaf *parse_unary_expression(Parser *parser, Bool lhs) {
+static Node *parse_unary_expression(Parser *parser, Bool lhs) {
 	TRACE_ENTER("parse_unary_expression");
 	const Token token = parser->token;
 	switch (token.kind) {
@@ -546,19 +437,19 @@ static Leaf *parse_unary_expression(Parser *parser, Bool lhs) {
 				expect_operator(parser, OPERATOR_OPENPAREN);
 				// TODO(dweiler): Lookup the type.
 				expect_operator(parser, OPERATOR_CLOSEPAREN);
-				Leaf *expr = parse_unary_expression(parser, lhs);
-				Leaf *leaf = leaf_new_cast_expression(parser->tree, 0, expr);
+				Node *expr = parse_unary_expression(parser, lhs);
+				Node *node = tree_new_cast_expression(parser->tree, 0, expr);
 				TRACE_LEAVE();
-				return leaf;
+				return node;
 			}
 			break;
 		case OPERATOR_AUTO_CAST:
 			{
 				advance(parser);
-				Leaf *expr = parse_unary_expression(parser, lhs);
-				Leaf *leaf = leaf_new_cast_expression(parser->tree, 0, expr);
+				Node *expr = parse_unary_expression(parser, lhs);
+				Node *node = tree_new_cast_expression(parser->tree, 0, expr);
 				TRACE_LEAVE();
-				return leaf;
+				return node;
 			}
 			break;
 		case OPERATOR_ADD:
@@ -572,19 +463,19 @@ static Leaf *parse_unary_expression(Parser *parser, Bool lhs) {
 		case OPERATOR_NOT:
 			{
 				const Token token = advance(parser);
-				Leaf *expr = parse_unary_expression(parser, lhs);
-				Leaf *leaf = leaf_new_unary_expression(parser->tree, token.as_operator, expr);
+				Node *expr = parse_unary_expression(parser, lhs);
+				Node *node = tree_new_unary_expression(parser->tree, token.as_operator, expr);
 				TRACE_LEAVE();
-				return leaf;
+				return node;
 			}
 			break;
 		case OPERATOR_PERIOD:
 			{
 				expect_operator(parser, OPERATOR_PERIOD);
-				Leaf *ident = parse_identifier(parser);
-				Leaf *leaf = leaf_new_selector_expression(parser->tree, 0, ident);
+				Node *ident = parse_identifier(parser);
+				Node *node = tree_new_selector_expression(parser->tree, 0, ident);
 				TRACE_LEAVE();
-				return leaf;
+				return node;
 			}
 		default:
 			break;
@@ -594,16 +485,16 @@ static Leaf *parse_unary_expression(Parser *parser, Bool lhs) {
 		break;
 	}
 
-	Leaf *operand = parse_operand(parser, lhs);
-	Leaf *leaf = parse_atom_expression(parser, operand, lhs);
+	Node *operand = parse_operand(parser, lhs);
+	Node *node = parse_atom_expression(parser, operand, lhs);
 	TRACE_LEAVE();
-	return leaf;
+	return node;
 }
 
-static Leaf *parse_binary_expression(Parser *parser, Bool lhs, int prec) {
+static Node *parse_binary_expression(Parser *parser, Bool lhs, int prec) {
 	TRACE_ENTER("parse_binary_expression");
 
-	Leaf *expr = parse_unary_expression(parser, lhs);
+	Node *expr = parse_unary_expression(parser, lhs);
 
 	// Simple operator precedence climbing.
 
@@ -633,7 +524,7 @@ static Leaf *parse_binary_expression(Parser *parser, Bool lhs, int prec) {
 		advance(parser);
 
 		// Expect operator or if/when keywords.
-		Leaf *rhs = parse_binary_expression(parser, false, op_prec + 1);
+		Node *rhs = parse_binary_expression(parser, false, op_prec + 1);
 		if (!rhs) {
 			ERROR("Expected expression on the right hand side");
 		}
@@ -641,7 +532,7 @@ static Leaf *parse_binary_expression(Parser *parser, Bool lhs, int prec) {
 		if (is_operator(op, OPERATOR_OR_ELSE)) {
 			UNIMPLEMENTED("or_else");
 		} else {
-			expr = leaf_new_binary_expression(parser->tree, op.as_operator, expr, rhs);
+			expr = tree_new_binary_expression(parser->tree, op.as_operator, expr, rhs);
 		}
 
 		lhs = false;
@@ -651,18 +542,18 @@ static Leaf *parse_binary_expression(Parser *parser, Bool lhs, int prec) {
 	return expr;
 }
 
-static FORCE_INLINE Leaf *parse_expression(Parser *parser, Bool lhs) {
+static FORCE_INLINE Node *parse_expression(Parser *parser, Bool lhs) {
 	TRACE_ENTER("parse_expression");
-	Leaf *leaf = parse_binary_expression(parser, lhs, 1);
+	Node *node = parse_binary_expression(parser, lhs, 1);
 	TRACE_LEAVE();
-	return leaf;
+	return node;
 }
 
-static Array(Leaf*) parse_expression_list(Parser *parser, Bool lhs) {
+static Array(Node*) parse_expression_list(Parser *parser, Bool lhs) {
 	TRACE_ENTER("parse_expression_list");
-	Array(Leaf*) list = 0;
+	Array(Node*) list = 0;
 	for (;;) {
-		Leaf *expr = parse_expression(parser, lhs);
+		Node *expr = parse_expression(parser, lhs);
 		array_push(list, expr);
 		if (is_kind(parser->token, KIND_EOF) || !is_operator(parser->token, OPERATOR_COMMA)) {
 			break;
@@ -673,26 +564,26 @@ static Array(Leaf*) parse_expression_list(Parser *parser, Bool lhs) {
 	return list;
 }
 
-static FORCE_INLINE Array(Leaf*) parse_lhs_expression_list(Parser *parser) {
+static FORCE_INLINE Array(Node*) parse_lhs_expression_list(Parser *parser) {
 	TRACE_ENTER("parse_lhs_expression_list");
-	Array(Leaf*) result = parse_expression_list(parser, true);
+	Array(Node*) result = parse_expression_list(parser, true);
 	TRACE_LEAVE();
 	return result;
 }
 
-static FORCE_INLINE Array(Leaf*) parse_rhs_expression_list(Parser *parser) {
+static FORCE_INLINE Array(Node*) parse_rhs_expression_list(Parser *parser) {
 	TRACE_ENTER("parse_rhs_expression_list");
-	Array(Leaf*) result = parse_expression_list(parser, false);
+	Array(Node*) result = parse_expression_list(parser, false);
 	TRACE_LEAVE();
 	return result;
 }
 
-static Leaf *parse_statement(Parser *parser);
+static Node *parse_statement(Parser *parser);
 
-static Array(Leaf*) parse_statement_list(Parser *parser) {
+static Array(Node*) parse_statement_list(Parser *parser) {
 	TRACE_ENTER("parse_statement_list");
 
-	Array(Leaf*) statements = 0;
+	Array(Node*) statements = 0;
 	const Token token = parser->token;
 
 	// Stop parsing the statement when we encounter one of:
@@ -701,8 +592,8 @@ static Array(Leaf*) parse_statement_list(Parser *parser) {
 	//		"}"
 	//		EOF
 	while (!is_keyword(token, KEYWORD_CASE) && !is_kind(token, KIND_RBRACE) && !is_kind(token, KIND_EOF)) {
-		Leaf *statement = parse_statement(parser);
-		if (statement && statement->node != NODE_EMPTY_STATEMENT) {
+		Node *statement = parse_statement(parser);
+		if (statement && statement->statement.kind != STATEMENT_EMPTY) {
 			array_push(statements, statement);
 			// TODO(dweiler): More robust.
 		}
@@ -711,40 +602,40 @@ static Array(Leaf*) parse_statement_list(Parser *parser) {
 	return statements;
 }
 
-static Leaf *parse_body(Parser *parser) {
+static Node *parse_body(Parser *parser) {
 	TRACE_ENTER("parse_body");
 	expect_kind(parser, KIND_LBRACE);
-	Array(Leaf*) statements = parse_statement_list(parser);
+	Array(Node*) statements = parse_statement_list(parser);
 	expect_kind(parser, KIND_RBRACE);
-	Leaf *leaf = leaf_new_block_statement(parser->tree, statements);
+	Node *node = tree_new_block_statement(parser->tree, statements);
 	TRACE_LEAVE();
-	return leaf;
+	return node;
 }
 
-static Leaf *parse_block_statement(Parser *parser, Bool when) {
+static Node *parse_block_statement(Parser *parser, Bool when) {
 	// The block statement may be part of a compile-time when statement.
 	TRACE_ENTER("parse_block_statement");
 	if (when) {
 		UNIMPLEMENTED("when block");
 	}
 	// TODO(dweiler) Check that we're inside a procedure.
-	Leaf *body = parse_body(parser);
+	Node *body = parse_body(parser);
 	TRACE_LEAVE();
 	return body;
 }
 
-static Leaf *parse_type_or_identifier(Parser *parser) {
+static Node *parse_type_or_identifier(Parser *parser) {
 	TRACE_ENTER("parse_type_or_identifier");
-	Leaf *operand = parse_operand(parser, true);
-	Leaf *type = parse_atom_expression(parser, operand, true);
+	Node *operand = parse_operand(parser, true);
+	Node *type = parse_atom_expression(parser, operand, true);
 	TRACE_LEAVE();
 	return type;
 }
 
-static Leaf *parse_value_declaration(Parser *parser, Array(Leaf*) names) {
+static Node *parse_value_declaration(Parser *parser, Array(Node*) names) {
 	TRACE_ENTER("parse_value_declaration");
-	Array(Leaf*) values = 0;
-	Leaf *type = parse_type_or_identifier(parser);
+	Array(Node*) values = 0;
+	Node *type = parse_type_or_identifier(parser);
 	const Token token = parser->token;
 	Bool constant = false;
 	// Check for ':='
@@ -756,28 +647,28 @@ static Leaf *parse_value_declaration(Parser *parser, Array(Leaf*) names) {
 		// TODO(dweiler): Assert the count.
 	}
 	// TODO(dweiler): Robustness
-	Leaf *leaf = leaf_new_value_declaration(parser->tree, type, names, values, constant);
+	Node *node = tree_new_declaration(parser->tree, type, names, values);
 	TRACE_LEAVE();
-	return leaf;
+	return node;
 }
 
-static Leaf *parse_simple_statement(Parser* parser) {
+static Node *parse_simple_statement(Parser* parser) {
 	TRACE_ENTER("parse_simple_statement");
-	Array(Leaf*) lhs = parse_lhs_expression_list(parser);
+	Array(Node*) lhs = parse_lhs_expression_list(parser);
 	const Token token = parser->token;
 	switch (token.kind) {
 	case KIND_ASSIGNMENT:
 		// TODO(dweiler): Ensure we're inside a procedure.
 		advance(parser);
-		Array(Leaf*) rhs = parse_rhs_expression_list(parser);
+		Array(Node*) rhs = parse_rhs_expression_list(parser);
 		if (array_size(rhs) == 0) {
 			// ERROR(dweiler): Missing right hand side in assignment.
 			ERROR("Missing right-hand side in assignment");
 			return 0;
 		}
-		Leaf *leaf = leaf_new_assignment_statement(parser->tree, token.as_assignment, lhs, rhs);
+		Node *node = tree_new_assignment_statement(parser->tree, token.as_assignment, lhs, rhs);
 		TRACE_LEAVE();
-		return leaf;
+		return node;
 	case KIND_OPERATOR:
 		switch (token.as_operator) {
 		case OPERATOR_IN:
@@ -803,12 +694,12 @@ static Leaf *parse_simple_statement(Parser* parser) {
 		return 0;
 	}
 
-	Leaf *leaf = leaf_new_expression_statement(parser->tree, lhs[0]);
+	Node *node = tree_new_expression_statement(parser->tree, lhs[0]);
 	TRACE_LEAVE();
-	return leaf;
+	return node;
 }
 
-static Leaf *parse_import_declaration(Parser *parser) {
+static Node *parse_import_declaration(Parser *parser) {
 	expect_keyword(parser, KEYWORD_IMPORT);
 	Token name;
 	switch (parser->token.kind) {
@@ -819,12 +710,12 @@ static Leaf *parse_import_declaration(Parser *parser) {
 		break;
 	}
 	expect_semicolon(parser);
-	return leaf_new_import_statement(parser->tree, name.string);
+	return tree_new_import_statement(parser->tree, name.string);
 }
 
-static Leaf *parse_statement(Parser *parser) {
+static Node *parse_statement(Parser *parser) {
 	TRACE_ENTER("parse_statement");
-	Leaf *leaf = 0;
+	Node *node = 0;
 	const Token token = parser->token;
 	switch (token.kind) {
 	case KIND_EOF:
@@ -840,10 +731,10 @@ static Leaf *parse_statement(Parser *parser) {
 		case LITERAL_RUNE:
 			FALLTHROUGH();
 		case LITERAL_STRING:
-			leaf = parse_simple_statement(parser);
+			node = parse_simple_statement(parser);
 			expect_semicolon(parser);
 			TRACE_LEAVE();
-			return leaf;
+			return node;
 		default:
 			ICE("Unexpected literal");
 		}
@@ -854,16 +745,16 @@ static Leaf *parse_statement(Parser *parser) {
 			// Needed to support assignment to context.
 			FALLTHROUGH();
 		case KEYWORD_PROC:
-			leaf = parse_simple_statement(parser);
+			node = parse_simple_statement(parser);
 			expect_semicolon(parser);
 			TRACE_LEAVE();
-			return leaf;
+			return node;
 		case KEYWORD_FOREIGN:
 			UNIMPLEMENTED("Foreign declaration");
 		case KEYWORD_IMPORT:
-			leaf = parse_import_declaration(parser);
+			node = parse_import_declaration(parser);
 			TRACE_LEAVE();
-			return leaf;
+			return node;
 		case KEYWORD_IF:
 			UNIMPLEMENTED("If statement");
 		case KEYWORD_WHEN:
@@ -889,10 +780,10 @@ static Leaf *parse_statement(Parser *parser) {
 		}
 		break;
 	case KIND_IDENTIFIER:
-		leaf = parse_simple_statement(parser);
+		node = parse_simple_statement(parser);
 		expect_semicolon(parser);
 		TRACE_LEAVE();
-		return leaf;
+		return node;
 	case KIND_OPERATOR:
 		switch (token.as_operator) {
 		case OPERATOR_OPENPAREN:
@@ -908,10 +799,10 @@ static Leaf *parse_statement(Parser *parser) {
 		case OPERATOR_NOT:
 			FALLTHROUGH();
 		case OPERATOR_AND:
-			leaf = parse_simple_statement(parser);
+			node = parse_simple_statement(parser);
 			expect_semicolon(parser);
 			TRACE_LEAVE();
-			return leaf;
+			return node;
 		default:
 			{
 				const String string = operator_to_string(token.as_operator);
@@ -927,14 +818,14 @@ static Leaf *parse_statement(Parser *parser) {
 	case KIND_HASH:
 		UNIMPLEMENTED("Directive");
 	case KIND_LBRACE:
-		leaf = parse_block_statement(parser, false);
+		node = parse_block_statement(parser, false);
 		TRACE_LEAVE();
-		return leaf;
+		return node;
 	case KIND_SEMICOLON:
-		leaf = leaf_new_empty_statement(parser->tree);
+		node = tree_new_empty_statement(parser->tree);
 		expect_semicolon(parser);
 		TRACE_LEAVE();
-		return leaf;
+		return node;
 	case KIND_INVALID:
 		ICE("Unexpected token in statement");
 	case KIND_RBRACE:
@@ -964,7 +855,7 @@ static Leaf *parse_statement(Parser *parser) {
 			}
 			break;
 		case KIND_LBRACE:
-			Leaf *block = parse_block_statement(parser, false);
+			Node *block = parse_block_statement(parser, false);
 			TRACE_LEAVE();
 			return block;
 		default:
@@ -985,28 +876,16 @@ Tree *parse(const char *filename) {
 	}
 
 	Tree *tree = malloc(sizeof *tree);
-	tree->leafs = 0;
-	tree->statements = 0;
+	tree_init(tree);
 
 	parser.tree = tree;
 	expect_semicolon(&parser);
 	while (parser.token.kind != KIND_EOF) {
-		Leaf *statement = parse_statement(&parser);
-		if (statement && statement->node != NODE_EMPTY_STATEMENT) {
+		Node *statement = parse_statement(&parser);
+		if (statement && statement->statement.kind != STATEMENT_EMPTY) {
 			array_push(tree->statements, statement);
 		}
 	}
 
 	return tree;
-}
-
-void tree_free(Tree *tree) {
-	if (!tree) return;
-	const Uint64 n_leafs = array_size(tree->leafs);
-	for (Uint64 i = 0; i < n_leafs; i++) {
-		Leaf *leaf = tree->leafs[i];
-		free(leaf);
-	}
-	array_free(tree->leafs);
-	free(tree);
 }

@@ -561,6 +561,14 @@ String kind_to_string(Kind kind) {
 	return KINDS[kind];
 }
 
+String literal_to_string(Literal literal) {
+	#define LITERAL(enumerator, name) SLIT(name),
+	static const String LITERALS[] = {
+		#include "lexemes.h"
+	};
+	return LITERALS[literal];
+}
+
 String keyword_to_string(Keyword keyword) {
 	#define KEYWORD(ident, string) SLIT(string),
 	static const String KEYWORDS[] = {

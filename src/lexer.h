@@ -26,6 +26,7 @@ enum Literal {
 	#include "lexemes.h"
 	LITERAL_COUNT,
 };
+String literal_to_string(Literal literal);
 
 #define OPERATOR(kind, ...) OPERATOR_ ## kind,
 enum Operator {
