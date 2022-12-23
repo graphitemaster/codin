@@ -106,7 +106,7 @@ static FORCE_INLINE Bool is_literal(Token token, Literal literal) {
 	return is_kind(token, KIND_LITERAL) && token.as_literal == literal;
 }
 
-static Token advance(Parser *parser) {
+static Token advancep(Parser *parser) {
 	const Token last = parser->this_token;
 	parser->last_token = last;
 	parser->this_token = lexer_next(&parser->lexer);
@@ -127,7 +127,7 @@ static Token expect_kind(Parser *parser, Kind kind) {
 			CAST(int,         have.size),
 			CAST(const char*, have.data));
 	}
-	return advance(parser);
+	return advancep(parser);
 }
 
 static Token expect_operator(Parser *parser, Operator op) {
@@ -141,7 +141,7 @@ static Token expect_operator(Parser *parser, Operator op) {
 			CAST(int,         have.size),
 			CAST(const char*, have.data));
 	}
-	return advance(parser);
+	return advancep(parser);
 }
 
 static Token expect_keyword(Parser* parser, Keyword keyword) {
@@ -155,7 +155,7 @@ static Token expect_keyword(Parser* parser, Keyword keyword) {
 			CAST(int,         have.size),
 			CAST(const char*, have.data));
 	}
-	return advance(parser);
+	return advancep(parser);
 }
 
 static Token expect_assignment(Parser *parser, Assignment assignment) {
@@ -169,7 +169,7 @@ static Token expect_assignment(Parser *parser, Assignment assignment) {
 			CAST(int,         have.size),
 			CAST(const char*, have.data));
 	}
-	return advance(parser);
+	return advancep(parser);
 }
 
 static Token expect_literal(Parser *parser, Literal literal) {
@@ -183,13 +183,13 @@ static Token expect_literal(Parser *parser, Literal literal) {
 			CAST(int,         have.size),
 			CAST(const char*, have.data));
 	}
-	return advance(parser);
+	return advancep(parser);
 }
 
 static FORCE_INLINE Token expect_semicolon(Parser *parser) {
 	// TODO(dweiler): Odin's ridicolous ASI
 	if (is_kind(parser->this_token, KIND_SEMICOLON)) {
-		return advance(parser);
+		return advancep(parser);
 	}
 	return (Token){ .kind = KIND_INVALID };
 }
@@ -221,7 +221,7 @@ static CallingConvention string_to_calling_convention(String string) {
 static Node *parse_identifier(Parser *parser) {
 	const Token token = parser->this_token;
 	if (is_kind(token, KIND_IDENTIFIER)) {
-		advance(parser);
+		advancep(parser);
 	}
 	return tree_new_identifier(parser->tree, token.string);
 }
@@ -240,7 +240,7 @@ static Node *parse_type_or_identifier(Parser *parser) {
 static Node *parse_type(Parser *parser) {
 	Node *type = parse_type_or_identifier(parser);
 	if (!type) {
-		advance(parser);
+		advancep(parser);
 		ERROR("Expected a type");
 	}
 	return type;
@@ -248,7 +248,7 @@ static Node *parse_type(Parser *parser) {
 
 static Bool accepted_operator(Parser *parser, Operator op) {
 	if (is_operator(parser->this_token, op)) {
-		advance(parser);
+		advancep(parser);
 		return true;
 	}
 	return false;
@@ -256,7 +256,7 @@ static Bool accepted_operator(Parser *parser, Operator op) {
 
 static Bool accepted_kind(Parser *parser, Kind kind) {
 	if (is_kind(parser->this_token, kind)) {
-		advance(parser);
+		advancep(parser);
 		return true;
 	}
 	return false;
@@ -386,7 +386,7 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 			FALLTHROUGH();
 		case LITERAL_STRING:
 			{
-				const Token token = advance(parser);
+				const Token token = advancep(parser);
 				node = tree_new_literal_value(parser->tree, token.as_literal, token.string);
 				TRACE_LEAVE();
 				return node;
@@ -560,7 +560,7 @@ static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
 			// .?
 			// .(T)
 			case OPERATOR_PERIOD:
-				advance(parser);
+				advancep(parser);
 				switch (parser->this_token.kind) {
 				case KIND_IDENTIFIER:
 					node = parse_identifier(parser);
@@ -585,13 +585,13 @@ static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
 					break;
 				default:
 					ERROR("Expected selector");
-					advance(parser);
+					advancep(parser);
 					break;
 				}
 				break;
 
 			case OPERATOR_ARROW:
-				advance(parser);
+				advancep(parser);
 				node = parse_identifier(parser);
 				operand = tree_new_selector_expression(parser->tree, operand, node);
 				break;
@@ -638,7 +638,7 @@ static Node *parse_unary_expression(Parser *parser, Bool lhs) {
 			FALLTHROUGH();
 		case OPERATOR_CAST:
 			{
-				advance(parser);
+				advancep(parser);
 				expect_operator(parser, OPERATOR_OPENPAREN);
 				Node *type = parse_type(parser);
 				expect_operator(parser, OPERATOR_CLOSEPAREN);
@@ -650,7 +650,7 @@ static Node *parse_unary_expression(Parser *parser, Bool lhs) {
 			break;
 		case OPERATOR_AUTO_CAST:
 			{
-				advance(parser);
+				advancep(parser);
 				Node *expr = parse_unary_expression(parser, lhs);
 				Node *node = tree_new_cast_expression(parser->tree, 0, expr);
 				TRACE_LEAVE();
@@ -667,7 +667,7 @@ static Node *parse_unary_expression(Parser *parser, Bool lhs) {
 			FALLTHROUGH();
 		case OPERATOR_NOT:
 			{
-				const Token token = advance(parser);
+				const Token token = advancep(parser);
 				Node *expr = parse_unary_expression(parser, lhs);
 				Node *node = tree_new_unary_expression(parser->tree, token.as_operator, expr);
 				TRACE_LEAVE();
@@ -725,7 +725,7 @@ static Node *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec) {
 			break;
 		}
 
-		advance(parser);
+		advancep(parser);
 
 		// Expect operator or if/when keywords.
 		Node *rhs = parse_binary_expression(parser, false, op_prec + 1);
@@ -764,7 +764,7 @@ static Array(Node*) parse_expression_list(Parser *parser, Bool lhs) {
 		if (is_kind(parser->this_token, KIND_EOF) || !is_operator(parser->this_token, OPERATOR_COMMA)) {
 			break;
 		}
-		advance(parser);
+		advancep(parser);
 	}
 	TRACE_LEAVE();
 	return list;
@@ -842,7 +842,7 @@ static Node *parse_declaration_statement(Parser *parser, Array(Node*) names) {
 	// Check for '=' (:=)
 	// Check for ':' (::)
 	if (is_assignment(token, ASSIGNMENT_EQ) || is_operator(token, OPERATOR_COLON)) {
-		const Token seperator = advance(parser);
+		const Token seperator = advancep(parser);
 		constant = is_operator(seperator, OPERATOR_COLON);
 		values = parse_rhs_expression_list(parser);
 		const Uint64 n_names = array_size(names);
@@ -864,7 +864,7 @@ static Node *parse_simple_statement(Parser* parser) {
 	switch (token.kind) {
 	case KIND_ASSIGNMENT:
 		// TODO(dweiler): Ensure we're inside a procedure.
-		advance(parser);
+		advancep(parser);
 		Array(Node*) rhs = parse_rhs_expression_list(parser);
 		if (array_size(rhs) == 0) {
 			ERROR("Missing right-hand side in assignment");
@@ -914,7 +914,7 @@ static Node *parse_import_declaration(Parser *parser) {
 	Token name;
 	switch (parser->this_token.kind) {
 	case KIND_IDENTIFIER:
-		name = advance(parser);
+		name = advancep(parser);
 		break;
 	default:
 		break;
@@ -1085,7 +1085,7 @@ Tree *parse(const char *filename) {
 	tree_init(tree);
 
 	parser.tree = tree;
-	advance(&parser);
+	advancep(&parser);
 	while (!is_kind(parser.this_token, KIND_EOF)) {
 		Node *statement = parse_statement(&parser);
 		if (statement) {
