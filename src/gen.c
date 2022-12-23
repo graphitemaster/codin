@@ -143,6 +143,7 @@ static Bool gen_binary_instruction(Generator *generator, const BinaryExpression 
 }
 
 static Bool gen_binary_expression(Generator *generator, const BinaryExpression *expression, StrBuf *strbuf, Sint32 depth) {
+	(void)depth;
 	return gen_binary_instruction(generator, expression, strbuf);
 }
 
@@ -174,10 +175,12 @@ static Bool gen_expression(Generator *generator, const Expression *expression, S
 static Bool gen_expression_statement(Generator *generator, const ExpressionStatement *statement, StrBuf *strbuf, Sint32 depth) {
 	const Node *node = statement->expression;
 	ASSERT(node->kind == NODE_EXPRESSION);
-	return gen_expression(generator, &node->expression, strbuf, depth);
+	gen_expression(generator, &node->expression, strbuf, depth);
+	strbuf_put_rune(strbuf, ';');
+	return true;
 }
 
-static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf);
+static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf, Sint32 depth);
 
 static Bool gen_statement(Generator *generator, const Statement *statement, StrBuf *strbuf, Sint32 depth) {
 	gen_padding(generator, depth, strbuf);
@@ -186,17 +189,11 @@ static Bool gen_statement(Generator *generator, const Statement *statement, StrB
 		gen_expression_statement(generator, &statement->expression, strbuf, depth);
 		break;
 	case STATEMENT_DECLARATION:
-		gen_declaration_statement(generator, &statement->declaration, strbuf);
+		gen_declaration_statement(generator, &statement->declaration, strbuf, depth);
 		break;
 	default:
 		break;
 	}
-
-	// NOTE(dweiler): Don't terminate procedure statements with a semicolon.
-	if (statement->kind != STATEMENT_DECLARATION || statement->declaration.values[0]->kind != NODE_PROCEDURE) {
-		strbuf_put_rune(strbuf, ';');
-	}
-
 	return true;
 }
 
@@ -245,7 +242,7 @@ static Bool gen_value(Generator *generator, const Node *node, StrBuf *strbuf) {
 	return false;
 }
 
-static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf) {
+static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf, Sint32 depth) {
 	const Uint64 n_decls = array_size(statement->names);
 	const Node *type = statement->type;
 	for (Uint64 i = 0; i < n_decls; i++) {
@@ -274,6 +271,15 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 		}
 	
 		gen_value(generator, value, strbuf);
+
+		if (value->kind != NODE_PROCEDURE) {
+			strbuf_put_rune(strbuf, ';');
+		}
+
+		if (i != n_decls - 1) {
+			strbuf_put_rune(strbuf, '\n');
+			gen_padding(generator, depth, strbuf);
+		}
 	}
 	return true;
 }
