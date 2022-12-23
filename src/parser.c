@@ -481,9 +481,9 @@ static Node *parse_call_expression(Parser *parser, Node *operand) {
 	expect_operator(parser, OPERATOR_OPENPAREN);
 	while (!is_operator(parser->this_token, OPERATOR_CLOSEPAREN) && !is_kind(parser->this_token, KIND_EOF)) {
 		if (is_operator(parser->this_token, OPERATOR_COMMA)) {
-			ERROR("Expected an expression");
+			ERROR("Expected an expression COMMA");
 		} else if (is_assignment(parser->this_token, ASSIGNMENT_EQ)) {
-			ERROR("Expected an expression");
+			ERROR("Expected an expression EQ");
 		}
 	
 		Bool has_ellipsis = false;
@@ -503,6 +503,10 @@ static Node *parse_call_expression(Parser *parser, Node *operand) {
 			argument = tree_new_value(parser->tree, argument, value);
 		}
 		array_push(arguments, argument);
+
+		if (accepted_operator(parser, OPERATOR_COMMA)) {
+			// ...
+		}
 	}
 	expect_operator(parser, OPERATOR_CLOSEPAREN);
 
@@ -855,6 +859,7 @@ static Node *parse_declaration_statement(Parser *parser, Array(Node*) names) {
 			ERROR("Expected %d values on the right-hand side of this declaration", CAST(Sint32, n_names));
 		}
 	}
+	(void)constant;
 	// TODO(dweiler): Robustness.
 	Node *node = tree_new_declaration_statement(parser->tree, type, names, values);
 	TRACE_LEAVE();

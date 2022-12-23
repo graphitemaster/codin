@@ -1,4 +1,6 @@
 #include <string.h> // memcpy
+#include <stdio.h>
+#include <stdarg.h> 
 
 #include "strbuf.h"
 
@@ -16,6 +18,8 @@ Bool strbuf_put_byte(StrBuf *strbuf, Uint8 byte) {
 }
 
 Bool strbuf_put_rune(StrBuf *strbuf, Rune ch) {
+	return strbuf_put_byte(strbuf, ch);
+	
 	// Decode UTF-8 Rune into individual code-points.
 	const Uint8 b0 = ch & 0xff;
 	const Uint8 b1 = (ch >> 8) & 0xff;
@@ -33,6 +37,23 @@ Bool strbuf_put_string(StrBuf *strbuf, String string) {
 	const Uint64 size = array_size(strbuf->contents);
 	if (array_expand(strbuf->contents, string.size)) {
 		memcpy(&strbuf->contents[size], string.data, string.size);
+		return true;
+	}
+	return false;
+}
+
+Bool strbuf_put_formatted(StrBuf *strbuf, const char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	const long bytes = vsnprintf(0, 0, fmt, va);
+	va_end(va);
+	const Uint64 size = array_size(strbuf->contents);
+	if (array_expand(strbuf->contents, bytes + 1)) {
+		va_list ap;
+		va_start(ap, fmt);
+		vsnprintf(CAST(char *, &strbuf->contents[size]), bytes + 1, fmt, ap);
+		array_meta(strbuf->contents)->size--; // Remove NUL from vsnprintf.
+		va_end(ap);
 		return true;
 	}
 	return false;

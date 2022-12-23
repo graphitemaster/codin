@@ -231,5 +231,6 @@ void tree_init(Tree *tree);
 void tree_free(Tree *tree);
 
 void tree_dump(Tree *tree);
+void tree_dump_node(const Node *node, Sint32 depth, Bool nl);
 
 #endif // CODIN_TREE_H

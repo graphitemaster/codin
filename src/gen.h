@@ -3,11 +3,6 @@
 #include "strbuf.h"
 
 typedef struct Tree Tree;
-
-typedef struct Generator Generator;
-
-struct Generator {
-  StrBuf buffer;
-};
+Bool gen(const Tree *tree, StrBuf *strbuf);
 
 #endif // CODIN_GEN_H

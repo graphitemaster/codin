@@ -1,11 +1,27 @@
+#include <stdio.h>
+
 #include "parser.h"
 #include "tree.h"
+#include "gen.h"
 
 int main(int argc, char **argv) {
 	(void)argc;
 	(void)argv;
 	Tree *tree = parse("tests/main.odin");
-	tree_dump(tree);
+	
+	StrBuf strbuf;
+	strbuf.contents = 0;
+
+	// tree_dump(tree);
+
+	gen(tree, &strbuf);
+	const String string = strbuf_result(&strbuf);
+	printf("%.*s\n",
+		CAST(Sint32,       string.size),
+		CAST(const char *, string.data));
+
+	strbuf_free(&strbuf);
 	tree_free(tree);
+
 	return 0;
 }

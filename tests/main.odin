@@ -1,3 +1,4 @@
 main :: proc() -> int {
-  fmt.printf("Hello world\n");
+  x: int = 10;
+  printf("Hello world %d\n", x);
 }
