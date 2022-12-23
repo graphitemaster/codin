@@ -1,8 +1,16 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "lexer.h"
 #include "support.h"
+#include "report.h"
+
+#define ERROR(...) \
+	do { \
+		report_error(lexer->input.source, &lexer->location, __VA_ARGS__); \
+		exit(1); \
+	} while (0)
 
 // Searches for a keyword
 static Bool keyword_find(const String *string, Keyword *result) {
@@ -205,6 +213,11 @@ Bool lexer_init(Lexer *lexer, const Source *source) {
 	return true;
 }
 
+static Bool unescape(Lexer *lexer) {
+	// TODO(dweiler): Implement.
+	return false;
+}
+
 Token lexer_next(Lexer *lexer) {
 	skip_whitespace(lexer, lexer->asi);
 
@@ -263,8 +276,22 @@ Token lexer_next(Lexer *lexer) {
 			// Raw string literal
 			FALLTHROUGH();
 		case '"':
-			// Raw string literal
-			// TODO(dweiler): Implement.
+			Rune quote = rune;
+			for (;;) {
+				const Rune r = lexer->rune;
+				if ((rune == '"' && r == '\n') || r == EOF) {
+					ERROR("Unterminated string literal");
+					break;
+				}
+				advance(lexer);
+				if (r == quote) break;
+				if (rune != '"' && r == '\\') {
+					unescape(lexer);
+				}
+			}
+			token.kind = KIND_LITERAL;
+			token.as_literal = LITERAL_STRING;
+			token.string.size = lexer->here - token.string.data;
 			break;
 		case '.':
 			token.kind = KIND_OPERATOR;
