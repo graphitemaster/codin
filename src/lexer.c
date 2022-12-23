@@ -277,22 +277,24 @@ Token lexer_next(Lexer *lexer) {
 			// Raw string literal
 			FALLTHROUGH();
 		case '"':
-			Rune quote = rune;
-			for (;;) {
-				const Rune r = lexer->rune;
-				if ((rune == '"' && r == '\n') || r == EOF) {
-					ERROR("Unterminated string literal");
-					break;
+			{
+				Rune quote = rune;
+				for (;;) {
+					const Rune r = lexer->rune;
+					if ((rune == '"' && r == '\n') || r == EOF) {
+						ERROR("Unterminated string literal");
+						break;
+					}
+					advance(lexer);
+					if (r == quote) break;
+					if (rune != '"' && r == '\\') {
+						unescape(lexer);
+					}
 				}
-				advance(lexer);
-				if (r == quote) break;
-				if (rune != '"' && r == '\\') {
-					unescape(lexer);
-				}
+				token.kind = KIND_LITERAL;
+				token.as_literal = LITERAL_STRING;
+				token.string.size = lexer->here - token.string.data;
 			}
-			token.kind = KIND_LITERAL;
-			token.as_literal = LITERAL_STRING;
-			token.string.size = lexer->here - token.string.data;
 			break;
 		case '.':
 			token.kind = KIND_OPERATOR;

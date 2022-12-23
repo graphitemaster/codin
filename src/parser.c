@@ -385,10 +385,12 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 		case LITERAL_RUNE:
 			FALLTHROUGH();
 		case LITERAL_STRING:
-			const Token token = advance(parser);
-			node = tree_new_literal_value(parser->tree, token.as_literal, token.string);
-			TRACE_LEAVE();
-			return node;
+			{
+				const Token token = advance(parser);
+				node = tree_new_literal_value(parser->tree, token.as_literal, token.string);
+				TRACE_LEAVE();
+				return node;
+			}
 		case LITERAL_COUNT:
 			UNREACHABLE();
 		}
@@ -1057,9 +1059,11 @@ static Node *parse_statement(Parser *parser) {
 			}
 			break;
 		case KIND_LBRACE:
-			Node *block = parse_block_statement(parser, false);
-			TRACE_LEAVE();
-			return block;
+			{
+				Node *block = parse_block_statement(parser, false);
+				TRACE_LEAVE();
+				return block;
+			}
 		default:
 			break;
 		}
