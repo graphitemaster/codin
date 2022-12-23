@@ -124,6 +124,15 @@ Node *tree_new_declaration_statement(Tree *tree, Node *type, Array(Node*) names,
 	return node;
 }
 
+Node *tree_new_if_statement(Tree *tree, Node *condition, Node *body, Node *elif) {
+	Node *node = new_statement(tree, STATEMENT_IF);
+	IfStatement *statement = &node->statement.iph;
+	statement->condition = condition;
+	statement->body = body;
+	statement->elif = elif;
+	return node;
+}
+
 Node *tree_new_value(Tree *tree, Node *field, Node *val) {
 	Node *node = new_node(tree, NODE_VALUE);
 	Value *value = &node->value;
@@ -324,11 +333,10 @@ static void tree_dump_assignment_statement(const AssignmentStatement *statement,
 }
 
 static void tree_dump_declaration_statement(const DeclarationStatement *statement, Sint32 depth) {
-	printf("(decl ");
+	printf("(decl\n");
 	if (statement->type) {
-		tree_dump_node(statement->type, 0, false);
+		tree_dump_node(statement->type, depth + 1, true);
 	}
-	putchar('\n');
 	const Uint64 n_decls = array_size(statement->names);
 	for (Uint64 i = 0; i < n_decls; i++) {
 		const Node *name = statement->names[i];
@@ -336,6 +344,17 @@ static void tree_dump_declaration_statement(const DeclarationStatement *statemen
 		tree_dump_node(name, depth + 1, false);
 		putchar(' ');
 		tree_dump_node(value, 0, i != n_decls - 1);
+	}
+	putchar(')');
+}
+
+static void tree_dump_if_statement(const IfStatement *statement, Sint32 depth) {
+	printf("(if\n");
+	tree_dump_node(statement->condition, depth + 1, true);
+	putchar(' ');
+	tree_dump_node(statement->body, depth + 1, false);
+	if (statement->elif) {
+		tree_dump_node(statement->elif, depth + 1, false);
 	}
 	putchar(')');
 }
@@ -354,6 +373,8 @@ static void tree_dump_statement(const Statement *statement, Sint32 depth) {
 		return tree_dump_assignment_statement(&statement->assignment, depth);
 	case STATEMENT_DECLARATION:
 		return tree_dump_declaration_statement(&statement->declaration, depth);
+	case STATEMENT_IF:
+		return tree_dump_if_statement(&statement->iph, depth);
 	}
 }
 

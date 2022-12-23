@@ -13,6 +13,7 @@ int main(int argc, char **argv) {
 	strbuf.contents = 0;
 
 	// tree_dump(tree);
+	// return 0;
 
 	Generator gen;
 	gen_init(&gen, tree);

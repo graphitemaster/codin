@@ -14,6 +14,7 @@ static Bool uses(const Generator *generator, Instruction instruction) {
 	return generator->used[instruction >> 6] & (1 << (instruction & 63));
 }
 
+static Bool gen_value(Generator *generator, const Node *node, StrBuf *strbuf);
 static Bool gen_node(Generator *generator, const Node *node, StrBuf *strbuf, Sint32 depth);
 
 static Bool gen_padding(Generator *generator, Sint32 depth, StrBuf *strbuf) {
@@ -173,6 +174,7 @@ static Bool gen_expression(Generator *generator, const Expression *expression, S
 }
 
 static Bool gen_expression_statement(Generator *generator, const ExpressionStatement *statement, StrBuf *strbuf, Sint32 depth) {
+	gen_padding(generator, depth, strbuf);
 	const Node *node = statement->expression;
 	ASSERT(node->kind == NODE_EXPRESSION);
 	gen_expression(generator, &node->expression, strbuf, depth);
@@ -180,69 +182,21 @@ static Bool gen_expression_statement(Generator *generator, const ExpressionState
 	return true;
 }
 
-static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf, Sint32 depth);
-
-static Bool gen_statement(Generator *generator, const Statement *statement, StrBuf *strbuf, Sint32 depth) {
+static Bool gen_if_statement(Generator *generator, const IfStatement *statement, StrBuf *strbuf, Sint32 depth) {
 	gen_padding(generator, depth, strbuf);
-	switch (statement->kind) {
-	case STATEMENT_EXPRESSION:
-		gen_expression_statement(generator, &statement->expression, strbuf, depth);
-		break;
-	case STATEMENT_DECLARATION:
-		gen_declaration_statement(generator, &statement->declaration, strbuf, depth);
-		break;
-	default:
-		break;
+	strbuf_put_string(strbuf, SLIT("if ("));
+	gen_node(generator, statement->condition, strbuf, 0);
+	strbuf_put_string(strbuf, SLIT(") "));
+	gen_node(generator, statement->body, strbuf, depth);
+	if (statement->elif) {
+		strbuf_put_string(strbuf, SLIT(" else "));
+		gen_node(generator, statement->elif, strbuf, depth);
 	}
 	return true;
-}
-
-static Bool gen_block(Generator *generator, const BlockStatement *statement, StrBuf *strbuf, Sint32 depth) {
-	strbuf_put_rune(strbuf, '{');
-	strbuf_put_rune(strbuf, '\n');
-	const Uint64 n_statements = array_size(statement->statements);
-	for (Uint64 i = 0; i < n_statements; i++) {
-		const Node *node = statement->statements[i];
-		ASSERT(node->kind == NODE_STATEMENT);
-		gen_statement(generator, &node->statement, strbuf, depth + 1);
-		strbuf_put_rune(strbuf, '\n');
-	}
-	strbuf_put_rune(strbuf, '}');
-	return true;
-}
-
-static Bool gen_literal_value(Generator *generator, const LiteralValue *literal, StrBuf *strbuf) {
-	(void)generator;
-	switch (literal->literal) {
-	case LITERAL_INTEGER:
-	case LITERAL_FLOAT:
-	case LITERAL_IMAGINARY:
-	case LITERAL_RUNE:
-	case LITERAL_STRING:
-		strbuf_put_string(strbuf, literal->value);
-		break;
-	case LITERAL_COUNT:
-		return false;
-	}
-	return true;
-}
-
-static Bool gen_value(Generator *generator, const Node *node, StrBuf *strbuf) {
-	// tree_dump_node(node, 0, false);
-	if (node->kind == NODE_PROCEDURE) {
-		const Procedure *procedure = &node->procedure;
-		const Node *node = procedure->body;
-		ASSERT(node->kind == NODE_STATEMENT);
-		const Statement *statement = &node->statement;
-		ASSERT(statement->kind == STATEMENT_BLOCK);
-		gen_block(generator, &statement->block, strbuf, 0);
-	} else if (node->kind == NODE_LITERAL_VALUE) {
-		gen_literal_value(generator, &node->literal_value, strbuf);
-	}
-	return false;
 }
 
 static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf, Sint32 depth) {
+	gen_padding(generator, depth, strbuf);
 	const Uint64 n_decls = array_size(statement->names);
 	const Node *type = statement->type;
 	for (Uint64 i = 0; i < n_decls; i++) {
@@ -282,6 +236,68 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 		}
 	}
 	return true;
+}
+
+static Bool gen_statement(Generator *generator, const Statement *statement, StrBuf *strbuf, Sint32 depth);
+static Bool gen_block_statement(Generator *generator, const BlockStatement *statement, StrBuf *strbuf, Sint32 depth) {
+	strbuf_put_rune(strbuf, '{');
+	strbuf_put_rune(strbuf, '\n');
+	const Uint64 n_statements = array_size(statement->statements);
+	for (Uint64 i = 0; i < n_statements; i++) {
+		const Node *node = statement->statements[i];
+		ASSERT(node->kind == NODE_STATEMENT);
+		gen_statement(generator, &node->statement, strbuf, depth + 1);
+		strbuf_put_rune(strbuf, '\n');
+	}
+	gen_padding(generator, depth, strbuf);
+	strbuf_put_rune(strbuf, '}');
+	return true;
+}
+
+static Bool gen_statement(Generator *generator, const Statement *statement, StrBuf *strbuf, Sint32 depth) {
+	switch (statement->kind) {
+	case STATEMENT_EXPRESSION:
+		return gen_expression_statement(generator, &statement->expression, strbuf, depth);
+	case STATEMENT_DECLARATION:
+		return gen_declaration_statement(generator, &statement->declaration, strbuf, depth);
+	case STATEMENT_IF:
+		return gen_if_statement(generator, &statement->iph, strbuf, depth);
+	case STATEMENT_BLOCK:
+		return gen_block_statement(generator, &statement->block, strbuf, depth);
+	default:
+		return false;
+	}
+	UNREACHABLE();
+}
+
+static Bool gen_literal_value(Generator *generator, const LiteralValue *literal, StrBuf *strbuf) {
+	(void)generator;
+	switch (literal->literal) {
+	case LITERAL_INTEGER:
+	case LITERAL_FLOAT:
+	case LITERAL_IMAGINARY:
+	case LITERAL_RUNE:
+	case LITERAL_STRING:
+		strbuf_put_string(strbuf, literal->value);
+		break;
+	case LITERAL_COUNT:
+		return false;
+	}
+	return true;
+}
+
+static Bool gen_value(Generator *generator, const Node *node, StrBuf *strbuf) {
+	if (node->kind == NODE_PROCEDURE) {
+		const Procedure *procedure = &node->procedure;
+		const Node *node = procedure->body;
+		ASSERT(node->kind == NODE_STATEMENT);
+		const Statement *statement = &node->statement;
+		ASSERT(statement->kind == STATEMENT_BLOCK);
+		gen_block_statement(generator, &statement->block, strbuf, 0);
+	} else if (node->kind == NODE_LITERAL_VALUE) {
+		gen_literal_value(generator, &node->literal_value, strbuf);
+	}
+	return false;
 }
 
 static Bool gen_node(Generator *generator, const Node *node, StrBuf *strbuf, Sint32 depth) {
@@ -330,9 +346,10 @@ static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 	strbuf_put_string(strbuf, SLIT("#endif\n"));
 	strbuf_put_rune(strbuf, '\n');
 
-	if (uses(generator, INSTRUCTION_NEGI32)) {
+	// if (uses(generator, INSTRUCTION_NEGI32)) {
 		gen_c0_unary_prelude(generator, "negi32", "-", "i32", strbuf);
-	}
+	// }
+
 	if (uses(generator, INSTRUCTION_ADDI32)) {
 		gen_c0_binary_prelude(generator, "addi32", "+", "i32", strbuf);
 	}
@@ -348,7 +365,7 @@ static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 
 Bool gen_init(Generator *generator, const Tree *tree) {
 	generator->tree = tree;
-	memset(generator->used, 0, sizeof(generator->used));
+	memset(generator->used, 0xff, sizeof(generator->used));
 	return true;
 }
 

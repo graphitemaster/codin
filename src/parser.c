@@ -266,6 +266,14 @@ static Bool accepted_kind(Parser *parser, Kind kind) {
 	return false;
 }
 
+static Bool accepted_keyword(Parser *parser, Keyword keyword) {
+	if (is_keyword(parser->this_token, keyword)) {
+		advancep(parser);
+		return true;
+	}
+	return false;
+}
+
 static Node *parse_literal_value(Parser *parser, Node *type);
 
 static Node *parse_result_list(Parser *parser) {
@@ -932,6 +940,84 @@ static Node *parse_import_declaration(Parser *parser) {
 	return tree_new_import_statement(parser->tree, name.string);
 }
 
+static Node *convert_statement_to_body(Parser *parser, Node *statement) {
+	if (statement->kind != NODE_STATEMENT) {
+		ICE("Expected a statement");
+	}
+	const StatementKind kind = statement->statement.kind;
+	if (kind == STATEMENT_BLOCK || kind == STATEMENT_EMPTY) {
+		ERROR("Expected a regular statement");
+	}
+	Array(Node*) statements = 0;
+	array_push(statements, statement);
+	return tree_new_block_statement(parser->tree, statements);
+}
+
+static Node *convert_statement_to_expression(Parser *parser, Node *statement) {
+	if (statement->kind != NODE_STATEMENT) {
+		ICE("Expected a statement");
+		return 0;
+	}
+
+	const StatementKind kind = statement->statement.kind;
+	if (kind == STATEMENT_EXPRESSION) {
+		return statement->statement.expression.expression;
+	}
+
+	ERROR("Expected a statement");
+	return 0;
+}
+
+static Node *parse_do_body(Parser *parser) {
+	TRACE_ENTER("parse_do_body");
+	Node *statement = parse_statement(parser);
+	Node *body = convert_statement_to_body(parser, statement);
+	TRACE_LEAVE();
+	return body;
+}
+
+static Node *parse_if_statement(Parser *parser) {
+	TRACE_ENTER("parse_if_statement");
+
+	expect_keyword(parser, KEYWORD_IF);
+
+	// TODO(dweiler): init; cond
+	// TODO(dweiler): init; cond; post
+	Node *init = parse_simple_statement(parser);
+	Node *condition = convert_statement_to_expression(parser, init);
+	// Node *condition = parse_expression(parser, false);
+
+	if (!condition) {
+		ERROR("Expected condition in if statement");
+	}
+
+	Node *body = 0;
+	if (accepted_keyword(parser, KEYWORD_DO)) {
+		body = parse_do_body(parser);
+	} else {
+		body = parse_block_statement(parser, false);
+	}
+
+	Node *elif = 0;
+	if (is_keyword(parser->this_token, KEYWORD_ELSE)) {
+		expect_keyword(parser, KEYWORD_ELSE);
+		if (is_keyword(parser->this_token, KEYWORD_IF)) {
+			elif = parse_if_statement(parser);
+		} else if (is_kind(parser->this_token, KIND_LBRACE)) {
+			elif = parse_block_statement(parser, false);
+		} else if (is_keyword(parser->this_token, KEYWORD_DO)) {
+			expect_keyword(parser, KEYWORD_DO);
+			elif = parse_do_body(parser);
+		} else {
+			ERROR("Expected block on 'else' statement");
+		}
+	}
+
+	Node *node = tree_new_if_statement(parser->tree, condition, body, elif);
+	TRACE_LEAVE();
+	return node;
+}
+
 static Node *parse_statement(Parser *parser) {
 	TRACE_ENTER("parse_statement");
 	Node *node = 0;
@@ -975,7 +1061,9 @@ static Node *parse_statement(Parser *parser) {
 			TRACE_LEAVE();
 			return node;
 		case KEYWORD_IF:
-			UNIMPLEMENTED("If statement");
+			node = parse_if_statement(parser);
+			TRACE_LEAVE();
+			return node;
 		case KEYWORD_WHEN:
 			UNIMPLEMENTED("When statement");
 		case KEYWORD_FOR:
