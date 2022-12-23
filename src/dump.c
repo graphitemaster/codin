@@ -112,7 +112,7 @@ static void dump_expression_statement(const Leaf *leaf, int MAYBE_UNUSED depth) 
 
 static void dump_assignment_statement(const Leaf *leaf, int MAYBE_UNUSED depth) {
 	if (!leaf) return;
-	const String string = kind_to_string(leaf->as_assignment_statement.kind);
+	const String string = assignment_to_string(leaf->as_assignment_statement.assignment);
 	const Uint64 n_lhs = array_size(leaf->as_assignment_statement.lhs);
 	const Uint64 n_rhs = array_size(leaf->as_assignment_statement.rhs);
 	assert(n_lhs == n_rhs);

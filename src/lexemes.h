@@ -2,6 +2,10 @@
 #define KIND(...)
 #endif
 
+#ifndef ASSIGNMENT
+#define ASSIGNMENT(...)
+#endif
+
 #ifndef LITERAL
 #define LITERAL(...)
 #endif
@@ -23,26 +27,33 @@ KIND(IDENTIFIER,   "identifier")
 KIND(LITERAL,      "literal")
 KIND(OPERATOR,     "operator")
 KIND(KEYWORD,      "keyword")
+KIND(ASSIGNMENT,   "assignment")
 KIND(HASH,         "directive")     // '#' is a directive (not an operator)
 KIND(ATTRIBUTE,    "attribute")     // '@' is a attribute (not an operator)
 KIND(SEMICOLON,    "semicolon")     // ';' is a terminator
 KIND(LBRACE,       "left brace")    // '{' is not an operator
 KIND(RBRACE,       "right brace")   // '}' is not an operator
-KIND(EQ,           "assign-eq")     // '=' is n ot an operator
-KIND(ADDEQ,        "assign-add")    // '+=' is not an operator
-KIND(SUBEQ,        "assign-sub")    // '-=' is not an operator
-KIND(MULEQ,        "assign-mul")    // '*=' is not an operator
-KIND(QUOEQ,        "assign-quot")   // '/=' is not an operator
-KIND(MODEQ,        "assign-mod")    // '%=' is not an operator
-KIND(MODMODEQ,     "assign-rem")    // '%%=' is not an operator
-KIND(ANDEQ,        "assign-and")    // '&=' is not an operator
-KIND(OREQ,         "assign-or")     // '|=' is not an operator
-KIND(XOREQ,        "assign-xor")    // '~=' is not an operator
-KIND(ANDNOTEQ,     "assign-andnot") // '&~=' is not an operator
-KIND(SHLEQ,        "assign-lshift") // '<<=' is not an operator
-KIND(SHREQ,        "assign-rshift") // '>>=' is not an operator
-KIND(CMPANDEQ,     "assign-andeq")  // '&&=' is not an operator
-KIND(CMPOREQ,      "assign-oreq")   // '||=' is not an operator
+
+// Assignment tokens.
+//
+// These are different from operators because assignments are statements.
+//
+//   ENUM,           NAME
+ASSIGNMENT(EQ,       "eq")     // '=' is n ot an operator
+ASSIGNMENT(ADDEQ,    "add")    // '+=' is not an operator
+ASSIGNMENT(SUBEQ,    "sub")    // '-=' is not an operator
+ASSIGNMENT(MULEQ,    "mul")    // '*=' is not an operator
+ASSIGNMENT(QUOEQ,    "quot")   // '/=' is not an operator
+ASSIGNMENT(MODEQ,    "mod")    // '%=' is not an operator
+ASSIGNMENT(MODMODEQ, "rem")    // '%%=' is not an operator
+ASSIGNMENT(ANDEQ,    "and")    // '&=' is not an operator
+ASSIGNMENT(OREQ,     "or")     // '|=' is not an operator
+ASSIGNMENT(XOREQ,    "xor")    // '~=' is not an operator
+ASSIGNMENT(ANDNOTEQ, "andnot") // '&~=' is not an operator
+ASSIGNMENT(SHLEQ,    "lshift") // '<<=' is not an operator
+ASSIGNMENT(SHREQ,    "rshift") // '>>=' is not an operator
+ASSIGNMENT(CMPANDEQ, "andeq")  // '&&=' is not an operator
+ASSIGNMENT(CMPOREQ,  "oreq")   // '||=' is not an operator
 
 // Literal kinds
 //      ENUM,      NAME
@@ -134,4 +145,5 @@ KEYWORD(MATRIX,      "matrix")
 #undef KEYWORD
 #undef OPERATOR
 #undef LITERAL
+#undef ASSIGNMENT
 #undef KIND

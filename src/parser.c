@@ -131,9 +131,9 @@ static Leaf* leaf_new_auto_cast_expression(Tree *tree, Leaf *expression) {
 	return leaf;
 }
 
-static Leaf* leaf_new_assignment_statement(Tree *tree, Kind kind, Array(Leaf*) lhs, Array(Leaf*) rhs) {
+static Leaf* leaf_new_assignment_statement(Tree *tree, Assignment assignment, Array(Leaf*) lhs, Array(Leaf*) rhs) {
 	Leaf *leaf = leaf_new(tree, NODE_ASSIGNMENT_STATEMENT);
-	leaf->as_assignment_statement.kind = kind;
+	leaf->as_assignment_statement.assignment = assignment;
 	leaf->as_assignment_statement.lhs = lhs;
 	leaf->as_assignment_statement.rhs = rhs;
 	return leaf;
@@ -221,34 +221,6 @@ static Token expect_semicolon(Parser *parser) {
 	return advance(parser);
 }
 
-static Token expect_kind(Parser *parser, Kind kind) {
-	if (parser->token.kind != kind) {
-			#define KIND(ident, name) name,
-			static const char *KINDS[] = {
-				#include "lexemes.h"
-			};
-			printf("Expected '%s' got '%s'\n", KINDS[kind], KINDS[parser->token.kind]);
-	}
-	return advance(parser);
-}
-
-static Token expect_operator(Parser *parser, Operator op) {
-	if (parser->token.kind != KIND_OPERATOR || parser->token.as_operator != op) {
-		// TODO(dweiler): Implement.
-		String string = operator_to_string(op);
-		printf("Expected operator '%.*s'\n", (int)string.size, string.data);
-	}
-	return advance(parser);
-}
-
-static Token expect_keyword(Parser* parser, Keyword keyword) {
-	if (parser->token.kind != KIND_KEYWORD || parser->token.as_keyword != keyword) {
-		String string = keyword_to_string(keyword);
-		printf("Expected keyword '%.*s\n", (int)string.size, string.data);
-	}
-	return advance(parser);
-}
-
 static FORCE_INLINE Bool is_kind(Token token, Kind kind) {
 	return token.kind == kind;
 }
@@ -257,6 +229,65 @@ static FORCE_INLINE Bool is_operator(Token token, Operator op) {
 }
 static FORCE_INLINE Bool is_keyword(Token token, Keyword keyword) {
 	return is_kind(token, KIND_KEYWORD) && token.as_keyword == keyword;
+}
+static FORCE_INLINE Bool is_assignment(Token token, Assignment assignment) {
+	return is_kind(token, KIND_ASSIGNMENT) && token.as_assignment == assignment;
+}
+
+static Token expect_kind(Parser *parser, Kind kind) {
+	const Token token = parser->token;
+	if (!is_kind(token, kind)) {
+		const String want = kind_to_string(kind);
+		const String have = token_to_string(token);
+		ERROR("Expected '%.*s', got '%.*s'\n",
+			CAST(int,         want.size),
+			CAST(const char*, want.data),
+			CAST(int,         have.size),
+			CAST(const char*, have.data));
+	}
+	return advance(parser);
+}
+
+static Token expect_operator(Parser *parser, Operator op) {
+	const Token token = parser->token;
+	if (!is_operator(token, op)) {
+		const String want = operator_to_string(op);
+		const String have = token_to_string(token);
+		ERROR("Expected operator '%.*s', got '%.*s'",
+			CAST(int,         want.size),
+			CAST(const char*, want.data),
+			CAST(int,         have.size),
+			CAST(const char*, have.data));
+	}
+	return advance(parser);
+}
+
+static Token expect_keyword(Parser* parser, Keyword keyword) {
+	const Token token = parser->token;
+	if (!is_keyword(token, keyword)) {
+		const String want = keyword_to_string(keyword);
+		const String have = token_to_string(token);
+		ERROR("Expected keyword '%.*s', got '%.*s'",
+			CAST(int,         want.size),
+			CAST(const char*, want.data),
+			CAST(int,         have.size),
+			CAST(const char*, have.data));
+	}
+	return advance(parser);
+}
+
+static Token expect_assignment(Parser *parser, Assignment assignment) {
+	const Token token = parser->token;
+	if (!is_assignment(token, assignment)) {
+		const String want = assignment_to_string(assignment);
+		const String have = token_to_string(token);
+		ERROR("Expected assignment '%.*s', got '%.*s'",
+			CAST(int,         want.size),
+			CAST(const char*, want.data),
+			CAST(int,         have.size),
+			CAST(const char*, have.data));
+	}
+	return advance(parser);
 }
 
 static Leaf *parse_identifier(Parser *parser) {
@@ -372,7 +403,7 @@ static Leaf *parse_call_expression(Parser *parser, Leaf *operand) {
 	while (!is_operator(parser->token, OPERATOR_CLOSEPAREN) && !is_kind(parser->token, KIND_EOF)) {
 		if (is_operator(parser->token, OPERATOR_COMMA)) {
 			ERROR("Expected an expression");
-		} else if (is_kind(parser->token, KIND_EQ)) {
+		} else if (is_assignment(parser->token, ASSIGNMENT_EQ)) {
 			ERROR("Expected an expression");
 		}
 	
@@ -383,8 +414,8 @@ static Leaf *parse_call_expression(Parser *parser, Leaf *operand) {
 		}
 
 		Leaf *arg = parse_expression(parser, false);
-		if (is_kind(parser->token, KIND_EQ)) {
-			expect_kind(parser, KIND_EQ);
+		if (is_assignment(parser->token, ASSIGNMENT_EQ)) {
+			expect_assignment(parser, ASSIGNMENT_EQ);
 			if (has_ellipsis) {
 				ERROR("Cannot apply '..' to field");
 			}
@@ -405,8 +436,8 @@ static Array(Leaf*) parse_element_list(Parser *parser) {
 	Array(Leaf*) elements = 0;
 	while (!is_kind(parser->token, KIND_RBRACE) && !is_kind(parser->token, KIND_EOF)) {
 		Leaf *element = parse_value(parser);
-		if (is_kind(parser->token, KIND_EQ)) {
-			expect_kind(parser, KIND_EQ);
+		if (is_assignment(parser->token, ASSIGNMENT_EQ)) {
+			expect_assignment(parser, ASSIGNMENT_EQ);
 			Leaf *value = parse_value(parser);
 			element = leaf_new_field_value(parser->tree, element, value);
 		}
@@ -730,7 +761,7 @@ static Leaf *parse_value_declaration(Parser *parser, Array(Leaf*) names) {
 	Bool constant = false;
 	// Check for ':='
 	// Check for '::'
-	if (is_kind(token, KIND_EQ) || is_operator(token, OPERATOR_COLON)) {
+	if (is_assignment(token, ASSIGNMENT_EQ) || is_operator(token, OPERATOR_COLON)) {
 		const Token seperator = advance(parser);
 		constant = is_operator(seperator, OPERATOR_COLON);
 		values = parse_rhs_expression_list(parser);
@@ -747,35 +778,7 @@ static Leaf *parse_simple_statement(Parser* parser) {
 	Array(Leaf*) lhs = parse_lhs_expression_list(parser);
 	const Token token = parser->token;
 	switch (token.kind) {
-	case KIND_EQ:
-		FALLTHROUGH();
-	case KIND_ADDEQ:
-		FALLTHROUGH();
-	case KIND_SUBEQ:
-		FALLTHROUGH();
-	case KIND_MULEQ:
-		FALLTHROUGH();
-	case KIND_QUOEQ:
-		FALLTHROUGH();
-	case KIND_MODEQ:
-		FALLTHROUGH();
-	case KIND_MODMODEQ:
-		FALLTHROUGH();
-	case KIND_ANDEQ:
-		FALLTHROUGH();
-	case KIND_OREQ:
-		FALLTHROUGH();
-	case KIND_XOREQ:
-		FALLTHROUGH();
-	case KIND_SHLEQ:
-		FALLTHROUGH();
-	case KIND_SHREQ:
-		FALLTHROUGH();
-	case KIND_ANDNOTEQ:
-		FALLTHROUGH();
-	case KIND_CMPANDEQ:
-		FALLTHROUGH();
-	case KIND_CMPOREQ:
+	case KIND_ASSIGNMENT:
 		// TODO(dweiler): Ensure we're inside a procedure.
 		advance(parser);
 		Array(Leaf*) rhs = parse_rhs_expression_list(parser);
@@ -784,7 +787,7 @@ static Leaf *parse_simple_statement(Parser* parser) {
 			ERROR("Missing right-hand side in assignment");
 			return 0;
 		}
-		Leaf *leaf = leaf_new_assignment_statement(parser->tree, token.kind, lhs, rhs);
+		Leaf *leaf = leaf_new_assignment_statement(parser->tree, token.as_assignment, lhs, rhs);
 		TRACE_LEAVE();
 		return leaf;
 	case KIND_OPERATOR:

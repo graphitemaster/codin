@@ -12,13 +12,13 @@ typedef enum Kind Kind;
 typedef enum Literal Literal;
 typedef enum Operator Operator;
 typedef enum Keyword Keyword;
+typedef enum Assignment Assignment;
 
 #define KIND(kind, ...) KIND_ ## kind,
 enum Kind {
 	#include "lexemes.h"
 	KIND_COUNT,
 };
-
 String kind_to_string(Kind kind);
 
 #define LITERAL(kind, ...) LITERAL_ ## kind,
@@ -32,7 +32,6 @@ enum Operator {
 	#include "lexemes.h"
 	OPERATOR_COUNT,
 };
-
 String operator_to_string(Operator op);
 
 #define KEYWORD(kind, ...) KEYWORD_ ## kind,
@@ -40,8 +39,15 @@ enum Keyword {
 	#include "lexemes.h"
 	KEYWORD_COUNT,
 };
-
 String keyword_to_string(Keyword keyword);
+
+#define ASSIGNMENT(kind, ...) ASSIGNMENT_ ## kind,
+enum Assignment {
+	#include "lexemes.h"
+	ASSIGNMENT_COUNT,
+};
+
+String assignment_to_string(Assignment assignment);
 
 struct Source {
 	String name;
@@ -61,6 +67,7 @@ struct Token {
 		Literal as_literal;
 		Operator as_operator;
 		Keyword as_keyword;
+		Assignment as_assignment;
 	};
 };
 

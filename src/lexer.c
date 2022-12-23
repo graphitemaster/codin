@@ -340,14 +340,16 @@ Token lexer_next(Lexer *lexer) {
 			switch (lexer->rune) {
 			case '=':
 				advance(lexer);
-				token.kind = KIND_EQ;
+				token.kind = KIND_ASSIGNMENT;
+				token.as_assignment = ASSIGNMENT_EQ;
 				break;
 			case '%':
 				advance(lexer);
 				token.as_operator = OPERATOR_MODMOD;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.kind = KIND_MODMODEQ;
+					token.kind = KIND_ASSIGNMENT;
+					token.as_assignment = ASSIGNMENT_MODMODEQ;
 				}
 				break;
 			}
@@ -357,11 +359,13 @@ Token lexer_next(Lexer *lexer) {
 			token.as_operator = OPERATOR_MUL;
 			if (lexer->rune == '=') {
 				advance(lexer);
-				token.kind = KIND_MULEQ;
+				token.kind = KIND_ASSIGNMENT;
+				token.as_assignment = ASSIGNMENT_MULEQ;
 			}
 			break;
 		case '=':
-			token.kind = KIND_EQ;
+			token.kind = KIND_ASSIGNMENT;
+			token.as_assignment = ASSIGNMENT_EQ;
 			if (lexer->rune == '=') {
 				advance(lexer);
 				token.kind = KIND_OPERATOR;
@@ -373,7 +377,8 @@ Token lexer_next(Lexer *lexer) {
 			token.as_operator = OPERATOR_XOR;
 			if (lexer->rune == '=') {
 				advance(lexer);
-				token.kind = KIND_XOREQ;
+				token.kind = KIND_ASSIGNMENT;
+				token.as_assignment = ASSIGNMENT_XOREQ;
 			}
 			break;
 		case '!':
@@ -389,7 +394,8 @@ Token lexer_next(Lexer *lexer) {
 			token.as_operator = OPERATOR_ADD;
 			if (lexer->rune == '=') {
 				advance(lexer);
-				token.kind = KIND_ADDEQ;
+				token.kind = KIND_ASSIGNMENT;
+				token.as_assignment = ASSIGNMENT_ADDEQ;
 			}
 			break;
 		case '-':
@@ -398,7 +404,8 @@ Token lexer_next(Lexer *lexer) {
 			switch (lexer->rune) {
 			case '=':
 				advance(lexer);
-				token.kind = KIND_SUBEQ;
+				token.kind = KIND_ASSIGNMENT;
+				token.as_assignment = ASSIGNMENT_SUBEQ;
 				break;
 			case '>':
 				advance(lexer);
@@ -415,7 +422,8 @@ Token lexer_next(Lexer *lexer) {
 			switch (lexer->rune) {
 			case '=':
 				advance(lexer);
-				token.kind = KIND_QUOEQ;
+				token.kind = KIND_ASSIGNMENT;
+				token.as_assignment = ASSIGNMENT_QUOEQ;
 				break;
 			// Line comment.
 			case '/':
@@ -465,7 +473,8 @@ Token lexer_next(Lexer *lexer) {
 				token.as_operator = OPERATOR_SHL;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.kind = KIND_SHLEQ;
+					token.kind = KIND_ASSIGNMENT;
+					token.as_assignment = ASSIGNMENT_SHLEQ;
 				}
 				break;
 			}
@@ -483,7 +492,8 @@ Token lexer_next(Lexer *lexer) {
 				token.as_operator = OPERATOR_SHR;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.kind = KIND_SHREQ;
+					token.kind = KIND_ASSIGNMENT;
+					token.as_assignment = ASSIGNMENT_SHREQ;
 				}
 				break;
 			}
@@ -497,19 +507,22 @@ Token lexer_next(Lexer *lexer) {
 				token.as_operator = OPERATOR_ANDNOT;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.kind = KIND_ANDNOTEQ;
+					token.kind = KIND_ASSIGNMENT;
+					token.as_assignment = ASSIGNMENT_ANDNOTEQ;
 				}
 				break;
 			case '=':
 				advance(lexer);
-				token.kind = KIND_ANDEQ;
+				token.kind = KIND_ASSIGNMENT;
+				token.as_assignment = ASSIGNMENT_ANDEQ;
 				break;
 			case '&':
 				advance(lexer);
 				token.as_operator = OPERATOR_CMPAND;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.kind = KIND_ANDEQ;
+					token.kind = KIND_ASSIGNMENT;
+					token.as_assignment = ASSIGNMENT_ANDEQ;
 				}
 				break;
 			}
@@ -520,14 +533,16 @@ Token lexer_next(Lexer *lexer) {
 			switch (lexer->rune) {
 			case '=':
 				advance(lexer);
-				token.kind = KIND_OREQ;
+				token.kind = KIND_ASSIGNMENT;
+				token.as_assignment = ASSIGNMENT_OREQ;
 				break;
 			case '|':
 				advance(lexer);
 				token.as_operator = OPERATOR_CMPOR;
 				if (lexer->rune == '=') {
 					advance(lexer);
-					token.kind = KIND_CMPOREQ;
+					token.kind = KIND_ASSIGNMENT;
+					token.as_assignment = ASSIGNMENT_CMPOREQ;
 				}
 				break;
 			}
@@ -562,6 +577,14 @@ String operator_to_string(Operator op) {
 	return OPERATORS[op];
 }
 
+String assignment_to_string(Assignment assignment) {
+	#define ASSIGNMENT(ident, string) SLIT(string),
+	static const String ASSIGNMENTS[] = {
+		#include "lexemes.h"
+	};
+	return ASSIGNMENTS[assignment];
+}
+
 String token_to_string(Token token) {
 	#define KIND(enumerator, kind) SLIT(#enumerator),
 	static const String STRINGS[] = {
@@ -578,6 +601,8 @@ String token_to_string(Token token) {
 		return token.string;
 	case KIND_OPERATOR:
 		return operator_to_string(token.as_operator);
+	case KIND_ASSIGNMENT:
+		return assignment_to_string(token.as_assignment);
 	default:
 		return STRINGS[token.kind];
 	}
