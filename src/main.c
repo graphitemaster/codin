@@ -7,13 +7,6 @@
 #include "gen.h"
 #include "path.h"
 
-static char *string_dup(const char *string) {
-	const size_t len = strlen(string) + 1;
-	char *data = malloc(len);
-	if (!data) return 0;
-	return memcpy(data, string, len);
-}
-
 typedef struct Command Command;
 
 struct Command {
@@ -21,12 +14,19 @@ struct Command {
 	const char *description;
 };
 
+// Cannot believe strdup is not part of standard C.
+static char *string_dup(const char *string) {
+	const size_t len = strlen(string) + 1;
+	char *data = malloc(len);
+	if (!data) return 0;
+	return memcpy(data, string, len);
+}
+
 static const Command COMMANDS[] = {
 	{ "build",    "compile directory of .odin files, as an executable\n\t\t\tone must contain the program's entry point, all must be the same package." },
 	{ "run",      "same as 'build', but also runs the newly compiled executable." },
 	{ "dump-ast", "dump the generated syntax tree to stdout." },
 	{ "dump-c",   "dump the generated c to stdout." },
-	{ "version",  "print version information" },
 };
 
 static char *project_name(const char *path) {
@@ -42,9 +42,16 @@ static int usage(const char *app) {
 	printf("Usage:\n");
 	printf("\t%s command [arguments]\n", app);
 	printf("Commands:\n");
+	Uint64 max = 0;
+	for (Uint32 i = 0; i < sizeof(COMMANDS)/sizeof(*COMMANDS); i++) {
+		const Uint64 len = strlen(COMMANDS[i].name);
+		if (len > max) max = len;
+	}
 	for (Uint32 i = 0; i < sizeof(COMMANDS)/sizeof(*COMMANDS); i++) {
 		const Command *command = &COMMANDS[i];
-		printf("\t%s\t\t%s\n", command->name, command->description);
+		putchar('\t');
+		const Uint64 len = strlen(command->name);
+		printf("%s%*c\t%s\n", command->name, CAST(Sint32, max - len), ' ', command->description);
 	}
 	printf("\n");
 	printf("For further details on a command, invoke command help:\n");
@@ -52,7 +59,7 @@ static int usage(const char *app) {
 	return 1;
 }
 
-Bool generate(const Tree *tree, StrBuf *strbuf) {
+static Bool generate(const Tree *tree, StrBuf *strbuf) {
 	Generator gen;
 	if (!gen_init(&gen, tree)) {
 		return false;
