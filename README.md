@@ -23,6 +23,12 @@ $ ./codin build tests/main.odin -file
 $ ./codin run tests/main.odin -file
 ```
 
+#### Windows
+On Windows you'll need to have Visual Studio installed. Just run `codin` from the __x64 Native Tools Command Prompt for VS__.
+
+#### Linux
+On Linux you'll need to have `gcc` installed and in your `PATH`.
+
 ### Example
 <details>
   <summary>Click to see an example of how codin translates</summary>
