@@ -110,9 +110,9 @@ static Bool build(const char *path, Bool is_file) {
 	//	"gcc .build/%s.c -O1 -o %s" or
 	//	"cl.exe .build/%s.c /O1 /OUT:%s"
 #if defined(OS_WINDOWS)
-	strbuf_put_formatted(&strbuf, "cl.exe .build/%s.c /O1 /OUT:%s", project, project);
+	strbuf_put_formatted(&strbuf, "cl.exe .build/%s.c /O1 /OUT:%s.exe", project, project);
 #elif defined(OS_LINUX)
-	strbuf_put_formatted(&strbuf, "gcc .build/%s.c -O1 -o %s", project, project);
+	strbuf_put_formatted(&strbuf, "gcc .build/%s.c -O1 -o %s.bin", project, project);
 #endif
 	strbuf_put_rune(&strbuf, '\0');
 	free(project);
