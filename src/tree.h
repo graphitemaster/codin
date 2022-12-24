@@ -7,6 +7,8 @@ typedef enum NodeKind NodeKind;
 typedef enum ExpressionKind ExpressionKind;
 typedef enum StatementKind StatementKind;
 
+typedef enum CallingConvention CallingConvention;
+
 typedef struct Tree Tree;
 typedef struct Node Node;
 
@@ -190,10 +192,22 @@ enum ProcedureFlag {
 	PROC_FLAG_DIVERGING = 1 << 0,
 };
 
+enum CallingConvention {
+	CCONV_INVALID,
+	CCONV_ODIN,
+	CCONV_CONTEXTLESS,
+	CCONV_CDECL,
+	CCONV_STDCALL,
+	CCONV_FASTCALL,
+	CCONV_NAKED,
+	CCONV_NONE,
+};
+
 struct ProcedureType {
 	Node *params;  // FieldList
 	Node *results; // FieldList
 	Uint64 flags;
+	CallingConvention convention;
 };
 
 struct Node {
@@ -209,19 +223,6 @@ struct Node {
 		Procedure       procedure;
 		ProcedureType   procedure_type;
 	};
-};
-
-typedef enum CallingConvention CallingConvention;
-
-enum CallingConvention {
-	CCONV_INVALID,
-	CCONV_ODIN,
-	CCONV_CONTEXTLESS,
-	CCONV_CDECL,
-	CCONV_STDCALL,
-	CCONV_FASTCALL,
-	CCONV_NONE,
-	CCONV_NAKED,
 };
 
 _Static_assert(sizeof(Node) <= 64, "Too big");
@@ -252,7 +253,7 @@ Node *tree_new_literal_value(Tree *tree, Literal literal, String value);
 Node *tree_new_compound_literal(Tree *tree, Node *type, Array(Node*) elements);
 Node *tree_new_field_list(Tree *tree, Array(Node*) list);
 Node *tree_new_procedure(Tree *tree, Node *type, Node *body);
-Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags);
+Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags, CallingConvention convention);
 
 void tree_init(Tree *tree);
 void tree_free(Tree *tree);

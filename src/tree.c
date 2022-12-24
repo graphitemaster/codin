@@ -175,12 +175,13 @@ Node *tree_new_procedure(Tree *tree, Node *type, Node *body) {
 	return node;
 }
 
-Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags) {
+Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags, CallingConvention convention) {
 	Node *node = new_node(tree, NODE_PROCEDURE_TYPE);
 	ProcedureType *procedure_type = &node->procedure_type;
 	procedure_type->params = params;
 	procedure_type->results = results;
 	procedure_type->flags = flags;
+	procedure_type->convention = convention;
 	return node;
 }
 
@@ -524,10 +525,26 @@ static void tree_dump_procedure(const Procedure *procedure, Sint32 depth) {
 	putchar(')');
 }
 
+static const char *calling_convention_to_string(CallingConvention convention) {
+	static const char *CALLING_CONVENTIONS[] = {
+		[CCONV_INVALID]     = "invalid",
+		[CCONV_ODIN]        = "odin",
+		[CCONV_CONTEXTLESS] = "contextless",
+		[CCONV_CDECL]       = "cdecl",
+		[CCONV_STDCALL]     = "stdcall",
+		[CCONV_FASTCALL]    = "fastcall",
+		[CCONV_NAKED]       = "naked",
+		[CCONV_NONE]        = "none",
+	};
+	return CALLING_CONVENTIONS[convention];
+}
+
 static void tree_dump_procedure_type(const ProcedureType *procedure, Sint32 depth) {
 	tree_dump_pad(depth);
 	const Uint64 n_parameters = array_size(procedure->params);
 	const Uint64 n_results = array_size(procedure->results);
+	printf("(cconv \"%s\")\n", calling_convention_to_string(procedure->convention));
+	tree_dump_pad(depth);
 	printf("(parameters ");
 	if (n_parameters == 0) {
 		printf("<empty>");

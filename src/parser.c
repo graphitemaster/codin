@@ -223,11 +223,14 @@ static CallingConvention string_to_calling_convention(String string) {
 }
 
 static Node *parse_identifier(Parser *parser) {
+	TRACE_ENTER("parse_identifier");
 	const Token token = parser->this_token;
 	if (is_kind(token, KIND_IDENTIFIER)) {
 		advancep(parser);
 	}
-	return tree_new_identifier(parser->tree, token.string);
+	Node *identifier = tree_new_identifier(parser->tree, token.string);
+	TRACE_LEAVE();
+	return identifier;
 }
 
 static Node *parse_operand(Parser *parser, Bool lhs);
@@ -242,11 +245,13 @@ static Node *parse_type_or_identifier(Parser *parser) {
 }
 
 static Node *parse_type(Parser *parser) {
+	TRACE_ENTER("parse_type");
 	Node *type = parse_type_or_identifier(parser);
 	if (!type) {
 		advancep(parser);
 		ERROR("Expected a type");
 	}
+	TRACE_LEAVE();
 	return type;
 }
 
@@ -294,6 +299,8 @@ static Node *parse_results(Parser *parser, Bool *diverging) {
 
 	if (accepted_operator(parser, OPERATOR_NOT)) {
 		*diverging = true;
+		TRACE_LEAVE();
+		return 0;
 	}
 
 	Node *list = 0;
@@ -327,6 +334,7 @@ static Node *parse_procedure_type(Parser *parser) {
 			ERROR("Unknown calling convention '%.*s'",
 				CAST(Sint32,       string.size),
 				CAST(const char *, string.data));
+			TRACE_LEAVE();
 			return 0;
 		}
 	} else {
@@ -344,7 +352,7 @@ static Node *parse_procedure_type(Parser *parser) {
 		flags |= PROC_FLAG_DIVERGING;
 	}
 
-	Node *type = tree_new_procedure_type(parser->tree, params, results, flags);
+	Node *type = tree_new_procedure_type(parser->tree, params, results, flags, convention);
 	TRACE_LEAVE();
 	return type;
 }
@@ -352,6 +360,7 @@ static Node *parse_procedure_type(Parser *parser) {
 static Node *parse_body(Parser *parser);
 
 static Node *parse_procedure(Parser *parser) {
+	TRACE_ENTER("parse_procedure");
 	Node *type = parse_procedure_type(parser);
 	if (is_keyword(parser->this_token, KEYWORD_WHERE)) {
 		expect_keyword(parser, KEYWORD_WHERE);
@@ -368,10 +377,13 @@ static Node *parse_procedure(Parser *parser) {
 		Node *body = parse_body(parser);
 		parser->this_procedure = last_procedure;
 		ASSERT(type);
-		return tree_new_procedure(parser->tree, type, body);
+		Node *procedure = tree_new_procedure(parser->tree, type, body);
+		TRACE_LEAVE();
+		return procedure;
 	}
 
-	ASSERT("WTF!?");
+	ICE("Unexpected situation in procedure parsing");
+	TRACE_LEAVE();
 	return type;
 }
 
@@ -902,8 +914,9 @@ static Node *parse_simple_statement(Parser* parser) {
 		case OPERATOR_COLON:
 			expect_operator(parser, OPERATOR_COLON);
 			// TODO(dweiler): Label check.
+			Node *node = parse_declaration_statement(parser, lhs);
 			TRACE_LEAVE();
-			return parse_declaration_statement(parser, lhs);
+			return node;
 		default:
 			{
 				const String string = operator_to_string(token.as_operator);
