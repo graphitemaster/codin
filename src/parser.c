@@ -42,7 +42,7 @@ static int s_trace_level = 0;
 		exit(1); \
 	} while (0)
 
-static void source_free(Source *source) {
+void source_free(Source *source) {
 	string_free(&source->contents);
 	string_free(&source->name);
 }
@@ -921,7 +921,11 @@ static Node *parse_simple_statement(Parser* parser) {
 		return 0;
 	}
 
-	Node *node = tree_new_expression_statement(parser->tree, lhs[0]);
+	Node *lhs0 = lhs[0];
+
+	array_free(lhs);
+
+	Node *node = tree_new_expression_statement(parser->tree, lhs0);
 	TRACE_LEAVE();
 	return node;
 }
@@ -1192,6 +1196,8 @@ Tree *parse(const char *filename) {
 			}
 		}
 	}
+
+	tree->source = parser.source;
 
 	return tree;
 }

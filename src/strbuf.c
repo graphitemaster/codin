@@ -13,6 +13,10 @@ void strbuf_free(StrBuf *strbuf) {
 	array_free(strbuf->contents);
 }
 
+void strbuf_clear(StrBuf *strbuf) {
+	array_clear(strbuf->contents);
+}
+
 Bool strbuf_put_byte(StrBuf *strbuf, Uint8 byte) {
 	return array_push(strbuf->contents, byte);
 }

@@ -4,16 +4,22 @@
 #include <stdbool.h>
 #include <stdnoreturn.h>
 
-#if defined(_MSC_VER)
-#define FORCE_INLINE __forceinline
+#if defined(_WIN32)
+	#define OS_WINDOWS
 #else
-#define FORCE_INLINE __attribute__((always_inline)) inline
+	#define OS_LINUX
 #endif
 
 #if defined(_MSC_VER)
-#define UNREACHABLE() __assume(0)
+	#define FORCE_INLINE __forceinline
 #else
-#define UNREACHABLE() __builtin_unreachable()
+	#define FORCE_INLINE __attribute__((always_inline)) inline
+#endif
+
+#if defined(_MSC_VER)
+	#define UNREACHABLE() __assume(0)
+#else
+	#define UNREACHABLE() __builtin_unreachable()
 #endif
 
 #if defined(__cplusplus)
@@ -61,6 +67,8 @@ Bool string_compare(const String *lhs, const String *rhs);
 #define RUNE_EOF CAST(Rune, -1)
 
 noreturn void report_assertion(const char *expression, const char *file, int line);
+
+Bool utf8_to_utf16(const char *source, Uint16 **const destination);
 
 #define ASSERT(expression) \
   ((void)((expression) ? (void)0 : report_assertion(#expression, __FILE__, __LINE__)))

@@ -206,8 +206,8 @@ Bool lexer_init(Lexer *lexer, const Source *source) {
 	lexer->location.line = 1;
 
 	lexer->here = lexer->input.cur;
-
 	lexer->rune = 0;
+	lexer->asi = false;
 
 	advancel(lexer);
 	if (lexer->rune == RUNE_BOM) {

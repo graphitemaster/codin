@@ -1,3 +1,7 @@
+bar :: proc() -> i32 {
+  fmt.printf("called bar()\n");
+}
+
 main :: proc() -> i32 {
   false: i32 = 0;
   true: i32 = 1;
@@ -6,6 +10,7 @@ main :: proc() -> i32 {
   fmt.printf("Hello %s %d modified for proof!\n", s, -x + y * z - 1);
   if true {
     fmt.printf("do print this\n");
+    bar();
     if false {
       fmt.printf("do not print this\n");
     } else {

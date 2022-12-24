@@ -4,6 +4,9 @@
 
 #include "tree.h"
 
+// parser.c
+void source_free(Source *source);
+
 static Node *new_node(Tree *tree, NodeKind kind) {
 	Node *node = calloc(sizeof *node, 1);
 	node->kind = kind;
@@ -180,9 +183,45 @@ void tree_init(Tree *tree) {
 void tree_free(Tree *tree) {
 	const Uint64 n_nodes = array_size(tree->nodes);
 	for (Uint64 i = 0; i < n_nodes; i++) {
+		Node *node = tree->nodes[i];
+		if (node->kind == NODE_STATEMENT) {
+			Statement *statement = &node->statement;
+			switch (statement->kind) {
+			case STATEMENT_BLOCK:
+				array_free(statement->block.statements);
+				break;
+			case STATEMENT_ASSIGNMENT:
+				array_free(statement->assignment.lhs);
+				array_free(statement->assignment.rhs);
+				break;
+			case STATEMENT_DECLARATION:
+				array_free(statement->declaration.names);
+				array_free(statement->declaration.values);
+				break;
+			default:
+				break;
+			}
+		} else if (node->kind == NODE_COMPOUND_LITERAL) {
+			CompoundLiteral *compound_literal = &node->compound_literal;
+			array_free(compound_literal->elements);
+		} else if (node->kind == NODE_FIELD_LIST) {
+			FieldList *field_list = &node->field_list;
+			array_free(field_list->fields);
+		} else if (node->kind == NODE_EXPRESSION) {
+			Expression *expression = &node->expression;
+			if (expression->kind == EXPRESSION_CALL) {
+				CallExpression *call_expression = &expression->call;
+				array_free(call_expression->arguments);
+			}
+		}
 		free(tree->nodes[i]);
 	}
 	array_free(tree->nodes);
+	array_free(tree->statements);
+
+	source_free(&tree->source);
+
+	free(tree);
 }
 
 void tree_dump_node(const Node *node, Sint32 depth, Bool nl);

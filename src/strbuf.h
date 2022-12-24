@@ -11,9 +11,9 @@ struct StrBuf {
 
 void strbuf_init(StrBuf *strbuf);
 void strbuf_free(StrBuf *strbuf);
+void strbuf_clear(StrBuf *strbuf);
 Bool strbuf_put_rune(StrBuf *strbuf, Rune ch);
 Bool strbuf_put_string(StrBuf *strbuf, String string);
 String strbuf_result(StrBuf *strbuf);
 Bool strbuf_put_formatted(StrBuf *strbuf, const char *fmt, ...);
-
 #endif // CODIN_STRBUF

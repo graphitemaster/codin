@@ -212,6 +212,7 @@ enum CallingConvention {
 _Static_assert(sizeof(Node) <= 64, "Too big");
 
 struct Tree {
+	Source source;
 	Array(Node*) nodes;
 	Array(Node*) statements;
 };

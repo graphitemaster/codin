@@ -61,7 +61,7 @@ $ cl.exe unity.c
 
 ### Running
 ```
-$ ./codin build tests/main.odin -file
+$ ./codin run tests/main.odin -file
 ```
 
 ### Documentation
