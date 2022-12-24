@@ -31,7 +31,7 @@ static const Command COMMANDS[] = {
 static char *project_name(const char *path) {
 	const char *stem = strrchr(path, '/');
 	if (!stem) stem = strrchr(path, '\\');
-	char *name = string_dup(stem ? stem : path);
+	char *name = string_dup(stem ? stem + 1 : path);
 	char *odin = strstr(name, ".odin");
 	if (odin) *odin = '\0';
 	return name;
