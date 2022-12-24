@@ -127,8 +127,17 @@ static Bool build(const char *path, Bool is_file) {
 
 static Bool run(const char *path) {
 	char *project = project_name(path);
-	const Bool result = system(project) == 0;
+	StrBuf strbuf;
+	strbuf_init(&strbuf);
+#if defined(OS_WINDOWS)
+	strbuf_put_formatted(&strbuf, ",\\%s.exe", project);
+#elif defined(OS_LINUX)
+	strbuf_put_formatted(&strbuf, "./%s.bin", project);
+#endif
+	strbuf_put_rune(&strbuf, '\0');
 	free(project);
+	const Bool result = system(CAST(const char *, strbuf.contents)) == 0;
+	strbuf_free(&strbuf);
 	return result;
 }
 

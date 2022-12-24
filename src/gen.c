@@ -34,7 +34,12 @@ static Bool gen_identifier(Generator *generator, const Identifier *identifier, S
 }
 
 static Bool gen_type(Generator *generator, const Node *node, StrBuf *strbuf) {
-	if (node->kind == NODE_FIELD_LIST) {
+	if (node->kind == NODE_PROCEDURE_TYPE) {
+		const ProcedureType *procedure_type = &node->procedure_type;
+		// Generate a structure for the return value.
+		// procedure_type->results
+		return gen_type(generator, procedure_type->results, strbuf);
+	} else if (node->kind == NODE_FIELD_LIST) {
 		const FieldList *field_list = &node->field_list;
 		return gen_type(generator, field_list->fields[0], strbuf);
 	} else if (node->kind == NODE_IDENTIFIER) {

@@ -284,7 +284,7 @@ static Node *parse_result_list(Parser *parser) {
 	return 0;
 }
 
-static Node *parse_results(Parser *parser) {
+static Node *parse_results(Parser *parser, Bool *diverging) {
 	TRACE_ENTER("parse_results");
 	if (!accepted_operator(parser, OPERATOR_ARROW)) {
 		TRACE_LEAVE();
@@ -293,7 +293,7 @@ static Node *parse_results(Parser *parser) {
 	}
 
 	if (accepted_operator(parser, OPERATOR_NOT)) {
-		UNIMPLEMENTED("Diverging procedures");
+		*diverging = true;
 	}
 
 	Node *list = 0;
@@ -334,14 +334,19 @@ static Node *parse_procedure_type(Parser *parser) {
 	}
 
 	expect_operator(parser, OPERATOR_OPENPAREN);
-	// Node *params = parse_parameters(parser);
+	Node *params = 0; // parse_parameters(parser);
 	expect_operator(parser, OPERATOR_CLOSEPAREN);
 
-	Node *results = parse_results(parser);
+	Uint64 flags = 0;
+	Bool diverging = false;
+	Node *results = parse_results(parser, &diverging);
+	if (diverging) {
+		flags |= PROC_FLAG_DIVERGING;
+	}
 
+	Node *type = tree_new_procedure_type(parser->tree, params, results, flags);
 	TRACE_LEAVE();
-	ASSERT(results);
-	return results;
+	return type;
 }
 
 static Node *parse_body(Parser *parser);

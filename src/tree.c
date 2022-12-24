@@ -175,6 +175,15 @@ Node *tree_new_procedure(Tree *tree, Node *type, Node *body) {
 	return node;
 }
 
+Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags) {
+	Node *node = new_node(tree, NODE_PROCEDURE_TYPE);
+	ProcedureType *procedure_type = &node->procedure_type;
+	procedure_type->params = params;
+	procedure_type->results = results;
+	procedure_type->flags = flags;
+	return node;
+}
+
 void tree_init(Tree *tree) {
 	tree->nodes = 0;
 	tree->statements = 0;
@@ -224,7 +233,7 @@ void tree_free(Tree *tree) {
 	free(tree);
 }
 
-void tree_dump_node(const Node *node, Sint32 depth, Bool nl);
+void tree_dump_node(const Node *node, Sint32 depth);
 
 static void tree_dump_pad(Sint32 depth) {
 	for (Sint32 i = 0; i < depth; i++) {
@@ -235,73 +244,85 @@ static void tree_dump_pad(Sint32 depth) {
 static void tree_dump_unary_expression(const UnaryExpression *expression, Sint32 depth) {
 	(void)depth;
 	const String operation = operator_to_string(expression->operation);
-	printf("(unary '%.*s'",
+	printf("(unary\n");
+	tree_dump_pad(depth + 1);
+	printf("'%.*s'",
 		CAST(Sint32,       operation.size),
 		CAST(const char *, operation.data));
 	if (expression->operand) {
-		putchar(' ');
-		tree_dump_node(expression->operand, 0, false);
+		putchar('\n');
+		tree_dump_node(expression->operand, depth + 1);
 	}
-	printf(")");
+	putchar(')');
 }
 
 static void tree_dump_binary_expression(const BinaryExpression *expression, Sint32 depth) {
 	(void)depth;
 	const String operation = operator_to_string(expression->operation);
-	printf("(binary '%.*s' ",
+	printf("(binary\n");
+	tree_dump_pad(depth + 1);
+	printf("'%.*s'\n",
 		CAST(Sint32,       operation.size),
 		CAST(const char *, operation.data));
-	tree_dump_node(expression->lhs, 0, false);
-	putchar(' ');
-	tree_dump_node(expression->rhs, 0, false);
+	tree_dump_node(expression->lhs, depth + 1);
+	putchar('\n');
+	tree_dump_node(expression->rhs, depth + 1);
 	putchar(')');
 }
 
 static void tree_dump_cast_expression(const CastExpression *expression, Sint32 depth) {
 	(void)depth;
-	printf("(cast ");
+	printf("(cast\n");
 	if (expression->type) {
-		tree_dump_node(expression->type, 0, false);
-		putchar(' ');
+		tree_dump_node(expression->type, depth + 1);
+		putchar('\n');
 	}
-	tree_dump_node(expression->expression, 0, false);
+	tree_dump_node(expression->expression, depth + 1);
 	putchar(')');
 }
 
 static void tree_dump_selector_expression(const SelectorExpression *expression, Sint32 depth) {
 	(void)depth;
-	printf("(selector ");
+	printf("(selector\n");
 	if (expression->operand) {
-		tree_dump_node(expression->operand, 0, false);
-		putchar(' ');
+		tree_dump_node(expression->operand, depth + 1);
+		putchar('\n');
 	}
-	tree_dump_node(expression->identifier, 0, false);
+	tree_dump_node(expression->identifier, depth + 1);
 	putchar(')');
 }
 
 static void tree_dump_call_expression(const CallExpression *expression, Sint32 depth) {
 	(void)depth;
-	printf("(call ");
-	tree_dump_node(expression->operand, 0, false);
+	printf("(call\n");
+	tree_dump_node(expression->operand, depth + 1);
 	putchar('\n');
 	const Uint64 n_arguments = array_size(expression->arguments);
 	for (Uint64 i = 0; i < n_arguments; i++) {
-		tree_dump_node(expression->arguments[i], depth + 1, i != n_arguments - 1);
+		tree_dump_node(expression->arguments[i], depth + 1);
+		if (i != n_arguments - 1) {
+			putchar('\n');
+		}
+	}
+	if (n_arguments == 0) {
+		tree_dump_pad(depth + 1);
+		printf("<empty>");
 	}
 	putchar(')');
 }
 
 static void tree_dump_assertion_expression(const AssertionExpression *expression, Sint32 depth) {
 	(void)depth;
-	printf("(assert ");
-	tree_dump_node(expression->operand, 0, false);
-	putchar(' ');
-	tree_dump_node(expression->type, 0, false);
+	printf("(assert\n");
+	tree_dump_node(expression->operand, depth + 1);
+	putchar('\n');
+	tree_dump_node(expression->type, depth + 1);
 	putchar(')');
 }
 
 // expressions
 static void tree_dump_expression(const Expression *expression, Sint32 depth) {
+	tree_dump_pad(depth);
 	switch (expression->kind) {
 	case EXPRESSION_UNARY:
 		return tree_dump_unary_expression(&expression->unary, depth);
@@ -327,14 +348,15 @@ static void tree_dump_empty_statement(const EmptyStatement *statement, Sint32 de
 
 static void tree_dump_block_statement(const BlockStatement *statement, Sint32 depth) {
 	const Uint64 n_statements = array_size(statement->statements);
-	printf("(block");
-	if (n_statements == 0) {
-		printf(" <empty>");
-	} else {
-		putchar('\n');
-	}
+	printf("(block\n");
 	for (Uint64 i = 0; i < n_statements; i++) {
-		tree_dump_node(statement->statements[i], depth + 1, i != n_statements - 1);
+		tree_dump_node(statement->statements[i], depth + 1);
+		if (i != n_statements - 1) {
+			putchar('\n');
+		}
+	}
+	if (n_statements == 0) {
+		printf("<empty>");
 	}
 	printf(")");
 }
@@ -349,24 +371,29 @@ static void tree_dump_import_statement(const ImportStatement *statement, Sint32 
 
 static void tree_dump_expression_statement(const ExpressionStatement *statement, Sint32 depth) {
 	(void)depth;
-	printf("(expression ");
-	tree_dump_node(statement->expression, 0, false);
+	printf("(expression\n");
+	tree_dump_node(statement->expression, depth + 1);
 	putchar(')');
 }
 
 static void tree_dump_assignment_statement(const AssignmentStatement *statement, Sint32 depth) {
 	(void)depth;
 	const String assignment = assignment_to_string(statement->assignment);
-	printf("(assignment '%.*s'\n",
+	printf("(assignment\n");
+	tree_dump_pad(depth + 1);
+	printf("'%.*s'\n",
 		CAST(Sint32,       assignment.size),
 		CAST(const char *, assignment.data));
 	const Uint64 n_assignments = array_size(statement->lhs);
 	for (Uint64 i = 0; i < n_assignments; i++) {
 		const Node *const lhs = statement->lhs[i];
 		const Node *const rhs = statement->rhs[i];
-		tree_dump_node(lhs, depth + 1, 0);
-		putchar(' ');
-		tree_dump_node(rhs, 0, i != n_assignments - 1);
+		tree_dump_node(lhs, depth + 1);
+		putchar('\n');
+		tree_dump_node(rhs, depth + 1);
+		if (i != n_assignments) {
+			putchar('\n');
+		}
 	}
 	putchar(')');
 }
@@ -374,31 +401,39 @@ static void tree_dump_assignment_statement(const AssignmentStatement *statement,
 static void tree_dump_declaration_statement(const DeclarationStatement *statement, Sint32 depth) {
 	printf("(decl\n");
 	if (statement->type) {
-		tree_dump_node(statement->type, depth + 1, true);
+		tree_dump_pad(depth + 1);
+		printf("(type\n");
+		tree_dump_node(statement->type, depth + 2);
+		printf(")\n");
 	}
 	const Uint64 n_decls = array_size(statement->names);
 	for (Uint64 i = 0; i < n_decls; i++) {
 		const Node *name = statement->names[i];
 		const Node *value = statement->values[i];
-		tree_dump_node(name, depth + 1, false);
-		putchar(' ');
-		tree_dump_node(value, 0, i != n_decls - 1);
+		tree_dump_node(name, depth + 1);
+		putchar('\n');
+		tree_dump_node(value, depth + 1);
+		if (i != n_decls - 1) {
+			putchar('\n');
+		}
 	}
 	putchar(')');
 }
 
 static void tree_dump_if_statement(const IfStatement *statement, Sint32 depth) {
 	printf("(if\n");
-	tree_dump_node(statement->condition, depth + 1, true);
-	putchar(' ');
-	tree_dump_node(statement->body, depth + 1, false);
+	tree_dump_node(statement->condition, depth + 1);
+	putchar('\n');
+	tree_dump_node(statement->body, depth + 1);
 	if (statement->elif) {
-		tree_dump_node(statement->elif, depth + 1, false);
+		putchar('\n');
+		tree_dump_node(statement->elif, depth + 1);
 	}
 	putchar(')');
 }
 
 static void tree_dump_statement(const Statement *statement, Sint32 depth) {
+	tree_dump_pad(depth);
 	switch (statement->kind) {
 	case STATEMENT_EMPTY:
 		return tree_dump_empty_statement(&statement->empty, depth);
@@ -418,6 +453,7 @@ static void tree_dump_statement(const Statement *statement, Sint32 depth) {
 }
 
 static void tree_dump_identifier(const Identifier *identifier, Sint32 depth) {
+	tree_dump_pad(depth);
 	(void)depth;
 	const String contents = identifier->contents;
 	printf("(ident '%.*s')",
@@ -426,6 +462,7 @@ static void tree_dump_identifier(const Identifier *identifier, Sint32 depth) {
 }
 
 static void tree_dump_value(const Value *value, Sint32 depth) {
+	tree_dump_pad(depth);
 	(void)value;
 	(void)depth;
 	// TODO(dweiler): Implement.
@@ -433,6 +470,7 @@ static void tree_dump_value(const Value *value, Sint32 depth) {
 }
 
 static void tree_dump_literal_value(const LiteralValue *literal_value, Sint32 depth) {
+	tree_dump_pad(depth);
 	(void)depth;
 	const String literal = literal_to_string(literal_value->literal);
 	const String value = literal_value->value;
@@ -444,50 +482,72 @@ static void tree_dump_literal_value(const LiteralValue *literal_value, Sint32 de
 }
 
 static void tree_dump_compound_literal(const CompoundLiteral *compound_literal, Sint32 depth) {
-	printf("(compound ");
+	const Uint64 n_elements = array_size(compound_literal->elements);
+	tree_dump_pad(depth);
+	printf("(compound\n");
 	if (compound_literal->type) {
-		tree_dump_node(compound_literal->type, 0, false);
-		putchar(' ');
+		tree_dump_node(compound_literal->type, depth + 1);
 	} else {
 		printf("<unknown>");
 	}
-	const Uint64 n_elements = array_size(compound_literal->elements);
 	if (n_elements != 0) {
-			putchar('\n');
+		putchar('\n');
 	}
 	for (Uint64 i = 0; i < n_elements; i++) {
 		const Node *const element = compound_literal->elements[i];
-		tree_dump_node(element, depth + 1, i != n_elements - 1);
+		tree_dump_node(element, depth + 1);
 	}
 	putchar(')');
 }
 
 static void tree_dump_field_list(const FieldList* field_list, Sint32 depth) {
 	const Uint64 n_fields = array_size(field_list->fields);
-	printf("(fields");
+	tree_dump_pad(depth);
+	printf("(fields\n");
 	if (n_fields == 0) {
-		printf(" <empty>");
-	} else {
-		putchar('\n');
+		printf("<empty>");
 	}
 	for (Uint64 i = 0; i < n_fields; i++) {
 		const Node *field = field_list->fields[i];
-		tree_dump_node(field, depth + 1, i != n_fields - 1);
+		tree_dump_node(field, depth + 1);
 	}
 	putchar(')');
 }
 
 static void tree_dump_procedure(const Procedure *procedure, Sint32 depth) {
+	tree_dump_pad(depth);
 	(void)depth;
 	printf("(proc\n");
-	tree_dump_node(procedure->type, depth + 1, false);
-	putchar(' ');
-	tree_dump_node(procedure->body, depth + 1, false);
+	tree_dump_node(procedure->type, depth + 1);
+	putchar('\n');
+	tree_dump_node(procedure->body, depth + 1);
 	putchar(')');
 }
 
-void tree_dump_node(const Node *node, Sint32 depth, Bool nl) {
+static void tree_dump_procedure_type(const ProcedureType *procedure, Sint32 depth) {
 	tree_dump_pad(depth);
+	const Uint64 n_parameters = array_size(procedure->params);
+	const Uint64 n_results = array_size(procedure->results);
+	printf("(parameters ");
+	if (n_parameters == 0) {
+		printf("<empty>");
+	} else {
+		putchar('\n');
+		tree_dump_node(procedure->params, depth + 1);
+	}
+	printf(")\n");
+	tree_dump_pad(depth);
+	printf("(results ");
+	if (n_results == 0) {
+		printf("<empty>");
+	} else {
+		putchar('\n');
+		tree_dump_field_list(&procedure->results->field_list, depth + 1);
+	}
+	putchar(')');
+}
+
+void tree_dump_node(const Node *node, Sint32 depth) {
 	switch (node->kind) {
 	case NODE_EXPRESSION:
 		tree_dump_expression(&node->expression, depth);
@@ -513,9 +573,9 @@ void tree_dump_node(const Node *node, Sint32 depth, Bool nl) {
 	case NODE_PROCEDURE:
 		tree_dump_procedure(&node->procedure, depth);
 		break;
-	}
-	if (nl) {
-		putchar('\n');
+	case NODE_PROCEDURE_TYPE:
+		tree_dump_procedure_type(&node->procedure_type, depth);
+		break;
 	}
 }
 
@@ -523,7 +583,10 @@ void tree_dump(Tree *tree) {
 	printf("(tree\n");
 	const Uint64 n_statements = array_size(tree->statements);
 	for (Uint64 i = 0; i < n_statements; i++) {
-		tree_dump_node(tree->statements[i], 1, i != n_statements - 1);
+		tree_dump_node(tree->statements[i], 1);
+		if (i != n_statements - 1) {
+			putchar('\n');
+		}
 	}
 	printf(")\n");
 }

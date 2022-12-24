@@ -33,6 +33,7 @@ typedef struct LiteralValue LiteralValue;
 typedef struct CompoundLiteral CompoundLiteral;
 typedef struct FieldList FieldList;
 typedef struct Procedure Procedure;
+typedef struct ProcedureType ProcedureType;
 
 enum NodeKind {
 	NODE_EXPRESSION,
@@ -43,6 +44,7 @@ enum NodeKind {
 	NODE_COMPOUND_LITERAL,
 	NODE_FIELD_LIST,
 	NODE_PROCEDURE,
+	NODE_PROCEDURE_TYPE,
 };
 
 enum ExpressionKind {
@@ -182,6 +184,18 @@ struct Procedure {
 	Node *body;
 };
 
+typedef enum ProcedureFlag ProcedureFlag;
+
+enum ProcedureFlag {
+	PROC_FLAG_DIVERGING = 1 << 0,
+};
+
+struct ProcedureType {
+	Node *params;  // FieldList
+	Node *results; // FieldList
+	Uint64 flags;
+};
+
 struct Node {
 	NodeKind kind;
 	union {
@@ -193,6 +207,7 @@ struct Node {
 		CompoundLiteral compound_literal;
 		FieldList       field_list;
 		Procedure       procedure;
+		ProcedureType   procedure_type;
 	};
 };
 
@@ -237,11 +252,12 @@ Node *tree_new_literal_value(Tree *tree, Literal literal, String value);
 Node *tree_new_compound_literal(Tree *tree, Node *type, Array(Node*) elements);
 Node *tree_new_field_list(Tree *tree, Array(Node*) list);
 Node *tree_new_procedure(Tree *tree, Node *type, Node *body);
+Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags);
 
 void tree_init(Tree *tree);
 void tree_free(Tree *tree);
 
 void tree_dump(Tree *tree);
-void tree_dump_node(const Node *node, Sint32 depth, Bool nl);
+void tree_dump_node(const Node *node, Sint32 depth);
 
 #endif // CODIN_TREE_H
