@@ -22,10 +22,11 @@ struct Command {
 };
 
 static const Command COMMANDS[] = {
-	{ "build",   "compile directory of .odin files, as an executable\n\t\t\tone must contain the program's entry point, all must be the same package." },
-	{ "run",     "same as 'build', but also runs the newly compiled executable." },
-	{ "dump",    "dump the generated syntax tree." },
-	{ "version", "print version information" },
+	{ "build",    "compile directory of .odin files, as an executable\n\t\t\tone must contain the program's entry point, all must be the same package." },
+	{ "run",      "same as 'build', but also runs the newly compiled executable." },
+	{ "dump-ast", "dump the generated syntax tree to stdout." },
+	{ "dump-c",   "dump the generated c to stdout." },
+	{ "version",  "print version information" },
 };
 
 static char *project_name(const char *path) {
@@ -51,6 +52,21 @@ static int usage(const char *app) {
 	return 1;
 }
 
+Bool generate(const Tree *tree, StrBuf *strbuf) {
+	Generator gen;
+	if (!gen_init(&gen, tree)) {
+		return false;
+	}
+
+	strbuf_init(strbuf);
+	if (!gen_run(&gen, strbuf)) {
+		strbuf_free(strbuf);
+		return false;
+	}
+
+	return true;
+}
+
 static Bool build(const char *path, Bool is_file) {
 	if (!is_file) {
 		fprintf(stderr, "Compiling directories is not yet supported. Use -file.\n");
@@ -63,15 +79,9 @@ static Bool build(const char *path, Bool is_file) {
 		return false;
 	}
 
-	Generator gen;
-	gen_init(&gen, tree);
-
 	StrBuf strbuf;
-	strbuf_init(&strbuf);
-	if (!gen_run(&gen, &strbuf)) {
-		// Could not generate C0 code.
+	if (!generate(tree, &strbuf)) {
 		fprintf(stderr, "Failed to generate C0\n");
-		strbuf_free(&strbuf);
 		tree_free(tree);
 		return false;
 	}
@@ -141,13 +151,31 @@ static Bool run(const char *path) {
 	return result;
 }
 
-static Bool dump(const char *file) {
+static Bool dump_ast(const char *file) {
 	Tree *tree = parse(file);
 	if (tree) {
 		tree_dump(tree);
 		tree_free(tree);
 		return true;
 	}
+	return false;
+}
+
+static Bool dump_c(const char *file) {
+	Tree *tree = parse(file);
+	if (!tree) {
+		return false;
+	}
+	StrBuf strbuf;
+	if (generate(tree, &strbuf)) {
+		const Uint64 size = array_size(strbuf.contents);
+		fwrite(strbuf.contents, size, 1, stdout);
+		fflush(stdout);
+		strbuf_free(&strbuf);
+		tree_free(tree);
+		return true;
+	}
+	tree_free(tree);
 	return false;
 }
 
@@ -167,8 +195,10 @@ int main(int argc, char **argv) {
 		return build(argv[1], file) ? 0 : 1;
 	} else if (!strcmp(argv[0], "run")) {
 		return (build(argv[1], file) && run(argv[1])) ? 0 : 1;
-	} else if (!strcmp(argv[0], "dump")) {
-		return dump(argv[1]) ? 0 : 1;
+	} else if (!strcmp(argv[0], "dump-ast")) {
+		return dump_ast(argv[1]) ? 0 : 1;
+	} else if (!strcmp(argv[0], "dump-c")) {
+		return dump_c(argv[1]) ? 0 : 1;
 	}
 
 	return usage(app);
