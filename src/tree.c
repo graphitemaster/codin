@@ -26,7 +26,7 @@ static Node *new_statement(Tree *tree, StatementKind kind) {
 	return node;
 }
 
-Node *tree_new_unary_expression(Tree *tree, Operator operation, Node *operand) {
+Node *tree_new_unary_expression(Tree *tree, OperatorKind operation, Node *operand) {
 	Node *node = new_expression(tree, EXPRESSION_UNARY);
 	UnaryExpression *expression = &node->expression.unary;
 	expression->operation = operation;
@@ -34,7 +34,7 @@ Node *tree_new_unary_expression(Tree *tree, Operator operation, Node *operand) {
 	return node;
 }
 
-Node *tree_new_binary_expression(Tree *tree, Operator operation, Node *lhs, Node *rhs) {
+Node *tree_new_binary_expression(Tree *tree, OperatorKind operation, Node *lhs, Node *rhs) {
 	Node *node = new_expression(tree, EXPRESSION_BINARY);
 	BinaryExpression *expression = &node->expression.binary;
 	expression->operation = operation;
@@ -102,7 +102,7 @@ Node *tree_new_block_statement(Tree *tree, Array(Node*) statements) {
 	return node;
 }
 
-Node *tree_new_assignment_statement(Tree *tree, Assignment assignment, Array(Node*) lhs, Array(Node*) rhs) {
+Node *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, Array(Node*) lhs, Array(Node*) rhs) {
 	Node *node = new_statement(tree, STATEMENT_ASSIGNMENT);
 	AssignmentStatement *statement = &node->statement.assignment;
 	statement->assignment = assignment;
@@ -151,7 +151,7 @@ Node *tree_new_value(Tree *tree, Node *field, Node *val) {
 	return node;
 }
 
-Node *tree_new_literal_value(Tree *tree, Literal literal, String value) {
+Node *tree_new_literal_value(Tree *tree, LiteralKind literal, String value) {
 	Node *node = new_node(tree, NODE_LITERAL_VALUE);
 	LiteralValue *literal_value = &node->literal_value;
 	literal_value->literal = literal;
@@ -189,6 +189,13 @@ Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 fl
 	procedure_type->results = results;
 	procedure_type->flags = flags;
 	procedure_type->convention = convention;
+	return node;
+}
+
+Node *tree_new_directive(Tree *tree, DirectiveKind directive, Node *expression) {
+	Node *node = new_node(tree, NODE_DIRECTIVE);
+	node->directive.directive = directive;
+	node->directive.expression = expression;
 	return node;
 }
 
@@ -303,7 +310,12 @@ static void tree_dump_selector_expression(const SelectorExpression *expression, 
 static void tree_dump_call_expression(const CallExpression *expression, Sint32 depth) {
 	(void)depth;
 	printf("(call\n");
-	tree_dump_node(expression->operand, depth + 1);
+	if (expression->operand) {
+		tree_dump_node(expression->operand, depth + 1);
+	} else {
+		tree_dump_pad(depth + 1);
+		printf("<builtin>");
+	}
 	putchar('\n');
 	const Uint64 n_arguments = array_size(expression->arguments);
 	for (Uint64 i = 0; i < n_arguments; i++) {
@@ -415,12 +427,15 @@ static void tree_dump_declaration_statement(const DeclarationStatement *statemen
 		printf(")\n");
 	}
 	const Uint64 n_decls = array_size(statement->names);
+	const Uint64 n_values = array_size(statement->values);
 	for (Uint64 i = 0; i < n_decls; i++) {
 		const Node *name = statement->names[i];
-		const Node *value = statement->values[i];
 		tree_dump_node(name, depth + 1);
-		putchar('\n');
-		tree_dump_node(value, depth + 1);
+		if (i < n_values) {
+			const Node *value = statement->values[i];
+			putchar('\n');
+			tree_dump_node(value, depth + 1);
+		}
 		if (i != n_decls - 1) {
 			putchar('\n');
 		}
@@ -587,6 +602,18 @@ static void tree_dump_procedure_type(const ProcedureType *procedure, Sint32 dept
 	putchar(')');
 }
 
+static void tree_dump_directive(const Directive *directive, Sint32 depth) {
+	tree_dump_pad(depth);
+	printf("(directive\n");
+	const String string = directive_to_string(directive->directive);
+	tree_dump_pad(depth + 1);
+	printf("\"%.*s\"\n",
+		CAST(Sint32,      string.size),
+		CAST(const char*, string.data));
+	tree_dump_node(directive->expression, depth + 1);
+	putchar(')');
+}
+
 void tree_dump_node(const Node *node, Sint32 depth) {
 	switch (node->kind) {
 	case NODE_EXPRESSION:
@@ -615,6 +642,9 @@ void tree_dump_node(const Node *node, Sint32 depth) {
 		break;
 	case NODE_PROCEDURE_TYPE:
 		tree_dump_procedure_type(&node->procedure_type, depth);
+		break;
+	case NODE_DIRECTIVE:
+		tree_dump_directive(&node->directive, depth);
 		break;
 	}
 }

@@ -97,16 +97,16 @@ static Bool parser_init(Parser *parser, const char *filename) {
 static FORCE_INLINE Bool is_kind(Token token, Kind kind) {
 	return token.kind == kind;
 }
-static FORCE_INLINE Bool is_operator(Token token, Operator op) {
+static FORCE_INLINE Bool is_operator(Token token, OperatorKind op) {
 	return is_kind(token, KIND_OPERATOR) && token.as_operator == op;
 }
-static FORCE_INLINE Bool is_keyword(Token token, Keyword keyword) {
+static FORCE_INLINE Bool is_keyword(Token token, KeywordKind keyword) {
 	return is_kind(token, KIND_KEYWORD) && token.as_keyword == keyword;
 }
-static FORCE_INLINE Bool is_assignment(Token token, Assignment assignment) {
+static FORCE_INLINE Bool is_assignment(Token token, AssignmentKind assignment) {
 	return is_kind(token, KIND_ASSIGNMENT) && token.as_assignment == assignment;
 }
-static FORCE_INLINE Bool is_literal(Token token, Literal literal) {
+static FORCE_INLINE Bool is_literal(Token token, LiteralKind literal) {
 	return is_kind(token, KIND_LITERAL) && token.as_literal == literal;
 }
 
@@ -134,7 +134,7 @@ static Token expect_kind(Parser *parser, Kind kind) {
 	return advancep(parser);
 }
 
-static Token expect_operator(Parser *parser, Operator op) {
+static Token expect_operator(Parser *parser, OperatorKind op) {
 	const Token token = parser->this_token;
 	if (!is_operator(token, op)) {
 		const String want = operator_to_string(op);
@@ -148,7 +148,7 @@ static Token expect_operator(Parser *parser, Operator op) {
 	return advancep(parser);
 }
 
-static Token expect_keyword(Parser* parser, Keyword keyword) {
+static Token expect_keyword(Parser* parser, KeywordKind keyword) {
 	const Token token = parser->this_token;
 	if (!is_keyword(token, keyword)) {
 		const String want = keyword_to_string(keyword);
@@ -162,7 +162,7 @@ static Token expect_keyword(Parser* parser, Keyword keyword) {
 	return advancep(parser);
 }
 
-static Token expect_assignment(Parser *parser, Assignment assignment) {
+static Token expect_assignment(Parser *parser, AssignmentKind assignment) {
 	const Token token = parser->this_token;
 	if (!is_assignment(token, assignment)) {
 		const String want = assignment_to_string(assignment);
@@ -176,7 +176,7 @@ static Token expect_assignment(Parser *parser, Assignment assignment) {
 	return advancep(parser);
 }
 
-static Token expect_literal(Parser *parser, Literal literal) {
+static Token expect_literal(Parser *parser, LiteralKind literal) {
 	const Token token = parser->this_token;
 	if (!is_literal(token, literal)) {
 		const String want = literal_to_string(literal);
@@ -196,14 +196,6 @@ static FORCE_INLINE Token expect_semicolon(Parser *parser) {
 		return advancep(parser);
 	}
 	return (Token){ .kind = KIND_INVALID };
-}
-
-static String unquote(const String string) {
-	const Rune quote = string.data[0];
-	if (quote == '\"' || quote == '`') {
-		return (String) { .data = &string.data[1], .size = string.size - 2 };
-	}
-	return string;
 }
 
 static CallingConvention string_to_calling_convention(String string) {
@@ -256,7 +248,7 @@ static Node *parse_type(Parser *parser) {
 	return type;
 }
 
-static Bool accepted_operator(Parser *parser, Operator op) {
+static Bool accepted_operator(Parser *parser, OperatorKind op) {
 	if (is_operator(parser->this_token, op)) {
 		advancep(parser);
 		return true;
@@ -272,7 +264,7 @@ static Bool accepted_kind(Parser *parser, Kind kind) {
 	return false;
 }
 
-static Bool accepted_keyword(Parser *parser, Keyword keyword) {
+static Bool accepted_keyword(Parser *parser, KeywordKind keyword) {
 	if (is_keyword(parser->this_token, keyword)) {
 		advancep(parser);
 		return true;
@@ -330,7 +322,7 @@ static Node *parse_procedure_type(Parser *parser) {
 	if (is_literal(parser->this_token, LITERAL_STRING)) {
 		const Token token = expect_literal(parser, LITERAL_STRING);
 		const String string = token.string;
-		convention = string_to_calling_convention(unquote(string));
+		convention = string_to_calling_convention(string_unquote(string));
 		if (convention == CCONV_INVALID) {
 			ERROR("Unknown calling convention '%.*s'",
 				CAST(Sint32,       string.size),
@@ -395,6 +387,8 @@ static Node *parse_procedure_group(Parser *parser) {
 	return 0;
 }
 
+static Node *parse_call_expression(Parser *parser, Node *operand);
+
 static Node *parse_directive(Parser *parser, Bool lhs) {
 	TRACE_ENTER("parse_directive");
 
@@ -403,12 +397,16 @@ static Node *parse_directive(Parser *parser, Bool lhs) {
 	const Token token = parser->last_token;
 	Node *operand = 0;
 	switch (token.as_directive) {
+	case DIRECTIVE_LOAD:
+		operand = tree_new_identifier(parser->tree, directive_to_string(token.as_directive));
+		operand = tree_new_directive(parser->tree, token.as_directive, parse_call_expression(parser, 0));
+		break;
 	default:
 		{
-			const String string = directive_to_string(token.as_directive);
-			ERROR("Unimplemented directive '%.*s'",
-				CAST(Sint32,      string.size),
-				CAST(const char*, string.data));
+			// const String string = directive_to_string(token.as_directive);
+			// ERROR("Unimplemented directive '%.*s'",
+			// 	CAST(Sint32,      string.size),
+			// 	CAST(const char*, string.data));
 		}
 		break;
 	}
@@ -495,7 +493,14 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 	case KIND_OPERATOR:
 		switch (token.as_operator) {
 		case OPERATOR_OPENPAREN:
-			UNIMPLEMENTED("(");
+			expect_operator(parser, OPERATOR_OPENPAREN);
+			if (is_operator(parser->last_token, OPERATOR_CLOSEPAREN)) {
+				ERROR("Empty parenthesized expression");
+			}
+			node = parse_expression(parser, false);
+			expect_operator(parser, OPERATOR_CLOSEPAREN);
+			TRACE_LEAVE();
+			return node;
 		case OPERATOR_POINTER:
 			UNIMPLEMENTED("^");
 		case OPERATOR_OPENBRACKET:

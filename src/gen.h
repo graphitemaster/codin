@@ -6,17 +6,58 @@ typedef struct Tree Tree;
 
 typedef struct Generator Generator;
 
-typedef enum Instruction Instruction;
+typedef enum IntInstruction IntInstruction;
+typedef enum FltInstruction FltInstruction;
+typedef enum CmpInstruction CmpInstruction;
+typedef enum RelInstruction RelInstruction;
+typedef enum BitInstruction BitInstruction;
 
-#define INSTRUCTION(enumerator, name) INSTRUCTION_ ## enumerator,
-enum Instruction {
+#define INT(name, ...) INSTR_ ## name,
+enum IntInstruction {
 	#include "instructions.h"
-	INSTRUCTION_COUNT,
+	INSTR_INT_COUNT,
 };
+
+#define FLT(name, ...) INSTR_ ## name,
+enum FltInstruction {
+	#include "instructions.h"
+	INSTR_FLT_COUNT,
+};
+
+#define CMP(name, ...) INSTR_ ## name,
+enum CmpInstruction {
+	#include "instructions.h"
+	INSTR_CMP_COUNT,
+};
+
+#define REL(name, ...) INSTR_ ## name,
+enum RelInstruction {
+	#include "instructions.h"
+	INSTR_REL_COUNT,
+};
+
+#define BIT(name, ...) INSTR_ ## name,
+enum BitInstruction {
+	#include "instructions.h"
+	INSTR_BIT_COUNT,
+};
+
+_Static_assert(INSTR_INT_COUNT <= 64, "Too many instructions");
+_Static_assert(INSTR_FLT_COUNT <= 64, "Too many instructions");
+_Static_assert(INSTR_CMP_COUNT <= 64, "Too many instructions");
+_Static_assert(INSTR_REL_COUNT <= 64, "Too many instructions");
+_Static_assert(INSTR_BIT_COUNT <= 64, "Too many instructions");
 
 struct Generator {
 	const Tree *tree;
-	Uint64 used[(INSTRUCTION_COUNT + 63) / 64];
+	Uint64 load_directive_id;
+
+	// Bits indicating which instructions are used.
+	Uint64 used_int;
+	Uint64 used_flt;
+	Uint64 used_cmp;
+	Uint64 used_rel;
+	Uint64 used_bit;
 };
 
 Bool gen_init(Generator *generator, const Tree *tree);

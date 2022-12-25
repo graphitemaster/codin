@@ -37,6 +37,7 @@ typedef struct CompoundLiteral CompoundLiteral;
 typedef struct FieldList FieldList;
 typedef struct Procedure Procedure;
 typedef struct ProcedureType ProcedureType;
+typedef struct Directive Directive;
 
 enum NodeKind {
 	NODE_EXPRESSION,
@@ -48,6 +49,7 @@ enum NodeKind {
 	NODE_FIELD_LIST,
 	NODE_PROCEDURE,
 	NODE_PROCEDURE_TYPE,
+	NODE_DIRECTIVE,
 };
 
 enum ExpressionKind {
@@ -71,12 +73,12 @@ enum StatementKind {
 };
 
 struct UnaryExpression {
-	Operator operation;
+	OperatorKind operation;
 	Node *operand;
 };
 
 struct BinaryExpression {
-	Operator operation;
+	OperatorKind operation;
 	Node *lhs;
 	Node *rhs;
 };
@@ -130,7 +132,7 @@ struct BlockStatement {
 };
 
 struct AssignmentStatement {
-	Assignment assignment;
+	AssignmentKind assignment;
 	Array(Node*) lhs;
 	Array(Node*) rhs;
 };
@@ -175,7 +177,7 @@ struct Value {
 };
 
 struct LiteralValue {
-	Literal literal;
+	LiteralKind literal;
 	String value;
 };
 
@@ -217,6 +219,11 @@ struct ProcedureType {
 	CallingConvention convention;
 };
 
+struct Directive {
+	DirectiveKind directive;
+	Node *expression;
+};
+
 struct Node {
 	NodeKind kind;
 	union {
@@ -229,6 +236,7 @@ struct Node {
 		FieldList       field_list;
 		Procedure       procedure;
 		ProcedureType   procedure_type;
+		Directive      	directive;
 	};
 };
 
@@ -240,8 +248,8 @@ struct Tree {
 	Array(Node*) statements;
 };
 
-Node *tree_new_unary_expression(Tree *tree, Operator operation, Node *operand);
-Node *tree_new_binary_expression(Tree *tree, Operator operation, Node *lhs, Node *rhs);
+Node *tree_new_unary_expression(Tree *tree, OperatorKind operation, Node *operand);
+Node *tree_new_binary_expression(Tree *tree, OperatorKind operation, Node *lhs, Node *rhs);
 Node *tree_new_cast_expression(Tree *tree, Node *type, Node *expr);
 Node *tree_new_selector_expression(Tree *tree, Node *operand, Node *identifier);
 Node *tree_new_call_expression(Tree *tree, Node *operand, Array(Node*) arguments);
@@ -251,17 +259,18 @@ Node *tree_new_import_statement(Tree *tree, String package);
 Node *tree_new_expression_statement(Tree *tree, Node *expression);
 Node *tree_new_block_statement(Tree *tree, Array(Node*) statements);
 Node *tree_new_import_statement(Tree *tree, String package);
-Node *tree_new_assignment_statement(Tree *tree, Assignment assignment, Array(Node*) lhs, Array(Node*) rhs);
+Node *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, Array(Node*) lhs, Array(Node*) rhs);
 Node *tree_new_declaration_statement(Tree *tree, Node *type, Array(Node*) names, Array(Node*) values);
 Node *tree_new_if_statement(Tree *tree, Node *condition, Node *body, Node *elif);
 Node *tree_new_return_statement(Tree *tree, Array(Node*) results);
 Node *tree_new_identifier(Tree *tree, String contents);
 Node *tree_new_value(Tree *tree, Node *field, Node *val);
-Node *tree_new_literal_value(Tree *tree, Literal literal, String value);
+Node *tree_new_literal_value(Tree *tree, LiteralKind literal, String value);
 Node *tree_new_compound_literal(Tree *tree, Node *type, Array(Node*) elements);
 Node *tree_new_field_list(Tree *tree, Array(Node*) list);
 Node *tree_new_procedure(Tree *tree, Node *type, Node *body);
 Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags, CallingConvention convention);
+Node *tree_new_directive(Tree *tree, DirectiveKind directive, Node *expression);
 
 void tree_init(Tree *tree);
 void tree_free(Tree *tree);

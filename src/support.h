@@ -66,6 +66,7 @@ struct String {
 #define SCLIT(content) \
 	((const String)SLIT(content))
 
+String string_unquote(String string);
 Bool string_assign(String *string, const char *source);
 void string_free(String *string);
 Bool string_compare(const String *lhs, const String *rhs);

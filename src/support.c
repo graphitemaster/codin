@@ -7,6 +7,14 @@ Bool string_compare(const String *lhs, const String *rhs) {
 	return lhs->size == rhs->size && memcmp(lhs->data, rhs->data, lhs->size) == 0;
 }
 
+String string_unquote(String string) {
+	const Rune quote = string.data[0];
+	if (quote == '\"' || quote == '`') {
+		return (String) { .data = &string.data[1], .size = string.size - 2 };
+	}
+	return string;
+}
+
 Bool string_assign(String *string, const char *source) {
 	const Uint64 length = strlen(source);
 	void *data = malloc(length);

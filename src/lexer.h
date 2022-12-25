@@ -9,11 +9,11 @@ typedef struct Source Source;
 typedef struct Input Input;
 
 typedef enum Kind Kind;
-typedef enum Literal Literal;
-typedef enum Operator Operator;
-typedef enum Keyword Keyword;
-typedef enum Assignment Assignment;
-typedef enum Directive Directive;
+typedef enum LiteralKind LiteralKind;
+typedef enum OperatorKind OperatorKind;
+typedef enum KeywordKind KeywordKind;
+typedef enum AssignmentKind AssignmentKind;
+typedef enum DirectiveKind DirectiveKind;
 
 #define KIND(kind, ...) KIND_ ## kind,
 enum Kind {
@@ -23,41 +23,41 @@ enum Kind {
 String kind_to_string(Kind kind);
 
 #define LITERAL(kind, ...) LITERAL_ ## kind,
-enum Literal {
+enum LiteralKind {
 	#include "lexemes.h"
 	LITERAL_COUNT,
 };
-String literal_to_string(Literal literal);
+String literal_to_string(LiteralKind literal);
 
 #define OPERATOR(kind, ...) OPERATOR_ ## kind,
-enum Operator {
+enum OperatorKind {
 	#include "lexemes.h"
 	OPERATOR_COUNT,
 };
-String operator_to_string(Operator op);
+String operator_to_string(OperatorKind op);
 
 #define KEYWORD(kind, ...) KEYWORD_ ## kind,
-enum Keyword {
+enum KeywordKind {
 	#include "lexemes.h"
 	KEYWORD_COUNT,
 };
-String keyword_to_string(Keyword keyword);
+String keyword_to_string(KeywordKind keyword);
 
 #define ASSIGNMENT(kind, ...) ASSIGNMENT_ ## kind,
-enum Assignment {
+enum AssignmentKind {
 	#include "lexemes.h"
 	ASSIGNMENT_COUNT,
 };
 
-String assignment_to_string(Assignment assignment);
+String assignment_to_string(AssignmentKind assignment);
 
 #define DIRECTIVE(kind, ...) DIRECTIVE_ ## kind,
-enum Directive {
+enum DirectiveKind {
 	#include "lexemes.h"
 	DIRECTIVE_COUNT,
 };
 
-String directive_to_string(Directive directive);
+String directive_to_string(DirectiveKind directive);
 
 struct Source {
 	String name;
@@ -74,11 +74,11 @@ struct Token {
 	Location location;
 	String string; // comment, identifier
 	union {
-		Literal as_literal;
-		Operator as_operator;
-		Keyword as_keyword;
-		Assignment as_assignment;
-		Directive as_directive;
+		LiteralKind as_literal;
+		OperatorKind as_operator;
+		KeywordKind as_keyword;
+		AssignmentKind as_assignment;
+		DirectiveKind as_directive;
 	};
 };
 

@@ -17,7 +17,7 @@
 	} while (0)
 
 // Searches for a keyword
-static Bool keyword_find(const String *string, Keyword *result) {
+static Bool keyword_find(const String *string, KeywordKind *result) {
 	#define KEYWORD(ident, content) \
 		if (string_compare(string, &SCLIT(content))) { \
 			*result = KEYWORD_ ## ident; \
@@ -28,7 +28,7 @@ static Bool keyword_find(const String *string, Keyword *result) {
 }
 
 // Searches for a operator
-static Bool operator_find(const String *string, Operator *result) {
+static Bool operator_find(const String *string, OperatorKind *result) {
 	#define OPERATOR(ident, content, ...) \
 		if (string_compare(string, &SCLIT(content))) { \
 			*result = OPERATOR_ ## ident; \
@@ -38,7 +38,7 @@ static Bool operator_find(const String *string, Operator *result) {
 	return false;
 }
 
-static Bool directive_find(const String *string, Directive *result) {
+static Bool directive_find(const String *string, DirectiveKind *result) {
 	#define DIRECTIVE(ident, content, ...) \
 		if (string_compare(string, &SCLIT(content))) { \
 			*result = DIRECTIVE_ ## ident; \
@@ -617,13 +617,13 @@ Token lexer_next(Lexer *lexer) {
 // Simple helper routines
 String kind_to_string(Kind kind) {
 	#define KIND(enumerator, name) SLIT(name),
-	const String KINDS[] = {
+	static const String KINDS[] = {
 		#include "lexemes.h"
 	};
 	return KINDS[kind];
 }
 
-String literal_to_string(Literal literal) {
+String literal_to_string(LiteralKind literal) {
 	#define LITERAL(enumerator, name) SLIT(name),
 	static const String LITERALS[] = {
 		#include "lexemes.h"
@@ -631,7 +631,7 @@ String literal_to_string(Literal literal) {
 	return LITERALS[literal];
 }
 
-String keyword_to_string(Keyword keyword) {
+String keyword_to_string(KeywordKind keyword) {
 	#define KEYWORD(ident, string) SLIT(string),
 	static const String KEYWORDS[] = {
 		#include "lexemes.h"
@@ -639,7 +639,7 @@ String keyword_to_string(Keyword keyword) {
 	return KEYWORDS[keyword];
 }
 
-String operator_to_string(Operator op) {
+String operator_to_string(OperatorKind op) {
 	#define OPERATOR(ident, string, ...) SLIT(string),
 	static const String OPERATORS[] = {
 		#include "lexemes.h"
@@ -647,7 +647,7 @@ String operator_to_string(Operator op) {
 	return OPERATORS[op];
 }
 
-String assignment_to_string(Assignment assignment) {
+String assignment_to_string(AssignmentKind assignment) {
 	#define ASSIGNMENT(ident, string) SLIT(string),
 	static const String ASSIGNMENTS[] = {
 		#include "lexemes.h"
@@ -655,7 +655,7 @@ String assignment_to_string(Assignment assignment) {
 	return ASSIGNMENTS[assignment];
 }
 
-String directive_to_string(Directive directive) {
+String directive_to_string(DirectiveKind directive) {
 	#define DIRECTIVE(ident, string) SLIT(string),
 	static const String DIRECTIVES[] = {
 		#include "lexemes.h"
