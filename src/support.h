@@ -51,9 +51,18 @@ struct String {
 	Uint64 size;
 };
 
+// Define a literal initializer for a String. This does not produce a compound-
+// literal though, use SCLIT for that. The reason for this distinction has to
+// do with static initializers, the use of a compound-literal is not allowed in
+// a static initializer because a compound-literal isn't considered a constant
+// expression, while an aggregate initializer-list of a static storage String is.
+//
+// Use this for static String or string arrays.
 #define SLIT(content) \
 	{ .data = CAST(Uint8*, content), .size = sizeof(content) - 1 }
 
+// Use this anywhere SLIT won't work, like taking the address of a String or
+// passing a String to a function.
 #define SCLIT(content) \
 	((const String)SLIT(content))
 
