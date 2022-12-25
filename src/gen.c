@@ -90,7 +90,7 @@ static Bool gen_call_expression(Generator *generator, const CallExpression *expr
 		const Node *node = expression->arguments[i];
 		ok = ok && gen_node(generator, node, strbuf, 0);
 		if (i != n_arguments - 1) {
-			strbuf_put_string(strbuf, SLIT(", "));
+			strbuf_put_string(strbuf, SCLIT(", "));
 		}
 	}
 
@@ -105,7 +105,7 @@ static Bool gen_unary_expression(Generator *generator, const UnaryExpression *ex
 	switch (expression->operation) {
 	case OPERATOR_SUB:
 		use(generator, INSTRUCTION_NEGI32);
-		strbuf_put_string(strbuf, SLIT("negi32("));
+		strbuf_put_string(strbuf, SCLIT("negi32("));
 		ok = ok && gen_node(generator, expression->operand, strbuf, 0);
 		strbuf_put_rune(strbuf, ')');
 		return ok;
@@ -146,7 +146,7 @@ static Bool gen_binary_instruction(Generator *generator, const BinaryExpression 
 		CAST(const char*, string.data));
 	Bool ok = true;
 	ok = ok && gen_node(generator, expression->lhs, strbuf, 0);
-	strbuf_put_string(strbuf, SLIT(", "));
+	strbuf_put_string(strbuf, SCLIT(", "));
 	ok = ok && gen_node(generator, expression->rhs, strbuf, 0);
 	strbuf_put_rune(strbuf, ')');
 	return true;
@@ -194,13 +194,13 @@ static Bool gen_expression_statement(Generator *generator, const ExpressionState
 
 static Bool gen_if_statement(Generator *generator, const IfStatement *statement, StrBuf *strbuf, Sint32 depth) {
 	gen_padding(generator, depth, strbuf);
-	strbuf_put_string(strbuf, SLIT("if ("));
+	strbuf_put_string(strbuf, SCLIT("if ("));
 	Bool ok = true;
 	ok = ok && gen_node(generator, statement->condition, strbuf, 0);
-	strbuf_put_string(strbuf, SLIT(") "));
+	strbuf_put_string(strbuf, SCLIT(") "));
 	ok = ok && gen_node(generator, statement->body, strbuf, depth);
 	if (statement->elif) {
-		strbuf_put_string(strbuf, SLIT(" else "));
+		strbuf_put_string(strbuf, SCLIT(" else "));
 		ok = ok && gen_node(generator, statement->elif, strbuf, depth);
 	}
 	return ok;
@@ -233,7 +233,7 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 			strbuf_put_rune(strbuf, ')');
 			strbuf_put_rune(strbuf, ' ');
 		} else {
-			strbuf_put_string(strbuf, SLIT(" = "));
+			strbuf_put_string(strbuf, SCLIT(" = "));
 		}
 	
 		ok = ok && gen_value(generator, value, strbuf);
@@ -340,7 +340,7 @@ static Bool gen_c0_unary_prelude(Generator *generator, const char *name, const c
 	(void)generator;
 	strbuf_put_formatted(strbuf, "FORCE_INLINE %s %s(%s value) {\n", type, name, type);
 	strbuf_put_formatted(strbuf, "\treturn %svalue;\n", op);
-	strbuf_put_string(strbuf, SLIT("}\n\n"));
+	strbuf_put_string(strbuf, SCLIT("}\n\n"));
 	return true;
 }
 
@@ -348,22 +348,22 @@ static Bool gen_c0_binary_prelude(Generator *generator, const char *name, const 
 	(void)generator;
 	strbuf_put_formatted(strbuf, "FORCE_INLINE %s %s(%s lhs, %s rhs) {\n", type, name, type, type);
 	strbuf_put_formatted(strbuf, "\treturn lhs %s rhs;\n", op);
-	strbuf_put_string(strbuf, SLIT("}\n\n"));
+	strbuf_put_string(strbuf, SCLIT("}\n\n"));
 	return true;
 }
 
 static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 	// HACK(dweiler): For now.
-	strbuf_put_string(strbuf, SLIT("#include <stdio.h>\n"));
+	strbuf_put_string(strbuf, SCLIT("#include <stdio.h>\n"));
 	strbuf_put_rune(strbuf, '\n');
-	strbuf_put_string(strbuf, SLIT("typedef int i32;\n"));
-	strbuf_put_string(strbuf, SLIT("typedef const char *string;\n"));
+	strbuf_put_string(strbuf, SCLIT("typedef int i32;\n"));
+	strbuf_put_string(strbuf, SCLIT("typedef const char *string;\n"));
 	strbuf_put_rune(strbuf, '\n');
-	strbuf_put_string(strbuf, SLIT("#if defined(_MSC_VER)\n"));
-	strbuf_put_string(strbuf, SLIT("	#define FORCE_INLINE __forceinline\n"));
-	strbuf_put_string(strbuf, SLIT("#else\n"));
-	strbuf_put_string(strbuf, SLIT("	#define FORCE_INLINE __attribute__((always_inline)) inline\n"));
-	strbuf_put_string(strbuf, SLIT("#endif\n"));
+	strbuf_put_string(strbuf, SCLIT("#if defined(_MSC_VER)\n"));
+	strbuf_put_string(strbuf, SCLIT("	#define FORCE_INLINE __forceinline\n"));
+	strbuf_put_string(strbuf, SCLIT("#else\n"));
+	strbuf_put_string(strbuf, SCLIT("	#define FORCE_INLINE __attribute__((always_inline)) inline\n"));
+	strbuf_put_string(strbuf, SCLIT("#endif\n"));
 	strbuf_put_rune(strbuf, '\n');
 
 	if (uses(generator, INSTRUCTION_NEGI32)) {

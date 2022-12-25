@@ -13,6 +13,7 @@ typedef enum Literal Literal;
 typedef enum Operator Operator;
 typedef enum Keyword Keyword;
 typedef enum Assignment Assignment;
+typedef enum Directive Directive;
 
 #define KIND(kind, ...) KIND_ ## kind,
 enum Kind {
@@ -50,6 +51,14 @@ enum Assignment {
 
 String assignment_to_string(Assignment assignment);
 
+#define DIRECTIVE(kind, ...) DIRECTIVE_ ## kind,
+enum Directive {
+	#include "lexemes.h"
+	DIRECTIVE_COUNT,
+};
+
+String directive_to_string(Directive directive);
+
 struct Source {
 	String name;
 	String contents;
@@ -69,8 +78,11 @@ struct Token {
 		Operator as_operator;
 		Keyword as_keyword;
 		Assignment as_assignment;
+		Directive as_directive;
 	};
 };
+
+_Static_assert(sizeof(Token) <= 64, "Too big");
 
 String token_to_string(Token token);
 

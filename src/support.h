@@ -51,9 +51,11 @@ struct String {
 	Uint64 size;
 };
 
-// Create a String from a string literal.
 #define SLIT(content) \
-	((const String){ .data = CAST(Uint8 *, content), .size = sizeof(content) - 1 })
+	{ .data = CAST(Uint8*, content), .size = sizeof(content) - 1 }
+
+#define SCLIT(content) \
+	((const String)SLIT(content))
 
 Bool string_assign(String *string, const char *source);
 void string_free(String *string);

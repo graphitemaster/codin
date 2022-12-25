@@ -207,18 +207,18 @@ static String unquote(const String string) {
 }
 
 static CallingConvention string_to_calling_convention(String string) {
-	/**/ if (string_compare(&string, &SLIT("odin")))        return CCONV_ODIN;
-	else if (string_compare(&string, &SLIT("contextless"))) return CCONV_CONTEXTLESS;
-	else if (string_compare(&string, &SLIT("cdecl")))       return CCONV_CDECL;
-	else if (string_compare(&string, &SLIT("c")))           return CCONV_CDECL;
-	else if (string_compare(&string, &SLIT("stdcall")))     return CCONV_STDCALL;
-	else if (string_compare(&string, &SLIT("std")))         return CCONV_STDCALL;
-	else if (string_compare(&string, &SLIT("fastcall")))    return CCONV_FASTCALL;
-	else if (string_compare(&string, &SLIT("fast")))        return CCONV_FASTCALL;
-	else if (string_compare(&string, &SLIT("none")))        return CCONV_NONE;
-	else if (string_compare(&string, &SLIT("naked")))       return CCONV_NAKED;
-	else if (string_compare(&string, &SLIT("win64")))       return CCONV_STDCALL;
-	else if (string_compare(&string, &SLIT("sysv")))        return CCONV_CDECL;
+	/**/ if (string_compare(&string, &SCLIT("odin")))        return CCONV_ODIN;
+	else if (string_compare(&string, &SCLIT("contextless"))) return CCONV_CONTEXTLESS;
+	else if (string_compare(&string, &SCLIT("cdecl")))       return CCONV_CDECL;
+	else if (string_compare(&string, &SCLIT("c")))           return CCONV_CDECL;
+	else if (string_compare(&string, &SCLIT("stdcall")))     return CCONV_STDCALL;
+	else if (string_compare(&string, &SCLIT("std")))         return CCONV_STDCALL;
+	else if (string_compare(&string, &SCLIT("fastcall")))    return CCONV_FASTCALL;
+	else if (string_compare(&string, &SCLIT("fast")))        return CCONV_FASTCALL;
+	else if (string_compare(&string, &SCLIT("none")))        return CCONV_NONE;
+	else if (string_compare(&string, &SCLIT("naked")))       return CCONV_NAKED;
+	else if (string_compare(&string, &SCLIT("win64")))       return CCONV_STDCALL;
+	else if (string_compare(&string, &SCLIT("sysv")))        return CCONV_CDECL;
 	return CCONV_INVALID;
 }
 
@@ -431,8 +431,8 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 			return node;
 		}
 		break;
-	case KIND_HASH:
-		UNIMPLEMENTED("hash");
+	case KIND_DIRECTIVE:
+		UNIMPLEMENTED("Directive");
 	case KIND_KEYWORD:
 		switch (token.as_keyword) {
 		case KEYWORD_DISTINCT:
@@ -1144,7 +1144,7 @@ static Node *parse_statement(Parser *parser) {
 		break;
 	case KIND_ATTRIBUTE:
 		UNIMPLEMENTED("Attribute");
-	case KIND_HASH:
+	case KIND_DIRECTIVE:
 		UNIMPLEMENTED("Directive");
 	case KIND_LBRACE:
 		node = parse_block_statement(parser, false);

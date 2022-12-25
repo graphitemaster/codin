@@ -18,6 +18,16 @@
 #define KEYWORD(...)
 #endif
 
+// Directives begin with '#'
+#ifndef DIRECTIVE
+#define DIRECTIVE(...)
+#endif
+
+// Attributes begin with '@'
+#ifndef ATTRIBUTE
+#define ATTRIBUTE(...)
+#endif
+
 // Token kinds
 //   ENUM,         NAME
 KIND(INVALID,      "invalid")
@@ -28,7 +38,7 @@ KIND(LITERAL,      "literal")
 KIND(OPERATOR,     "operator")
 KIND(KEYWORD,      "keyword")
 KIND(ASSIGNMENT,   "assignment")
-KIND(HASH,         "directive")     // '#' is a directive (not an operator)
+KIND(DIRECTIVE,    "directive")     // '#' is a directive (not an operator)
 KIND(ATTRIBUTE,    "attribute")     // '@' is a attribute (not an operator)
 KIND(SEMICOLON,    "semicolon")     // ';' is a terminator
 KIND(LBRACE,       "left brace")    // '{' is not an operator
@@ -140,9 +150,80 @@ KEYWORD(CONTEXT,     "context")
 KEYWORD(ASM,         "asm")
 KEYWORD(MATRIX,      "matrix")
 
+// Direcitves
+//        ENUM,                     MATCH
+DIRECTIVE(OPTIONAL_OK,              "optional_ok")
+DIRECTIVE(OPTIONAL_ALLOCATOR_ERROR, "optional_allocator_error")
+DIRECTIVE(BOUNDS_CHECK,             "bounds_check")
+DIRECTIVE(NO_BOUNDS_CHECK,          "no_bounds_check")
+DIRECTIVE(TYPE_ASSERT,              "type_assert")
+DIRECTIVE(NO_TYPE_ASSERT,           "no_type_assert")
+DIRECTIVE(ALIGN,                    "align")
+DIRECTIVE(RAW_UNION,                "raw_union")
+DIRECTIVE(PACKED,                   "packed")
+DIRECTIVE(TYPE,                     "type")
+DIRECTIVE(SIMD,                     "simd")
+DIRECTIVE(SOA,                      "soa")
+DIRECTIVE(PARTIAL,                  "partial")
+DIRECTIVE(SPARSE,                   "sparse")
+DIRECTIVE(RELATIVE,                 "relative")
+DIRECTIVE(FORCE_INLINE,             "force_inline")
+DIRECTIVE(FORCE_NO_INLINE,          "force_no_inline")
+DIRECTIVE(NO_NIL,                   "no_nil")
+DIRECTIVE(SHARED_NIL,               "shared_nil")
+DIRECTIVE(MAYBE,                    "maybe")
+DIRECTIVE(NO_ALIAS,                 "no_alias")
+DIRECTIVE(C_VARARG,                 "c_vararg")
+DIRECTIVE(CONST,                    "const")
+DIRECTIVE(ANY_INT,                  "any_int")
+DIRECTIVE(SUBTYPE,                  "subtype")
+DIRECTIVE(BY_PTR,                   "by_ptr")
+DIRECTIVE(ASSERT,                   "assert")
+DIRECTIVE(PANIC,                    "panic")
+DIRECTIVE(UNROLL,                   "unroll")
+
+/*
+// This is actually impossible to lex within the Odin language because @ can
+// introduce a single attribute (easy to lex), or it can introduce an attribute
+// list which is a comma-separated list of attributes inside parenthesis. We
+// just lex '@' to KIND_ATTRIBUTE and it's up to the parser to parse the list.
+//
+//        ENUM,                     MATCH,                    WHERE
+ATTRIBUTE(TEST,                     "test",                   ATTRIBUTE_PROC)
+ATTRIBUTE(EXPORT,                   "export",                 ATTRIBUTE_PROC | ATTRIBUTE_VAR)
+ATTRIBUTE(LINKAGE,                  "linkage",                ATTRIBUTE_PROC | ATTRIBUTE_VAR)
+ATTRIBUTE(REQUIRE,                  "require",                ATTRIBUTE_PROC | ATTRIBUTE_VAR)
+ATTRIBUTE(INIT,                     "init",                   ATTRIBUTE_PROC)
+ATTRIBUTE(DEFERRED,                 "deferred",               ATTRIBUTE_PROC)
+ATTRIBUTE(DEFERRED_NONE,            "deferred_none",          ATTRIBUTE_PROC)
+ATTRIBUTE(DEFERRED_IN,              "deferred_in",            ATTRIBUTE_PROC)
+ATTRIBUTE(DEFERRED_OUT,             "deferred_out",           ATTRIBUTE_PROC)
+ATTRIBUTE(DEFERRED_IN_OUT,          "deferred_in_out",        ATTRIBUTE_PROC)
+ATTRIBUTE(LINK_NAME,                "link_name",              ATTRIBUTE_PROC | ATTRIBUTE_VAR)
+ATTRIBUTE(LINK_PREFIX,              "link_prefix",            ATTRIBUTE_PROC)
+ATTRIBUTE(DEPRECATED,               "deprecated",             ATTRIBUTE_PROC)
+ATTRIBUTE(WARNING,                  "warning",                ATTRIBUTE_PROC)
+ATTRIBUTE(REQUIRE_RESULTS,          "require_results",        ATTRIBUTE_PROC)
+ATTRIBUTE(DISABLED,                 "disabled",               ATTRIBUTE_PROC)
+ATTRIBUTE(COLD,                     "cold",                   ATTRIBUTE_PROC)
+ATTRIBUTE(OPTIMIZATION_MODE,        "optimization_mode",      ATTRIBUTE_PROC)
+ATTRIBUTE(OBJC_NAME,                "objc_name",              ATTRIBUTE_PROC)
+ATTRIBUTE(OBJC_IS_CLASS_METHOD,     "objc_is_class_method",   ATTRIBUTE_PROC)
+ATTRIBUTE(OBJC_TYPE,                "objc_type",              ATTRIBUTE_PROC)
+ATTRIBUTE(REQUIRE_TARGET_FEATURE,   "require_target_feature", ATTRIBUTE_PROC)
+ATTRIBUTE(ENABLE_TARGET_FEATURE,    "enable_target_feature",  ATTRIBUTE_PROC)
+ATTRIBUTE(STATIC,                   "static",                 ATTRIBUTE_VAR)
+ATTRIBUTE(THREAD_LOCAL,             "thread_local",           ATTRIBUTE_VAR)
+ATTRIBUTE(LINK_SECTION,             "link_section",           ATTRIBUTE_VAR)
+ATTRIBUTE(PRIVATE,                  "private",                ATTRIBUTE_PROC | ATTRIBUTE_CONST | ATTRIBUTE_TYPE)
+ATTRIBUTE(OBJC_CLASS,               "objc_class",             ATTRIBUTE_TYPE)
+*/
+
 // NOTE(dweiler): Actual types are not keywords because in Odin a type can be
 // replaced within a package. This makes types regular identifiers.
 
+#undef ATTRIBUTE
+#undef DIRECTIVE
 #undef KEYWORD
 #undef OPERATOR
 #undef LITERAL
