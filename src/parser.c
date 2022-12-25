@@ -234,6 +234,7 @@ static Node *parse_identifier(Parser *parser) {
 }
 
 static Node *parse_operand(Parser *parser, Bool lhs);
+static Node *parse_expression(Parser *parser, Bool lhs);
 static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs);
 
 static Node *parse_type_or_identifier(Parser *parser) {
@@ -394,6 +395,27 @@ static Node *parse_procedure_group(Parser *parser) {
 	return 0;
 }
 
+static Node *parse_directive(Parser *parser, Bool lhs) {
+	TRACE_ENTER("parse_directive");
+
+	expect_kind(parser, KIND_DIRECTIVE);
+
+	const Token token = parser->last_token;
+	Node *operand = 0;
+	switch (token.as_directive) {
+	default:
+		{
+			const String string = directive_to_string(token.as_directive);
+			ERROR("Unimplemented directive '%.*s'",
+				CAST(Sint32,      string.size),
+				CAST(const char*, string.data));
+		}
+		break;
+	}
+	TRACE_LEAVE();
+	return operand;
+}
+
 static Node *parse_operand(Parser *parser, Bool lhs) {
 	TRACE_ENTER("parse_operand");
 	const Token token = parser->this_token;
@@ -432,7 +454,9 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 		}
 		break;
 	case KIND_DIRECTIVE:
-		UNIMPLEMENTED("Directive");
+		node = parse_directive(parser, lhs);
+		TRACE_LEAVE();
+		return node;
 	case KIND_KEYWORD:
 		switch (token.as_keyword) {
 		case KEYWORD_DISTINCT:
@@ -487,8 +511,6 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 	TRACE_LEAVE();
 	return 0;
 }
-
-static Node *parse_expression(Parser *parser, Bool lhs);
 
 static Node *parse_value(Parser *parser) {
 	TRACE_ENTER("parse_value");
@@ -867,7 +889,7 @@ static Node *parse_block_statement(Parser *parser, Bool when) {
 
 static Node *parse_declaration_statement(Parser *parser, Array(Node*) names) {
 	// ':'
-	TRACE_ENTER("parse_value_declaration");
+	TRACE_ENTER("parse_declaration_statement");
 	Array(Node*) values = 0;
 	Node *type = parse_type_or_identifier(parser);
 	const Token token = parser->this_token;
@@ -1040,6 +1062,26 @@ static Node *parse_if_statement(Parser *parser) {
 	return node;
 }
 
+static Node *parse_return_statement(Parser *parser) {
+	expect_keyword(parser, KEYWORD_RETURN);
+
+	Array(Node*) results = 0;
+	while (!is_kind(parser->this_token, KIND_SEMICOLON) &&
+	       !is_kind(parser->this_token, KIND_RBRACE))
+	{
+		Node *arg = parse_expression(parser, false);
+		array_push(results, arg);
+		if (!is_operator(parser->this_token, OPERATOR_COMMA) || is_kind(parser->this_token, KIND_EOF)) {
+			break;
+		}
+		advancep(parser);
+	}
+
+	expect_kind(parser, KIND_SEMICOLON);
+
+	return tree_new_return_statement(parser->tree, results);
+}
+
 static Node *parse_statement(Parser *parser) {
 	TRACE_ENTER("parse_statement");
 	Node *node = 0;
@@ -1095,7 +1137,9 @@ static Node *parse_statement(Parser *parser) {
 		case KEYWORD_DEFER:
 			UNIMPLEMENTED("Defer statement");
 		case KEYWORD_RETURN:
-			UNIMPLEMENTED("Return statement");
+			node = parse_return_statement(parser);
+			TRACE_LEAVE();
+			return node;
 		case KEYWORD_BREAK:
 			FALLTHROUGH();
 		case KEYWORD_CONTINUE:
@@ -1160,32 +1204,7 @@ static Node *parse_statement(Parser *parser) {
 	}
 
 	if (is_keyword(token, KEYWORD_ELSE)) {
-		expect_keyword(parser, KEYWORD_ELSE);
-		// printf("'else' unattached to an 'if' or 'when' statement\n");
-		switch (parser->this_token.kind) {
-		case KIND_KEYWORD:
-			switch (parser->this_token.as_keyword) {
-			case KEYWORD_IF:
-				UNIMPLEMENTED("If");
-			case KEYWORD_WHEN:
-				UNIMPLEMENTED("When");
-			case KEYWORD_DO:
-				expect_keyword(parser, KEYWORD_DO);
-				UNIMPLEMENTED("Do");
-				break;
-			default:
-				break;
-			}
-			break;
-		case KIND_LBRACE:
-			{
-				Node *block = parse_block_statement(parser, false);
-				TRACE_LEAVE();
-				return block;
-			}
-		default:
-			break;
-		}
+		ERROR("'else' unattached to an 'if' or 'when' statement");
 	}
 
 	ICE("Expected statement");

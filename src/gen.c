@@ -206,6 +206,15 @@ static Bool gen_if_statement(Generator *generator, const IfStatement *statement,
 	return ok;
 }
 
+static Bool gen_return_statement(Generator *generator, const ReturnStatement *statement, StrBuf *strbuf, Sint32 depth) {
+	gen_padding(generator, depth, strbuf);
+	strbuf_put_string(strbuf, SCLIT("return "));
+	Bool ok = gen_node(generator, statement->results[0], strbuf, 0);
+	strbuf_put_rune(strbuf, ';');
+	strbuf_put_rune(strbuf, '\n');
+	return ok;
+}
+
 static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf, Sint32 depth) {
 	gen_padding(generator, depth, strbuf);
 	const Uint64 n_decls = array_size(statement->names);
@@ -278,7 +287,9 @@ static Bool gen_statement(Generator *generator, const Statement *statement, StrB
 	case STATEMENT_DECLARATION:
 		return gen_declaration_statement(generator, &statement->declaration, strbuf, depth);
 	case STATEMENT_IF:
-		return gen_if_statement(generator, &statement->iph, strbuf, depth);
+		return gen_if_statement(generator, &statement->if_, strbuf, depth);
+	case STATEMENT_RETURN:
+		return gen_return_statement(generator, &statement->return_, strbuf, depth);
 	case STATEMENT_BLOCK:
 		return gen_block_statement(generator, &statement->block, strbuf, depth);
 	default:

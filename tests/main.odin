@@ -17,4 +17,6 @@ main :: proc() -> i32 {
       fmt.printf("do print this\n");
     }
   } else do fmt.printf("do not print this\n");
+
+  return 0;
 }

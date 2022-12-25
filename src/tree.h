@@ -28,6 +28,7 @@ typedef struct BlockStatement BlockStatement;
 typedef struct AssignmentStatement AssignmentStatement;
 typedef struct DeclarationStatement DeclarationStatement;
 typedef struct IfStatement IfStatement;
+typedef struct ReturnStatement ReturnStatement;
 
 typedef struct Identifier Identifier;
 typedef struct Value Value;
@@ -66,6 +67,7 @@ enum StatementKind {
 	STATEMENT_ASSIGNMENT,
 	STATEMENT_DECLARATION,
 	STATEMENT_IF,
+	STATEMENT_RETURN,
 };
 
 struct UnaryExpression {
@@ -145,6 +147,10 @@ struct IfStatement {
 	Node *elif;
 };
 
+struct ReturnStatement {
+	Array(Node*) results;
+};
+
 struct Statement {
 	StatementKind kind;
 	union {
@@ -154,7 +160,8 @@ struct Statement {
 		BlockStatement       block;
 		AssignmentStatement  assignment;
 		DeclarationStatement declaration;
-		IfStatement          iph;
+		IfStatement          if_;
+		ReturnStatement      return_;
 	};
 };
 
@@ -247,6 +254,7 @@ Node *tree_new_import_statement(Tree *tree, String package);
 Node *tree_new_assignment_statement(Tree *tree, Assignment assignment, Array(Node*) lhs, Array(Node*) rhs);
 Node *tree_new_declaration_statement(Tree *tree, Node *type, Array(Node*) names, Array(Node*) values);
 Node *tree_new_if_statement(Tree *tree, Node *condition, Node *body, Node *elif);
+Node *tree_new_return_statement(Tree *tree, Array(Node*) results);
 Node *tree_new_identifier(Tree *tree, String contents);
 Node *tree_new_value(Tree *tree, Node *field, Node *val);
 Node *tree_new_literal_value(Tree *tree, Literal literal, String value);

@@ -470,6 +470,7 @@ Token lexer_next(Lexer *lexer) {
 			while (is_char(lexer->rune)) {
 				advancel(lexer);
 			}
+			token.string.data += 1; // Skip '#'
 			token.string.size = lexer->here - token.string.data;
 			if (directive_find(&token.string, &token.as_directive)) {
 				token.kind = KIND_DIRECTIVE;
