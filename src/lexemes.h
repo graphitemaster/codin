@@ -181,6 +181,11 @@ DIRECTIVE(BY_PTR,                   "by_ptr")
 DIRECTIVE(ASSERT,                   "assert")
 DIRECTIVE(PANIC,                    "panic")
 DIRECTIVE(UNROLL,                   "unroll")
+DIRECTIVE(LOCATION,                 "location")
+DIRECTIVE(LOAD,                     "load")
+DIRECTIVE(LOAD_HASH,                "load_hash")
+DIRECTIVE(DEFINED,                  "defined")
+DIRECTIVE(CONFIG,                   "config")
 
 /*
 // This is actually impossible to lex within the Odin language because @ can
