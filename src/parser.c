@@ -1,46 +1,30 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <setjmp.h>
 
 #include "parser.h"
 #include "lexer.h"
 #include "report.h"
 #include "tree.h"
 
+#define TRACE 0
+
 #ifdef ERROR
 #undef ERROR
 #endif
 
 #define ERROR(...) \
-	report_error(&parser->source, &parser->lexer.location, __VA_ARGS__); \
-	exit(1)
-
-static int s_trace_level = 0;
-#define TRACE_ENTER(name) \
 	do { \
-		break; \
-		s_trace_level++; \
-		for (int i = 0; i < s_trace_level; i++) printf(" "); \
-		printf("%s\n", (name)); \
+		report_error(&parser->source, &parser->lexer.location, __VA_ARGS__); \
+		longjmp(parser->jmp, 1); \
 	} while (0)
 
-#define TRACE_LEAVE() \
-	do { \
-		s_trace_level--; \
-	} while (0)
-
-// Internal compiler error.
 #define ICE(...) \
-	do { \
-		ERROR(__VA_ARGS__); \
-		exit(1); \
-	} while (0)
+	ERROR(__VA_ARGS__)
 
 #define UNIMPLEMENTED(what) \
-	do { \
-		ERROR("Unimplemented: %s", what); \
-		exit(1); \
-	} while (0)
+	ERROR("Unimplemented: %s", (what))
 
 void source_free(Source *source) {
 	string_free(source->contents);
@@ -75,21 +59,37 @@ struct Parser {
 	Token this_token; // This token is being processed
 	Token last_token; // Last token processed
 	Node *this_procedure;
+	int trace;
+	jmp_buf jmp;
 };
 
-void parser_free(Parser *parser) {
-	source_free(&parser->source);
+static void parser_trace_enter(Parser *parser, const char *function) {
+	if (TRACE) {
+		if (parser->trace) {
+			printf("%*c", parser->trace * 2, ' ');
+		}
+		puts(function);
+	}
+	parser->trace++;
 }
+
+static void parser_trace_leave(Parser *parser) {
+	parser->trace--;
+}
+
+#define TRACE_ENTER() parser_trace_enter(parser, __FUNCTION__)
+#define TRACE_LEAVE() parser_trace_leave(parser)
 
 static Bool parser_init(Parser *parser, const char *filename) {
 	if (source_read(&parser->source, filename)) {
 		if (lexer_init(&parser->lexer, &parser->source)) {
 			parser->this_token.kind = KIND_INVALID;
 			parser->last_token.kind = KIND_INVALID;
+			parser->trace = 0;
 			return true;
 		}
 	}
-	parser_free(parser);
+	source_free(&parser->source);
 	return false;
 }
 
@@ -194,7 +194,7 @@ static CallingConvention string_to_calling_convention(String string) {
 }
 
 static Node *parse_identifier(Parser *parser) {
-	TRACE_ENTER("parse_identifier");
+	TRACE_ENTER();
 	const Token token = parser->this_token;
 	if (is_kind(token, KIND_IDENTIFIER)) {
 		advancep(parser);
@@ -209,7 +209,7 @@ static Node *parse_expression(Parser *parser, Bool lhs);
 static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs);
 
 static Node *parse_type_or_identifier(Parser *parser) {
-	TRACE_ENTER("parse_type_or_identifier");
+	TRACE_ENTER();
 	Node *operand = parse_operand(parser, true);
 	Node *type = parse_atom_expression(parser, operand, true);
 	TRACE_LEAVE();
@@ -217,7 +217,7 @@ static Node *parse_type_or_identifier(Parser *parser) {
 }
 
 static Node *parse_type(Parser *parser) {
-	TRACE_ENTER("parse_type");
+	TRACE_ENTER();
 	Node *type = parse_type_or_identifier(parser);
 	if (!type) {
 		advancep(parser);
@@ -255,14 +255,14 @@ static Node *parse_literal_value(Parser *parser, Node *type);
 
 static Node *parse_result_list(Parser *parser) {
 	(void)parser;
-	TRACE_ENTER("parse_result_list");
+	TRACE_ENTER();
 	UNIMPLEMENTED("parse_result_list not implemented");
 	TRACE_LEAVE();
 	return 0;
 }
 
 static Node *parse_results(Parser *parser, Bool *diverging) {
-	TRACE_ENTER("parse_results");
+	TRACE_ENTER();
 	if (!accepted_operator(parser, OPERATOR_ARROW)) {
 		TRACE_LEAVE();
 		ASSERT(false && "no arrow");
@@ -296,7 +296,7 @@ static Node *parse_results(Parser *parser, Bool *diverging) {
 }
 
 static Node *parse_procedure_type(Parser *parser) {
-	TRACE_ENTER("parse_procedure_type");
+	TRACE_ENTER();
 	CallingConvention convention = CCONV_INVALID;
 	if (is_literal(parser->this_token, LITERAL_STRING)) {
 		const Token token = expect_literal(parser, LITERAL_STRING);
@@ -330,7 +330,7 @@ static Node *parse_procedure_type(Parser *parser) {
 static Node *parse_body(Parser *parser);
 
 static Node *parse_procedure(Parser *parser) {
-	TRACE_ENTER("parse_procedure");
+	TRACE_ENTER();
 	Node *type = parse_procedure_type(parser);
 	if (is_keyword(parser->this_token, KEYWORD_WHERE)) {
 		expect_keyword(parser, KEYWORD_WHERE);
@@ -358,7 +358,7 @@ static Node *parse_procedure(Parser *parser) {
 }
 
 static Node *parse_procedure_group(Parser *parser) {
-	TRACE_ENTER("parse_procedure_group");
+	TRACE_ENTER();
 	UNIMPLEMENTED("parse_procedure_group");
 	TRACE_LEAVE();
 	return 0;
@@ -367,7 +367,7 @@ static Node *parse_procedure_group(Parser *parser) {
 static Node *parse_call_expression(Parser *parser, Node *operand);
 
 static Node *parse_directive(Parser *parser, Bool lhs) {
-	TRACE_ENTER("parse_directive");
+	TRACE_ENTER();
 
 	expect_kind(parser, KIND_DIRECTIVE);
 
@@ -386,12 +386,13 @@ static Node *parse_directive(Parser *parser, Bool lhs) {
 		}
 		break;
 	}
+
 	TRACE_LEAVE();
 	return operand;
 }
 
 static Node *parse_operand(Parser *parser, Bool lhs) {
-	TRACE_ENTER("parse_operand");
+	TRACE_ENTER();
 	const Token token = parser->this_token;
 	Node *node = 0;
 	switch (token.kind) {
@@ -494,7 +495,7 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 }
 
 static Node *parse_value(Parser *parser) {
-	TRACE_ENTER("parse_value");
+	TRACE_ENTER();
 	if (is_kind(parser->this_token, KIND_LBRACE)) {
 		UNIMPLEMENTED("Literal value");
 	}
@@ -504,7 +505,7 @@ static Node *parse_value(Parser *parser) {
 }
 
 static Node *parse_call_expression(Parser *parser, Node *operand) {
-	TRACE_ENTER("parse_call_expression");
+	TRACE_ENTER();
 	Array(Node*) arguments = 0;
 	expect_operator(parser, OPERATOR_OPENPAREN);
 	while (!is_operator(parser->this_token, OPERATOR_CLOSEPAREN) && !is_kind(parser->this_token, KIND_EOF)) {
@@ -544,7 +545,7 @@ static Node *parse_call_expression(Parser *parser, Node *operand) {
 }
 
 static Array(Node*) parse_element_list(Parser *parser) {
-	TRACE_ENTER("parse_element_list");
+	TRACE_ENTER();
 	Array(Node*) elements = 0;
 	while (!is_kind(parser->this_token, KIND_RBRACE) && !is_kind(parser->this_token, KIND_EOF)) {
 		Node *element = parse_value(parser);
@@ -561,7 +562,7 @@ static Array(Node*) parse_element_list(Parser *parser) {
 }
 
 static Node *parse_literal_value(Parser *parser, Node *type) {
-	TRACE_ENTER("parse_literal_value");
+	TRACE_ENTER();
 	Array(Node*) elements = 0;
 	expect_kind(parser, KIND_LBRACE);
 	if (!is_kind(parser->this_token, KIND_RBRACE)) {
@@ -573,7 +574,7 @@ static Node *parse_literal_value(Parser *parser, Node *type) {
 }
 
 static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
-	TRACE_ENTER("parse_atom_expression");
+	TRACE_ENTER();
 	if (!operand) {
 		// if (allow_type) return 0
 		// ERROR("Expected an operand");
@@ -631,7 +632,7 @@ static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
 				node = parse_identifier(parser);
 				operand = tree_new_selector_expression(parser->tree, operand, node);
 				break;
-	
+
 			case OPERATOR_OPENBRACKET:
 				UNIMPLEMENTED("Bracket");
 			case OPERATOR_POINTER:
@@ -665,7 +666,7 @@ static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
 }
 
 static Node *parse_unary_expression(Parser *parser, Bool lhs) {
-	TRACE_ENTER("parse_unary_expression");
+	TRACE_ENTER();
 	const Token token = parser->this_token;
 	switch (token.kind) {
 	case KIND_OPERATOR:
@@ -733,7 +734,7 @@ static Node *parse_unary_expression(Parser *parser, Bool lhs) {
 }
 
 static Node *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec) {
-	TRACE_ENTER("parse_binary_expression");
+	TRACE_ENTER();
 
 	Node *expr = parse_unary_expression(parser, lhs);
 
@@ -755,8 +756,8 @@ static Node *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec) {
 		} 
 		if (is_keyword(token, KEYWORD_IF) || is_keyword(token, KEYWORD_WHEN)) {
 			// TODO(dweiler): Ternary if and when expressions.
-			break;
 			UNIMPLEMENTED("if when ternary");
+			break;
 		} else if (!is_kind(token, KIND_OPERATOR)) {
 			break;
 		}
@@ -783,14 +784,14 @@ static Node *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec) {
 }
 
 static FORCE_INLINE Node *parse_expression(Parser *parser, Bool lhs) {
-	TRACE_ENTER("parse_expression");
+	TRACE_ENTER();
 	Node *node = parse_binary_expression(parser, lhs, 1);
 	TRACE_LEAVE();
 	return node;
 }
 
 static Array(Node*) parse_expression_list(Parser *parser, Bool lhs) {
-	TRACE_ENTER("parse_expression_list");
+	TRACE_ENTER();
 	Array(Node*) list = 0;
 	for (;;) {
 		Node *expr = parse_expression(parser, lhs);
@@ -807,14 +808,14 @@ static Array(Node*) parse_expression_list(Parser *parser, Bool lhs) {
 }
 
 static FORCE_INLINE Array(Node*) parse_lhs_expression_list(Parser *parser) {
-	TRACE_ENTER("parse_lhs_expression_list");
+	TRACE_ENTER();
 	Array(Node*) result = parse_expression_list(parser, true);
 	TRACE_LEAVE();
 	return result;
 }
 
 static FORCE_INLINE Array(Node*) parse_rhs_expression_list(Parser *parser) {
-	TRACE_ENTER("parse_rhs_expression_list");
+	TRACE_ENTER();
 	Array(Node*) result = parse_expression_list(parser, false);
 	TRACE_LEAVE();
 	return result;
@@ -823,7 +824,7 @@ static FORCE_INLINE Array(Node*) parse_rhs_expression_list(Parser *parser) {
 static Node *parse_statement(Parser *parser);
 
 static Array(Node*) parse_statement_list(Parser *parser) {
-	TRACE_ENTER("parse_statement_list");
+	TRACE_ENTER();
 
 	Array(Node*) statements = 0;
 
@@ -842,12 +843,13 @@ static Array(Node*) parse_statement_list(Parser *parser) {
 			// TODO(dweiler): More robust.
 		}
 	}
+
 	TRACE_LEAVE();
 	return statements;
 }
 
 static Node *parse_body(Parser *parser) {
-	TRACE_ENTER("parse_body");
+	TRACE_ENTER();
 	expect_kind(parser, KIND_LBRACE);
 	Array(Node*) statements = parse_statement_list(parser);
 	expect_kind(parser, KIND_RBRACE);
@@ -858,7 +860,7 @@ static Node *parse_body(Parser *parser) {
 
 static Node *parse_block_statement(Parser *parser, Bool when) {
 	// The block statement may be part of a compile-time when statement.
-	TRACE_ENTER("parse_block_statement");
+	TRACE_ENTER();
 	if (when) {
 		UNIMPLEMENTED("when block");
 	}
@@ -870,7 +872,7 @@ static Node *parse_block_statement(Parser *parser, Bool when) {
 
 static Node *parse_declaration_statement(Parser *parser, Array(Node*) names) {
 	// ':'
-	TRACE_ENTER("parse_declaration_statement");
+	TRACE_ENTER();
 	Array(Node*) values = 0;
 	Node *type = parse_type_or_identifier(parser);
 	const Token token = parser->this_token;
@@ -895,7 +897,7 @@ static Node *parse_declaration_statement(Parser *parser, Array(Node*) names) {
 }
 
 static Node *parse_simple_statement(Parser* parser) {
-	TRACE_ENTER("parse_simple_statement");
+	TRACE_ENTER();
 	Array(Node*) lhs = parse_lhs_expression_list(parser);
 	const Token token = parser->this_token;
 	switch (token.kind) {
@@ -945,11 +947,13 @@ static Node *parse_simple_statement(Parser* parser) {
 	array_free(lhs);
 
 	Node *node = tree_new_expression_statement(parser->tree, lhs0);
+
 	TRACE_LEAVE();
 	return node;
 }
 
 static Node *parse_import_declaration(Parser *parser) {
+	TRACE_ENTER();
 	expect_keyword(parser, KEYWORD_IMPORT);
 	Token name;
 	switch (parser->this_token.kind) {
@@ -960,13 +964,13 @@ static Node *parse_import_declaration(Parser *parser) {
 		break;
 	}
 	expect_semicolon(parser);
-	return tree_new_import_statement(parser->tree, name.string);
+	Node *result = tree_new_import_statement(parser->tree, name.string);
+	TRACE_LEAVE();
+	return result;
 }
 
 static Node *convert_statement_to_body(Parser *parser, Node *statement) {
-	if (statement->kind != NODE_STATEMENT) {
-		ICE("Expected a statement");
-	}
+	ASSERT(statement->kind == NODE_STATEMENT);
 	const StatementKind kind = statement->statement.kind;
 	if (kind == STATEMENT_BLOCK || kind == STATEMENT_EMPTY) {
 		ERROR("Expected a regular statement");
@@ -977,22 +981,17 @@ static Node *convert_statement_to_body(Parser *parser, Node *statement) {
 }
 
 static Node *convert_statement_to_expression(Parser *parser, Node *statement) {
-	if (statement->kind != NODE_STATEMENT) {
-		ICE("Expected a statement");
-		return 0;
-	}
-
+	ASSERT(statement->kind == NODE_STATEMENT);
 	const StatementKind kind = statement->statement.kind;
 	if (kind == STATEMENT_EXPRESSION) {
 		return statement->statement.expression.expression;
 	}
-
 	ERROR("Expected a statement");
 	return 0;
 }
 
 static Node *parse_do_body(Parser *parser) {
-	TRACE_ENTER("parse_do_body");
+	TRACE_ENTER();
 	Node *statement = parse_statement(parser);
 	Node *body = convert_statement_to_body(parser, statement);
 	TRACE_LEAVE();
@@ -1000,7 +999,7 @@ static Node *parse_do_body(Parser *parser) {
 }
 
 static Node *parse_if_statement(Parser *parser) {
-	TRACE_ENTER("parse_if_statement");
+	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_IF);
 
@@ -1042,6 +1041,8 @@ static Node *parse_if_statement(Parser *parser) {
 }
 
 static Node *parse_return_statement(Parser *parser) {
+	TRACE_ENTER();
+
 	expect_keyword(parser, KEYWORD_RETURN);
 
 	Array(Node*) results = 0;
@@ -1058,11 +1059,14 @@ static Node *parse_return_statement(Parser *parser) {
 
 	expect_kind(parser, KIND_SEMICOLON);
 
-	return tree_new_return_statement(parser->tree, results);
+	Node *result = tree_new_return_statement(parser->tree, results);
+
+	TRACE_LEAVE();
+	return result;
 }
 
 static Node *parse_statement(Parser *parser) {
-	TRACE_ENTER("parse_statement");
+	TRACE_ENTER();
 	Node *node = 0;
 	const Token token = parser->this_token;
 	switch (token.kind) {
@@ -1196,11 +1200,22 @@ Tree *parse(const char *filename) {
 		return 0;
 	}
 
+	parser_trace_enter(&parser, "parse");
+
 	Tree *tree = malloc(sizeof *tree);
 	tree_init(tree);
 
-	parser.tree = tree;
+	tree->source = parser.source;
+
+	parser.tree = tree;	
 	advancep(&parser);
+
+	if (setjmp(parser.jmp) != 0) {
+		parser_trace_leave(&parser);
+		tree_free(tree);
+		return 0;
+	}
+
 	while (!is_kind(parser.this_token, KIND_EOF)) {
 		Node *statement = parse_statement(&parser);
 		if (statement) {
@@ -1211,7 +1226,6 @@ Tree *parse(const char *filename) {
 		}
 	}
 
-	tree->source = parser.source;
-
+	parser_trace_leave(&parser);
 	return tree;
 }
