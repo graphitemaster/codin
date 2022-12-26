@@ -54,30 +54,35 @@ static Bool gen_call_expression(Generator *generator, const CallExpression *expr
 	(void)depth;
 
 	const Node *operand = expression->operand;
-	if (operand->kind == NODE_IDENTIFIER) {
+	switch (operand->kind) {
+	case NODE_IDENTIFIER:
 		// Could be a type cast.
 		if (string_compare(operand->identifier.contents, SCLIT("f32"))) {
 			strbuf_put_formatted(strbuf, "CODIN_f16_to_f32");
 		} else if (!gen_name(generator, operand, strbuf)) {
 			return false;
 		}
-	} else if (operand->kind == NODE_EXPRESSION) {
-		const Expression *expression = &operand->expression;
-		if (expression->kind == EXPRESSION_SELECTOR) {
-			// Can be one of:
-			// 	package.procedure()
-			//	object.procedure()
-			//	object->procedure(object, ...)
-			const SelectorExpression *selector = &expression->selector;
-			ASSERT(selector->identifier->kind == NODE_IDENTIFIER);
-			const Identifier *identifier = &selector->identifier->identifier;
-			if (!gen_identifier(generator, identifier, strbuf)) {
-				return false;
+		break;
+	case NODE_EXPRESSION:
+		{
+			const Expression *expression = &operand->expression;
+			if (expression->kind == EXPRESSION_SELECTOR) {
+				// Can be one of:
+				// 	package.procedure()
+				//	object.procedure()
+				//	object->procedure(object, ...)
+				const SelectorExpression *selector = &expression->selector;
+				ASSERT(selector->identifier->kind == NODE_IDENTIFIER);
+				const Identifier *identifier = &selector->identifier->identifier;
+				if (!gen_identifier(generator, identifier, strbuf)) {
+					return false;
+				}
 			}
 		}
-	} else if (operand->kind == NODE_DIRECTIVE) {
+		break;
+	case NODE_DIRECTIVE:
 		return gen_directive(generator, &operand->directive, strbuf);
-	} else {
+	default:
 		return false;
 	}
 
