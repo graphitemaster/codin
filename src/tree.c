@@ -192,10 +192,9 @@ Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 fl
 	return node;
 }
 
-Node *tree_new_directive(Tree *tree, DirectiveKind directive, Node *expression) {
+Node *tree_new_directive(Tree *tree, DirectiveKind kind) {
 	Node *node = new_node(tree, NODE_DIRECTIVE);
-	node->directive.directive = directive;
-	node->directive.expression = expression;
+	node->directive.kind = kind;
 	return node;
 }
 
@@ -590,12 +589,8 @@ static void tree_dump_procedure_type(const ProcedureType *procedure, Sint32 dept
 
 static void tree_dump_directive(const Directive *directive, Sint32 depth) {
 	tree_dump_pad(depth);
-	printf("(directive\n");
-	const String string = directive_to_string(directive->directive);
-	tree_dump_pad(depth + 1);
-	printf("\"%.*s\"\n", SFMT(string));
-	tree_dump_node(directive->expression, depth + 1);
-	putchar(')');
+	const String string = directive_to_string(directive->kind);
+	printf("(directive '%.*s\')", SFMT(string));
 }
 
 void tree_dump_node(const Node *node, Sint32 depth) {

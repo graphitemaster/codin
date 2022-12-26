@@ -220,8 +220,7 @@ struct ProcedureType {
 };
 
 struct Directive {
-	DirectiveKind directive;
-	Node *expression;
+	DirectiveKind kind;
 };
 
 struct Node {
@@ -270,7 +269,7 @@ Node *tree_new_compound_literal(Tree *tree, Node *type, Array(Node*) elements);
 Node *tree_new_field_list(Tree *tree, Array(Node*) list);
 Node *tree_new_procedure(Tree *tree, Node *type, Node *body);
 Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags, CallingConvention convention);
-Node *tree_new_directive(Tree *tree, DirectiveKind directive, Node *expression);
+Node *tree_new_directive(Tree *tree, DirectiveKind directive);
 
 void tree_init(Tree *tree);
 void tree_free(Tree *tree);

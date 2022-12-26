@@ -375,8 +375,7 @@ static Node *parse_directive(Parser *parser, Bool lhs) {
 	Node *operand = 0;
 	switch (token.as_directive) {
 	case DIRECTIVE_LOAD:
-		operand = tree_new_identifier(parser->tree, directive_to_string(token.as_directive));
-		operand = tree_new_directive(parser->tree, token.as_directive, parse_call_expression(parser, 0));
+		operand = tree_new_directive(parser->tree, token.as_directive);
 		break;
 	default:
 		{

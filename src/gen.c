@@ -48,6 +48,7 @@ static Bool gen_name(Generator *generator, const Node *node, StrBuf *strbuf) {
 }
 
 static Bool gen_expression(Generator *generator, const Expression *expression, StrBuf *strbuf, Sint32 depth);
+static Bool gen_directive(Generator *generator, const Directive *directive, StrBuf *strbuf);
 
 static Bool gen_call_expression(Generator *generator, const CallExpression *expression, StrBuf *strbuf, Sint32 depth) {
 	(void)depth;
@@ -74,6 +75,8 @@ static Bool gen_call_expression(Generator *generator, const CallExpression *expr
 				return false;
 			}
 		}
+	} else if (operand->kind == NODE_DIRECTIVE) {
+		return gen_directive(generator, &operand->directive, strbuf);
 	} else {
 		return false;
 	}
@@ -314,26 +317,40 @@ static Bool gen_literal_value(Generator *generator, const Node *type, const Lite
 }
 
 static Bool gen_directive(Generator *generator, const Directive *directive, StrBuf *strbuf) {
-	(void)generator;
-	(void)strbuf;
-	switch (directive->directive) {
+	switch (directive->kind) {
 	case DIRECTIVE_LOAD:
 		{
-			// Check if there is an optional type-cast for this directive.
-			const CallExpression *call = &directive->expression->expression.call;
-			Array(Node*) arguments = call->arguments;
-			if (array_size(arguments) == 2) {
-				const Node *type = arguments[1];
-				ASSERT(type->kind == NODE_IDENTIFIER);
-				const String ident = type->identifier.contents;
-				strbuf_put_rune(strbuf, '(');
-				strbuf_put_string(strbuf, ident);
-				strbuf_put_rune(strbuf, ')');
-			} else {
-				strbuf_put_string(strbuf, SCLIT("(void*)"));
+			// Find the call expression matching the load directive
+			const Tree *tree = generator->tree;
+			const Uint64 n_nodes = array_size(tree->nodes);
+			for (Uint64 j = 0; j < n_nodes; j++) {
+				const Node *find = tree->nodes[j];
+				if (find->kind != NODE_EXPRESSION) {
+					continue;
+				}
+				const Expression *expression = &find->expression;
+				if (expression->kind != EXPRESSION_CALL) {
+					continue;
+				}
+				const CallExpression *call = &expression->call;
+				const Node *operand = call->operand;
+				if (operand->kind == NODE_DIRECTIVE && &operand->directive == directive) {
+					Array(Node *) arguments = call->arguments;
+					if (array_size(arguments) == 2) {
+					const Node *type = arguments[1];
+					ASSERT(type->kind == NODE_IDENTIFIER);
+					const String ident = type->identifier.contents;
+					strbuf_put_rune(strbuf, '(');
+					strbuf_put_string(strbuf, ident);
+					strbuf_put_rune(strbuf, ')');
+					} else {
+						strbuf_put_string(strbuf, SCLIT("(void*)"));
+					}
+					strbuf_put_string(strbuf, SCLIT("(&CODIN_load_0[0])"));
+					return true;
+				}
 			}
-			strbuf_put_string(strbuf, SCLIT("(&CODIN_load_0[0])"));
-			return true;
+			return false;
 		}
 	default:
 		printf("Unimplemented directive\n");
@@ -664,14 +681,7 @@ static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 	return true;
 }
 
-static Bool gen_load_directive_prelude(Generator *generator, const Directive *directive, StrBuf *strbuf) {
-	// The #load directive is treated like a function call.
-	const Node *expr_node = directive->expression;
-	ASSERT(expr_node->kind == NODE_EXPRESSION);
-	ASSERT(expr_node->expression.kind == EXPRESSION_CALL);
-
-	const CallExpression *call = &expr_node->expression.call;
-
+static Bool gen_load_directive_prelude(Generator *generator, const CallExpression *call, StrBuf *strbuf) {
 	// Should have at least one argument.
 	Array(Node*) args = call->arguments;
 	ASSERT(array_size(args) >= 1);
@@ -739,7 +749,8 @@ static Bool gen_load_directive_prelude(Generator *generator, const Directive *di
 	strbuf_put_string(strbuf, SCLIT("};\n\n"));
 
 	array_free(contents);
-	return false;
+
+	return true;
 }
 
 static Bool gen_load_directives_prelude(Generator *generator, StrBuf *strbuf) {
@@ -747,14 +758,24 @@ static Bool gen_load_directives_prelude(Generator *generator, StrBuf *strbuf) {
 	const Uint64 n_nodes = array_size(tree->nodes);
 	for (Uint64 i = 0; i < n_nodes; i++) {
 		const Node *node = tree->nodes[i];
-		if (node->kind != NODE_DIRECTIVE) {
+		if (node->kind != NODE_DIRECTIVE || node->directive.kind != DIRECTIVE_LOAD) {
 			continue;
 		}
-		const Directive *directive = &node->directive;
-		if (directive->directive != DIRECTIVE_LOAD) {
-			continue;
+		// Search all nodes to find the call expression which references this load directive.
+		for (Uint64 j = 0; j < n_nodes; j++) {
+			const Node *find = tree->nodes[j];
+			if (find->kind != NODE_EXPRESSION) {
+				continue;
+			}
+			const Expression *expression = &find->expression;
+			if (expression->kind != EXPRESSION_CALL) {
+				continue;
+			}
+			if (expression->call.operand == node) {
+				gen_load_directive_prelude(generator, &expression->call, strbuf);
+				break;
+			}
 		}
-		gen_load_directive_prelude(generator, directive, strbuf);
 	}
 	return true;
 }
