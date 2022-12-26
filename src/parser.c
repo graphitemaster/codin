@@ -43,22 +43,21 @@ static int s_trace_level = 0;
 	} while (0)
 
 void source_free(Source *source) {
-	string_free(&source->contents);
-	string_free(&source->name);
+	string_free(source->contents);
+	string_free(source->name);
 }
 
 static Bool source_read(Source *source, const char *filename) {
-	source->name.data = 0;
-	if (!string_assign(&source->name, filename)) return false;
+	source->name = string_from_null(filename);
 	String *contents = &source->contents;
 	FILE *fp = fopen(filename, "rb");
 	if (!fp) goto L_error;
 	if (fseek(fp, 0, SEEK_END) != 0) goto L_error;
-	contents->size = ftell(fp);
+	contents->length = ftell(fp);
 	if (fseek(fp, 0, SEEK_SET) != 0) goto L_error;
-	contents->data = malloc(contents->size);
-	if (!contents->data) goto L_error;
-	if (fread(contents->data, contents->size, 1, fp) != 1) goto L_error;
+	contents->contents = malloc(contents->length);
+	if (!contents->contents) goto L_error;
+	if (fread(contents->contents, contents->length, 1, fp) != 1) goto L_error;
 	fclose(fp);
 	return true;
 L_error:
@@ -125,11 +124,7 @@ static Token expect_kind(Parser *parser, Kind kind) {
 	if (!is_kind(token, kind)) {
 		const String want = kind_to_string(kind);
 		const String have = token_to_string(token);
-		ERROR("Expected '%.*s', got '%.*s'\n",
-			CAST(int,         want.size),
-			CAST(const char*, want.data),
-			CAST(int,         have.size),
-			CAST(const char*, have.data));
+		ERROR("Expected '%.*s', got '%.*s'\n", SFMT(want), SFMT(have));
 	}
 	return advancep(parser);
 }
@@ -139,11 +134,7 @@ static Token expect_operator(Parser *parser, OperatorKind op) {
 	if (!is_operator(token, op)) {
 		const String want = operator_to_string(op);
 		const String have = token_to_string(token);
-		ERROR("Expected operator '%.*s', got '%.*s'",
-			CAST(int,         want.size),
-			CAST(const char*, want.data),
-			CAST(int,         have.size),
-			CAST(const char*, have.data));
+		ERROR("Expected operator '%.*s', got '%.*s'", SFMT(want), SFMT(have));
 	}
 	return advancep(parser);
 }
@@ -153,11 +144,7 @@ static Token expect_keyword(Parser* parser, KeywordKind keyword) {
 	if (!is_keyword(token, keyword)) {
 		const String want = keyword_to_string(keyword);
 		const String have = token_to_string(token);
-		ERROR("Expected keyword '%.*s', got '%.*s'",
-			CAST(int,         want.size),
-			CAST(const char*, want.data),
-			CAST(int,         have.size),
-			CAST(const char*, have.data));
+		ERROR("Expected keyword '%.*s', got '%.*s'", SFMT(want), SFMT(have));
 	}
 	return advancep(parser);
 }
@@ -167,11 +154,7 @@ static Token expect_assignment(Parser *parser, AssignmentKind assignment) {
 	if (!is_assignment(token, assignment)) {
 		const String want = assignment_to_string(assignment);
 		const String have = token_to_string(token);
-		ERROR("Expected assignment '%.*s', got '%.*s'",
-			CAST(int,         want.size),
-			CAST(const char*, want.data),
-			CAST(int,         have.size),
-			CAST(const char*, have.data));
+		ERROR("Expected assignment '%.*s', got '%.*s'", SFMT(want), SFMT(have));
 	}
 	return advancep(parser);
 }
@@ -181,11 +164,7 @@ static Token expect_literal(Parser *parser, LiteralKind literal) {
 	if (!is_literal(token, literal)) {
 		const String want = literal_to_string(literal);
 		const String have = token_to_string(token);
-		ERROR("Expected literal '%.*s', got '%.*s'",
-			CAST(int,         want.size),
-			CAST(const char*, want.data),
-			CAST(int,         have.size),
-			CAST(const char*, have.data));
+		ERROR("Expected literal '%.*s', got '%.*s'", SFMT(want), SFMT(have));
 	}
 	return advancep(parser);
 }
@@ -199,18 +178,18 @@ static FORCE_INLINE Token expect_semicolon(Parser *parser) {
 }
 
 static CallingConvention string_to_calling_convention(String string) {
-	/**/ if (string_compare(&string, &SCLIT("odin")))        return CCONV_ODIN;
-	else if (string_compare(&string, &SCLIT("contextless"))) return CCONV_CONTEXTLESS;
-	else if (string_compare(&string, &SCLIT("cdecl")))       return CCONV_CDECL;
-	else if (string_compare(&string, &SCLIT("c")))           return CCONV_CDECL;
-	else if (string_compare(&string, &SCLIT("stdcall")))     return CCONV_STDCALL;
-	else if (string_compare(&string, &SCLIT("std")))         return CCONV_STDCALL;
-	else if (string_compare(&string, &SCLIT("fastcall")))    return CCONV_FASTCALL;
-	else if (string_compare(&string, &SCLIT("fast")))        return CCONV_FASTCALL;
-	else if (string_compare(&string, &SCLIT("none")))        return CCONV_NONE;
-	else if (string_compare(&string, &SCLIT("naked")))       return CCONV_NAKED;
-	else if (string_compare(&string, &SCLIT("win64")))       return CCONV_STDCALL;
-	else if (string_compare(&string, &SCLIT("sysv")))        return CCONV_CDECL;
+	/**/ if (string_compare(string, SCLIT("odin")))        return CCONV_ODIN;
+	else if (string_compare(string, SCLIT("contextless"))) return CCONV_CONTEXTLESS;
+	else if (string_compare(string, SCLIT("cdecl")))       return CCONV_CDECL;
+	else if (string_compare(string, SCLIT("c")))           return CCONV_CDECL;
+	else if (string_compare(string, SCLIT("stdcall")))     return CCONV_STDCALL;
+	else if (string_compare(string, SCLIT("std")))         return CCONV_STDCALL;
+	else if (string_compare(string, SCLIT("fastcall")))    return CCONV_FASTCALL;
+	else if (string_compare(string, SCLIT("fast")))        return CCONV_FASTCALL;
+	else if (string_compare(string, SCLIT("none")))        return CCONV_NONE;
+	else if (string_compare(string, SCLIT("naked")))       return CCONV_NAKED;
+	else if (string_compare(string, SCLIT("win64")))       return CCONV_STDCALL;
+	else if (string_compare(string, SCLIT("sysv")))        return CCONV_CDECL;
 	return CCONV_INVALID;
 }
 
@@ -322,11 +301,9 @@ static Node *parse_procedure_type(Parser *parser) {
 	if (is_literal(parser->this_token, LITERAL_STRING)) {
 		const Token token = expect_literal(parser, LITERAL_STRING);
 		const String string = token.string;
-		convention = string_to_calling_convention(string_unquote(string));
+		convention = string_to_calling_convention(string_unquote(string, "\"`"));
 		if (convention == CCONV_INVALID) {
-			ERROR("Unknown calling convention '%.*s'",
-				CAST(Sint32,       string.size),
-				CAST(const char *, string.data));
+			ERROR("Unknown calling convention '%.*s'", SFMT(string));
 			TRACE_LEAVE();
 			return 0;
 		}
@@ -947,9 +924,7 @@ static Node *parse_simple_statement(Parser* parser) {
 		default:
 			{
 				const String string = operator_to_string(token.as_operator);
-				ICE("Unexpected operator '%.*s' in statement",
-					CAST(int,         string.size),
-					CAST(const char*, string.data));
+				ICE("Unexpected operator '%.*s' in statement", SFMT(string));
 			}
 		}
 		break;
@@ -1184,9 +1159,7 @@ static Node *parse_statement(Parser *parser) {
 		default:
 			{
 				const String string = operator_to_string(token.as_operator);
-				ICE("Unexpected operator '%.*s' in statement",
-					CAST(int,         string.size),
-					CAST(const char*, string.data));
+				ICE("Unexpected operator '%.*s' in statement", SFMT(string));
 			}
 			break;
 		}

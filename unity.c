@@ -7,5 +7,6 @@
 #include "src/path.c"
 #include "src/report.c"
 #include "src/strbuf.c"
-#include "src/support.c"
+#include "src/string.c"
 #include "src/tree.c"
+#include "src/utility.c"

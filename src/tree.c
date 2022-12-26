@@ -261,9 +261,7 @@ static void tree_dump_unary_expression(const UnaryExpression *expression, Sint32
 	const String operation = operator_to_string(expression->operation);
 	printf("(unary\n");
 	tree_dump_pad(depth + 1);
-	printf("'%.*s'",
-		CAST(Sint32,       operation.size),
-		CAST(const char *, operation.data));
+	printf("'%.*s'", SFMT(operation));
 	if (expression->operand) {
 		putchar('\n');
 		tree_dump_node(expression->operand, depth + 1);
@@ -276,9 +274,7 @@ static void tree_dump_binary_expression(const BinaryExpression *expression, Sint
 	const String operation = operator_to_string(expression->operation);
 	printf("(binary\n");
 	tree_dump_pad(depth + 1);
-	printf("'%.*s'\n",
-		CAST(Sint32,       operation.size),
-		CAST(const char *, operation.data));
+	printf("'%.*s'\n", SFMT(operation));
 	tree_dump_node(expression->lhs, depth + 1);
 	putchar('\n');
 	tree_dump_node(expression->rhs, depth + 1);
@@ -384,9 +380,7 @@ static void tree_dump_block_statement(const BlockStatement *statement, Sint32 de
 static void tree_dump_import_statement(const ImportStatement *statement, Sint32 depth) {
 	(void)depth;
 	const String package = statement->package;
-	printf("(import '%.*s')",
-		CAST(Sint32,       package.size),
-		CAST(const char *, package.data));
+	printf("(import '%.*s')", SFMT(package));
 }
 
 static void tree_dump_expression_statement(const ExpressionStatement *statement, Sint32 depth) {
@@ -401,9 +395,7 @@ static void tree_dump_assignment_statement(const AssignmentStatement *statement,
 	const String assignment = assignment_to_string(statement->assignment);
 	printf("(assignment\n");
 	tree_dump_pad(depth + 1);
-	printf("'%.*s'\n",
-		CAST(Sint32,       assignment.size),
-		CAST(const char *, assignment.data));
+	printf("'%.*s'\n", SFMT(assignment));
 	const Uint64 n_assignments = array_size(statement->lhs);
 	for (Uint64 i = 0; i < n_assignments; i++) {
 		const Node *const lhs = statement->lhs[i];
@@ -495,9 +487,7 @@ static void tree_dump_identifier(const Identifier *identifier, Sint32 depth) {
 	tree_dump_pad(depth);
 	(void)depth;
 	const String contents = identifier->contents;
-	printf("(ident '%.*s')",
-		CAST(Sint32,       contents.size),
-		CAST(const char *, contents.data));
+	printf("(ident '%.*s')", SFMT(contents));
 }
 
 static void tree_dump_value(const Value *value, Sint32 depth) {
@@ -513,11 +503,7 @@ static void tree_dump_literal_value(const LiteralValue *literal_value, Sint32 de
 	(void)depth;
 	const String literal = literal_to_string(literal_value->literal);
 	const String value = literal_value->value;
-	printf("(literal %.*s '%.*s')",
-		CAST(Sint32,       literal.size),
-		CAST(const char *, literal.data),
-		CAST(Sint32,       value.size),
-		CAST(const char *, value.data));
+	printf("(literal %.*s '%.*s')", SFMT(literal), SFMT(value));
 }
 
 static void tree_dump_compound_literal(const CompoundLiteral *compound_literal, Sint32 depth) {
@@ -607,9 +593,7 @@ static void tree_dump_directive(const Directive *directive, Sint32 depth) {
 	printf("(directive\n");
 	const String string = directive_to_string(directive->directive);
 	tree_dump_pad(depth + 1);
-	printf("\"%.*s\"\n",
-		CAST(Sint32,      string.size),
-		CAST(const char*, string.data));
+	printf("\"%.*s\"\n", SFMT(string));
 	tree_dump_node(directive->expression, depth + 1);
 	putchar(')');
 }

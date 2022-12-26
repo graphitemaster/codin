@@ -50,8 +50,7 @@ DEPS := $(filter %.d,$(SRCS:%.c=$(DEPDIR)/%.d))
 #
 # C flags
 #
-CFLAGS := -Isrc
-CFLAGS += -Wall
+CFLAGS := -Wall
 CFLAGS += -Wextra
 CFLAGS += -std=c11
 
@@ -110,9 +109,11 @@ ifeq ($(UNUSED), 1)
 	CFLAGS += -fdata-sections
 endif
 
-# Enable link-time optimizations if requested.
+# Enable link-time optimizations if requested. But not in debug builds.
 ifeq ($(LTO),1)
+ifeq ($(DEBUG),0)
 	CFLAGS += -flto
+endif
 endif
 
 # Sanitizer selection.

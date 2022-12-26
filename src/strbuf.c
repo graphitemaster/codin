@@ -39,8 +39,8 @@ Bool strbuf_put_rune(StrBuf *strbuf, Rune ch) {
 
 Bool strbuf_put_string(StrBuf *strbuf, String string) {
 	const Uint64 size = array_size(strbuf->contents);
-	if (array_expand(strbuf->contents, string.size)) {
-		memcpy(&strbuf->contents[size], string.data, string.size);
+	if (array_expand(strbuf->contents, string.length)) {
+		memcpy(&strbuf->contents[size], string.contents, string.length);
 		return true;
 	}
 	return false;
@@ -65,7 +65,7 @@ Bool strbuf_put_formatted(StrBuf *strbuf, const char *fmt, ...) {
 
 String strbuf_result(StrBuf *strbuf) {
 	return (String) {
-		.data = strbuf->contents,
-		.size = array_size(strbuf->contents)
+		.contents = strbuf->contents,
+		.length   = array_size(strbuf->contents)
 	};
 }

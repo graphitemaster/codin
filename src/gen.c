@@ -5,6 +5,7 @@
 #include "gen.h"
 #include "tree.h"
 #include "utility.h"
+#include "string.h"
 
 static Bool gen_value(Generator *generator, const Node *type, const Node *node, StrBuf *strbuf);
 static Bool gen_node(Generator *generator, const Node *node, StrBuf *strbuf, Sint32 depth);
@@ -20,9 +21,7 @@ static Bool gen_padding(Generator *generator, Sint32 depth, StrBuf *strbuf) {
 static Bool gen_identifier(Generator *generator, const Identifier *identifier, StrBuf *strbuf) {
 	(void)generator;
 	const String contents = identifier->contents;
-	return strbuf_put_formatted(strbuf, "%.*s",
-		CAST(Sint32,       contents.size),
-		CAST(const char *, contents.data));
+	return strbuf_put_formatted(strbuf, "%.*s", SFMT(contents));
 }
 
 static Bool gen_type(Generator *generator, const Node *node, StrBuf *strbuf) {
@@ -44,9 +43,7 @@ static Bool gen_name(Generator *generator, const Node *node, StrBuf *strbuf) {
 	(void)generator;
 	ASSERT(node->kind == NODE_IDENTIFIER);
 	const String string = node->identifier.contents;
-	strbuf_put_formatted(strbuf, "%.*s",
-		CAST(Sint32, string.size),
-		CAST(const char*, string.data));
+	strbuf_put_formatted(strbuf, "%.*s", SFMT(string));
 	return true;
 }
 
@@ -58,7 +55,7 @@ static Bool gen_call_expression(Generator *generator, const CallExpression *expr
 	const Node *operand = expression->operand;
 	if (operand->kind == NODE_IDENTIFIER) {
 		// Could be a type cast.
-		if (string_compare(&operand->identifier.contents, &SCLIT("f32"))) {
+		if (string_compare(operand->identifier.contents, SCLIT("f32"))) {
 			strbuf_put_formatted(strbuf, "CODIN_f16_to_f32");
 		} else if (!gen_name(generator, operand, strbuf)) {
 			return false;
@@ -292,15 +289,11 @@ static Bool gen_literal_value(Generator *generator, const Node *type, const Lite
 		// printf("TYPE = %p\n", type);
 		if (type && type->kind == NODE_IDENTIFIER) {
 			const String contents = type->identifier.contents;
-			if (string_compare(&contents, &SCLIT("f16"))) {
-				// Convert the literal to a float with strtof
-				Uint64 len = literal->value.size;
-				Array(char) copy = 0;
-				array_resize(copy, len + 1);
-				memcpy(copy, literal->value.data, len);
-				copy[len] = '\0';
-				char *end = 0;
+			if (string_compare(contents, SCLIT("f16"))) {
+				char *copy = string_to_null(literal->value);
+				char *end;
 				const Float32 value = strtof(copy, &end);
+				free(copy);
 				const Uint16 pattern = f32_to_f16(value);
 				return strbuf_put_formatted(strbuf, "0x%04x /* %f */", pattern, value);
 			}
@@ -696,7 +689,7 @@ static Bool gen_load_directive_prelude(Generator *generator, const Directive *di
 		const Node *type = args[1];
 		ASSERT(type->kind == NODE_IDENTIFIER);
 		const String ident = type->identifier.contents;
-		is_cstring = string_compare(&ident, &SCLIT("cstring"));
+		is_cstring = string_compare(ident, SCLIT("cstring"));
 	}
 
 	// The file argument should be a string literal.

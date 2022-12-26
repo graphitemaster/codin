@@ -1,33 +1,63 @@
-#include <string.h> // memcpy, strlen
+#include <string.h> // memcpy, strlen, memcmp
 #include <stdlib.h> // malloc, free
 
-#include "support.h"
+#include "string.h"
 
-Bool string_compare(const String *lhs, const String *rhs) {
-	return lhs->size == rhs->size && memcmp(lhs->data, rhs->data, lhs->size) == 0;
+const String STRING_NIL = { 0, 0 };
+
+String string_from_data(const Uint8 *data, Uint64 length) {
+	if (length == 0) {
+		return STRING_NIL;
+	}
+	Uint8 *storage = malloc(length);
+	if (!storage) {
+		return STRING_NIL;
+	}
+	memcpy(storage, data, length);	
+	return (String) { storage, length };
 }
 
-String string_unquote(String string) {
-	const Rune quote = string.data[0];
-	if (quote == '\"' || quote == '`') {
-		return (String) { .data = &string.data[1], .size = string.size - 2 };
+String string_from_null(const char *string) {
+	if (string == 0) {
+		return STRING_NIL;
+	}
+	const Uint64 length = strlen(string);
+	return string_from_data(CAST(const Uint8 *, string), length);
+}
+
+String string_copy(String string) {
+	return string_from_data(string.contents, string.length);
+}
+
+Bool string_compare(String lhs, String rhs) {
+	return lhs.length == rhs.length &&
+		memcmp(lhs.contents, rhs.contents, lhs.length) == 0;
+}
+
+String string_unquote(String string, const char *quote_set) {
+	if (string.length == 0) {
+		return STRING_NIL;
+	}
+	const char *ch = strchr(quote_set, string.contents[0]);
+	if (ch && string.contents[string.length - 1] == *ch) {
+		return (String) { string.contents + 1, string.length - 2 };
 	}
 	return string;
 }
 
-Bool string_assign(String *string, const char *source) {
-	const Uint64 length = strlen(source);
-	void *data = malloc(length);
-	if (!data) return false;
-	memcpy(data, source, length);
-	string->data = CAST(Uint8*, data);
-	string->size = length;
-	return true;
+void string_free(String string) {
+	free(string.contents);
 }
 
-void string_free(String *string) {
-	free(string->data);
-	string->data = 0;
+char* string_to_null(String string) {
+	const Uint64 length = string.length;
+	char *result = malloc(length + 1);
+	if (result) {
+		memcpy(result, string.contents, length);
+		result[length] = '\0';
+		return result;
+	}
+	return 0;
 }
 
 static void utf8_to_utf16_core(const char *const source, Uint16 *destination, Uint64 *const length) {

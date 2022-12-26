@@ -24,7 +24,7 @@ Array(Uint8) readfile(String filename) {
 	// Need to introduce the NUL to call fopen.
 	StrBuf strbuf;
 	strbuf_init(&strbuf);
-	strbuf_put_string(&strbuf, string_unquote(filename));
+	strbuf_put_string(&strbuf, string_unquote(filename, "\""));
 	strbuf_put_rune(&strbuf, '\0');
 	FILE *fp = fopen(CAST(const char *, strbuf.contents), "rb");
 	strbuf_free(&strbuf);

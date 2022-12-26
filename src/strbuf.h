@@ -1,6 +1,6 @@
 #ifndef CODIN_STRBUF_H
 #define CODIN_STRBUF_H
-#include "support.h"
+#include "string.h"
 #include "array.h"
 
 typedef struct StrBuf StrBuf;

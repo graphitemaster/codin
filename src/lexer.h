@@ -1,6 +1,6 @@
 #ifndef CODIN_LEXER_H
 #define CODIN_LEXER_H
-#include "support.h"
+#include "string.h"
 
 typedef struct Lexer Lexer;
 typedef struct Token Token;

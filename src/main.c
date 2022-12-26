@@ -106,7 +106,7 @@ static Bool build(const char *path, Bool is_file) {
 	path_mkdir(".build");
 
 	const String filename = strbuf_result(&file);
-	FILE *fp = fopen(CAST(const char *, filename.data), "wb");
+	FILE *fp = fopen(CAST(const char *, filename.contents), "wb");
 	if (!fp) {
 		fprintf(stderr, "Failed to write C0\n");
 		free(project);
@@ -117,7 +117,7 @@ static Bool build(const char *path, Bool is_file) {
 	strbuf_free(&file);
 
 	const String source = strbuf_result(&strbuf);
-	fwrite(source.data, source.size, 1, fp);
+	fwrite(source.contents, source.length, 1, fp);
 	fclose(fp);
 
 	strbuf_clear(&strbuf);
@@ -136,7 +136,7 @@ static Bool build(const char *path, Bool is_file) {
 
 	// Compile it.
 	const String compile = strbuf_result(&strbuf);
-	const Bool status = system(CAST(const char *, compile.data)) == 0;
+	const Bool status = system(CAST(const char *, compile.contents)) == 0;
 	strbuf_free(&strbuf);
 
 	return status;

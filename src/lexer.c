@@ -17,9 +17,9 @@
 	} while (0)
 
 // Searches for a keyword
-static Bool keyword_find(const String *string, KeywordKind *result) {
+static Bool keyword_find(String string, KeywordKind *result) {
 	#define KEYWORD(ident, content) \
-		if (string_compare(string, &SCLIT(content))) { \
+		if (string_compare(string, SCLIT(content))) { \
 			*result = KEYWORD_ ## ident; \
 			return true; \
 		}
@@ -28,9 +28,9 @@ static Bool keyword_find(const String *string, KeywordKind *result) {
 }
 
 // Searches for a operator
-static Bool operator_find(const String *string, OperatorKind *result) {
+static Bool operator_find(String string, OperatorKind *result) {
 	#define OPERATOR(ident, content, ...) \
-		if (string_compare(string, &SCLIT(content))) { \
+		if (string_compare(string, SCLIT(content))) { \
 			*result = OPERATOR_ ## ident; \
 			return true; \
 		}
@@ -38,9 +38,9 @@ static Bool operator_find(const String *string, OperatorKind *result) {
 	return false;
 }
 
-static Bool directive_find(const String *string, DirectiveKind *result) {
+static Bool directive_find(String string, DirectiveKind *result) {
 	#define DIRECTIVE(ident, content, ...) \
-		if (string_compare(string, &SCLIT(content))) { \
+		if (string_compare(string, SCLIT(content))) { \
 			*result = DIRECTIVE_ ## ident; \
 			return true; \
 		}
@@ -126,15 +126,15 @@ static void scan(Lexer* lexer, Sint32 base) {
 static Token scan_numeric(Lexer *lexer, Bool dot) {
 	Token token;
 	token.kind = KIND_LITERAL;
-	token.string.data = CAST(Uint8*, lexer->here);
-	token.string.size = 1;
+	token.string.contents = CAST(Uint8*, lexer->here);
+	token.string.length = 1;
 	token.as_literal = LITERAL_INTEGER;
 	token.location = lexer->location;
 
 	if (dot) {
 		token.as_literal = LITERAL_FLOAT;
-		token.string.data--;
-		token.string.size++;
+		token.string.contents--;
+		token.string.length++;
 		token.location.column--;
 		scan(lexer, 10);
 		goto L_exponent;
@@ -197,20 +197,20 @@ L_exponent:
 		token.as_literal = LITERAL_IMAGINARY;
 	}
 
-	token.string.size = lexer->here - token.string.data;
+	token.string.length = lexer->here - token.string.contents;
 
 	return token;
 }
 
 Bool lexer_init(Lexer *lexer, const Source *source) {
-	const String *const contents = &source->contents;
-	if (contents->size == 0) {
+	const String *const string = &source->contents;
+	if (string->length == 0) {
 		return false;
 	}
 
 	lexer->input.source = source;
-	lexer->input.cur = contents->data;
-	lexer->input.end = contents->data + contents->size;
+	lexer->input.cur = string->contents;
+	lexer->input.end = string->contents + string->length;
 
 	lexer->location.column = 1;
 	lexer->location.line = 1;
@@ -239,8 +239,8 @@ Token lexer_next(Lexer *lexer) {
 	Token token;
 	token.kind = KIND_INVALID;
 
-	token.string.data = CAST(Uint8*, lexer->here);
-	token.string.size = 1; // One rune.
+	token.string.contents = CAST(Uint8*, lexer->here);
+	token.string.length = 1; // One rune.
 
 	token.location = lexer->location;
 
@@ -251,13 +251,13 @@ Token lexer_next(Lexer *lexer) {
 		while (is_char(lexer->rune) || is_digit(lexer->rune)) {
 			advancel(lexer);
 		}
-		token.string.size = lexer->here - token.string.data;
+		token.string.length = lexer->here - token.string.contents;
 		// Check if this token is actually a keyword.
-		if (keyword_find(&token.string, &token.as_keyword)) {
+		if (keyword_find(token.string, &token.as_keyword)) {
 			token.kind = KIND_KEYWORD;
 		}
 		// Check if this token is actually a operator.
-		if (operator_find(&token.string, &token.as_operator)) {
+		if (operator_find(token.string, &token.as_operator)) {
 			token.kind = KIND_OPERATOR;
 		}
 	} else if (rune >= '0' && rune <= '9') {
@@ -307,7 +307,7 @@ Token lexer_next(Lexer *lexer) {
 				}
 				token.kind = KIND_LITERAL;
 				token.as_literal = LITERAL_STRING;
-				token.string.size = lexer->here - token.string.data;
+				token.string.length = lexer->here - token.string.contents;
 			}
 			break;
 		case '.':
@@ -470,9 +470,9 @@ Token lexer_next(Lexer *lexer) {
 			while (is_char(lexer->rune)) {
 				advancel(lexer);
 			}
-			token.string.data += 1; // Skip '#'
-			token.string.size = lexer->here - token.string.data;
-			if (directive_find(&token.string, &token.as_directive)) {
+			token.string.contents += 1; // Skip '#'
+			token.string.length = lexer->here - token.string.contents;
+			if (directive_find(token.string, &token.as_directive)) {
 				token.kind = KIND_DIRECTIVE;
 			} else {
 				token.kind = KIND_INVALID;
