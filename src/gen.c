@@ -592,14 +592,13 @@ static Bool gen_c0_f16_prelude(StrBuf *strbuf) {
 	strbuf_put_string(strbuf, SCLIT("static FORCE_INLINE f16 CODIN_f32_to_f16(f32 f) {\n"));
 	strbuf_put_string(strbuf, SCLIT("\tconst union { f32 f; u32 u; } s = { f };\n"));
 	strbuf_put_string(strbuf, SCLIT("\tconst u32 e = s.u >> 23;\n"));
-	strbuf_put_string(strbuf, SCLIT("\tconst u32 base = CODIN_f16_base[e+ 0x1ff];\n"));
+	strbuf_put_string(strbuf, SCLIT("\tconst u32 base = CODIN_f16_base[e & 0x1ff];\n"));
 	strbuf_put_string(strbuf, SCLIT("\tconst u8 shift = CODIN_f16_shift[e & 0x1ff];\n"));
 	strbuf_put_string(strbuf, SCLIT("\treturn base + ((s.u & 0x007fffff) >> shift);\n"));
 	strbuf_put_string(strbuf, SCLIT("}\n\n"));
 
 	static const union { Uint32 u; float f; } MAGIC = { 113 << 23 };
 	strbuf_put_string(strbuf, SCLIT("static FORCE_INLINE f32 CODIN_f16_to_f32(f16 f) {\n"));
-	strbuf_put_string(strbuf, SCLIT("\tconst union { f16 f; u16 u; } s = { f };\n"));
 	strbuf_put_string(strbuf, SCLIT("\tunion { u32 u; f32 f; } o = { (u32)(f & 0x7fff) << 13 };\n"));
 	strbuf_put_formatted(strbuf, "\tconst u32 exp = 0x%08x & o.u;\n", 0x7c00 << 13);
 	strbuf_put_formatted(strbuf, "\to.u += 0x%08x;\n", (127 - 15) << 23);
