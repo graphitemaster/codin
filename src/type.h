@@ -8,23 +8,23 @@ typedef enum TypeFlag TypeFlag;
 typedef struct TypeTrait TypeTrait;
 
 enum TypeKind {
-	TYPE_KIND_BOOL,        // b{8,16,32,64}, bool
-	TYPE_KIND_INT,         // {i,u}{8,16,32,64,128}
-	TYPE_KIND_FLOAT,       // f{16,32,64}
-	TYPE_KIND_COMPLEX,     // complex{32,64,128}
-	TYPE_KIND_QUATERNION,  // quaternion{64,128,256}
-	TYPE_KIND_MATRIX,      // matrix[0..3, 0..3]f{16,32,64}
-	TYPE_KIND_STRING,      // string
-	TYPE_KIND_RUNE,        // rune
-	TYPE_KIND_POINTER,     // ^T, or [^]T, or rawptr
-	TYPE_KIND_ARRAY,       // T[N], or T[enum], or [dynamic]T
-	TYPE_KIND_SLICE,       // T[]
-	TYPE_KIND_MAP,         // map[K,V]
-	TYPE_KIND_STRUCT,      // struct
-	TYPE_KIND_UNION,       // union
-	TYPE_KIND_ENUM,        // enum
-	TYPE_KIND_PROC,        // proc
-	TYPE_KIND_BITSET,      // bit_set
+	TYPE_KIND_BOOL,       // b{8,16,32,64}, bool
+	TYPE_KIND_INT,        // {i,u}{8,16,32,64,128}
+	TYPE_KIND_FLOAT,      // f{16,32,64}
+	TYPE_KIND_COMPLEX,    // complex{32,64,128}
+	TYPE_KIND_QUATERNION, // quaternion{64,128,256}
+	TYPE_KIND_MATRIX,     // matrix[0..3, 0..3]f{16,32,64}
+	TYPE_KIND_STRING,     // string
+	TYPE_KIND_RUNE,       // rune
+	TYPE_KIND_POINTER,    // ^T, or [^]T, or rawptr
+	TYPE_KIND_ARRAY,      // T[N], or T[enum], or [dynamic]T
+	TYPE_KIND_SLICE,      // T[]
+	TYPE_KIND_MAP,        // map[K,V]
+	TYPE_KIND_STRUCT,     // struct
+	TYPE_KIND_UNION,      // union
+	TYPE_KIND_ENUM,       // enum
+	TYPE_KIND_PROC,       // proc
+	TYPE_KIND_BITSET,     // bit_set
 };
 
 enum TypeFlag {
@@ -39,7 +39,7 @@ struct TypeTrait {
 	String identifier;
 	TypeKind kind;
 	TypeFlag flags;
-	int bits;
+	int size;
 };
 
 static const TypeTrait TYPE_TRAITS[] = {
@@ -60,7 +60,11 @@ static const TypeTrait TYPE_TRAITS[] = {
 	{ SLIT("u64"),  TYPE_KIND_INT,  TYPE_FLAG_UNSIGNED, 64  },
 	{ SLIT("u128"), TYPE_KIND_INT,  TYPE_FLAG_UNSIGNED, 128 },
 
-	{ SLIT("f16"),  TYPE_KIND_FLOAT, TYPE_FLAG_NONE,    }
+	{ SLIT("f16"),  TYPE_KIND_FLOAT, TYPE_FLAG_NONE,    16  },
+	{ SLIT("f32"),  TYPE_KIND_FLOAT, TYPE_FLAG_NONE,    32  },
+	{ SLIT("f64"),  TYPE_KIND_FLOAT, TYPE_FLAG_NONE,    64  },
 };
+
+// int, uint, bool, rune, byte
 
 #endif // CODIN_TYPE_H
