@@ -68,9 +68,11 @@ static Bool generate(const Tree *tree, StrBuf *strbuf) {
 	strbuf_init(strbuf);
 	if (!gen_run(&gen, strbuf)) {
 		strbuf_free(strbuf);
+		gen_free(&gen);
 		return false;
 	}
 
+	gen_free(&gen);
 	return true;
 }
 

@@ -202,7 +202,52 @@ static Bool gen_if_statement(Generator *generator, const IfStatement *statement,
 	return true;
 }
 
+static Bool gen_statement(Generator *generator, const Statement *statement, StrBuf *strbuf, Sint32 depth);
+
+static Bool gen_defer_statement(Generator *generator, const Node *node, StrBuf *strbuf, Sint32 depth) {
+	ASSERT(node->kind == NODE_STATEMENT);
+	if (node->statement.kind == STATEMENT_BLOCK) {
+		gen_padding(depth, strbuf);
+	}
+	if (!gen_node(generator, node, strbuf, depth)) {
+		return false;
+	}
+	if (node->statement.kind == STATEMENT_BLOCK) {
+		strbuf_put_rune(strbuf, '\n');
+	}
+	return true;
+}
+
+static Bool gen_defer_statements(Generator *generator, const Scope *scope, StrBuf *strbuf, Sint32 depth) {
+	Array(const DeferStatement*) defers = scope->defers;
+	const Uint64 n_defers = array_size(defers);
+	if (n_defers == 0) {
+		return true;
+	}
+	// Emit in reverse order.
+	for (Uint64 i = n_defers - 1; i < n_defers; i--) {
+		if (!gen_defer_statement(generator, defers[i]->statement, strbuf, depth)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static Bool gen_defers(Generator *generator, StrBuf *strbuf, Sint32 depth) {
+	Array(Scope*) scopes = generator->scopes;
+	const Uint64 n_scopes = array_size(scopes);
+	// Emit in reverse order.
+	for (Uint64 i = n_scopes - 1; i < n_scopes; i--) {
+		if (!gen_defer_statements(generator, scopes[i], strbuf, depth)) {
+			return false;
+		}
+	}
+	return true;
+}
+
 static Bool gen_return_statement(Generator *generator, const ReturnStatement *statement, StrBuf *strbuf, Sint32 depth) {
+	// Emit all defers up to this return point.
+	gen_defers(generator, strbuf, depth);
 	gen_padding(depth, strbuf);
 	strbuf_put_string(strbuf, SCLIT("return "));
 	if (!gen_node(generator, statement->results[0], strbuf, 0)) {
@@ -221,7 +266,6 @@ static Bool gen_for_statement(Generator *generator, const ForStatement *statemen
 	//	for init; cond; post {
 	//		body
 	//	}
-	//
 	//
 	// Into the following C
 	//
@@ -348,18 +392,38 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 	return true;
 }
 
-static Bool gen_statement(Generator *generator, const Statement *statement, StrBuf *strbuf, Sint32 depth);
 static Bool gen_block_statement(Generator *generator, const BlockStatement *statement, StrBuf *strbuf, Sint32 depth) {
 	strbuf_put_rune(strbuf, '{');
 	strbuf_put_rune(strbuf, '\n');
 	const Uint64 n_statements = array_size(statement->statements);
+
+	Scope *scope = malloc(sizeof *scope);
+	if (!scope) {
+		return false;
+	}
+
+	scope->defers = 0;
+	array_push(generator->scopes, scope);
+
 	for (Uint64 i = 0; i < n_statements; i++) {
 		const Node *node = statement->statements[i];
 		ASSERT(node->kind == NODE_STATEMENT);
-		if (!gen_statement(generator, &node->statement, strbuf, depth + 1)) {
-			return false;
+		if (node->statement.kind == STATEMENT_DEFER) {
+			array_push(scope->defers, &node->statement.defer);
+		} else {
+			if (!gen_statement(generator, &node->statement, strbuf, depth + 1)) {
+				return false;
+			}
 		}
 	}
+	// Don't bother generating defers if our last statement was a return since
+	// the return statement would've accounted for it already and one cannot
+	// execute any statements after a return.
+	if (statement->statements[n_statements - 1]->statement.kind != STATEMENT_RETURN) {
+		gen_defer_statements(generator, scope, strbuf, depth);
+	}
+	free(scope);
+	array_meta(generator->scopes)->size--;
 	gen_padding(depth, strbuf);
 	strbuf_put_rune(strbuf, '}');
 	return true;
@@ -394,7 +458,6 @@ static Bool gen_literal_value(Generator *generator, const Node *type, const Lite
 	case LITERAL_INTEGER:
 		FALLTHROUGH();
 	case LITERAL_FLOAT:
-		// printf("TYPE = %p\n", type);
 		if (type && type->kind == NODE_IDENTIFIER) {
 			const String contents = type->identifier.contents;
 			if (string_compare(contents, SCLIT("f16"))) {
@@ -974,7 +1037,13 @@ Bool gen_init(Generator *generator, const Tree *tree) {
 	generator->used_rel = 1 << INSTR_LTI32;
 	generator->used_bit = 0;
 	generator->used_flt = 0;
+	generator->scopes = 0;
 	return true;
+}
+
+void gen_free(Generator *generator) {
+	ASSERT(array_size(generator->scopes) == 0);
+	array_free(generator->scopes);
 }
 
 Bool gen_run(Generator *generator, StrBuf *strbuf) {

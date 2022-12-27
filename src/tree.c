@@ -173,6 +173,13 @@ Node *tree_new_return_statement(Tree *tree, Array(Node*) results) {
 	return node;
 }
 
+Node *tree_new_defer_statement(Tree *tree, Node *stmt) {
+	Node *node = new_statement(tree, STATEMENT_DEFER);
+	DeferStatement *statement = &node->statement.defer;
+	statement->statement = stmt;
+	return node;
+}
+
 Node *tree_new_value(Tree *tree, Node *field, Node *val) {
 	Node *node = new_node(tree, NODE_VALUE);
 	Value *value = &node->value;
@@ -537,12 +544,14 @@ static void tree_dump_for_statement(const ForStatement *statement, Sint32 depth)
 		putchar('\n');
 	}
 	if (statement->body) {
-		// tree_dump_pad(depth + 1);
 		tree_dump_node(statement->body, depth + 1);
 	}
-	// if (statement->post) {
-	// 	tree_dump_node(statement->post, depth + 2);
-	// }
+	putchar(')');
+}
+
+static void tree_dump_defer_statement(const DeferStatement *statement, Sint32 depth) {
+	printf("(defer\n");
+	tree_dump_node(statement->statement, depth + 1);
 	putchar(')');
 }
 
@@ -567,6 +576,8 @@ static void tree_dump_statement(const Statement *statement, Sint32 depth) {
 		return tree_dump_return_statement(&statement->return_, depth);
 	case STATEMENT_FOR:
 		return tree_dump_for_statement(&statement->for_, depth);
+	case STATEMENT_DEFER:
+		return tree_dump_defer_statement(&statement->defer, depth);
 	}
 }
 

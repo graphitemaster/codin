@@ -30,6 +30,7 @@ typedef struct DeclarationStatement DeclarationStatement;
 typedef struct IfStatement IfStatement;
 typedef struct ReturnStatement ReturnStatement;
 typedef struct ForStatement ForStatement;
+typedef struct DeferStatement DeferStatement;
 
 typedef struct Identifier Identifier;
 typedef struct Value Value;
@@ -72,6 +73,7 @@ enum StatementKind {
 	STATEMENT_IF,
 	STATEMENT_RETURN,
 	STATEMENT_FOR,
+	STATEMENT_DEFER,
 };
 
 struct UnaryExpression {
@@ -163,6 +165,10 @@ struct ForStatement {
 	Node *post;
 };
 
+struct DeferStatement {
+	Node *statement;
+};
+
 struct Statement {
 	StatementKind kind;
 	union {
@@ -175,6 +181,7 @@ struct Statement {
 		IfStatement          if_;
 		ReturnStatement      return_;
 		ForStatement         for_;
+		DeferStatement       defer;
 	};
 };
 
@@ -276,6 +283,7 @@ Node *tree_new_declaration_statement(Tree *tree, Node *type, Array(Node*) names,
 Node *tree_new_if_statement(Tree *tree, Node *init, Node *condition, Node *body, Node *elif);
 Node *tree_new_for_statement(Tree *tree, Node *init, Node *cond, Node *body, Node *post);
 Node *tree_new_return_statement(Tree *tree, Array(Node*) results);
+Node *tree_new_defer_statement(Tree *tree, Node *statement);
 Node *tree_new_identifier(Tree *tree, String contents);
 Node *tree_new_value(Tree *tree, Node *field, Node *val);
 Node *tree_new_literal_value(Tree *tree, LiteralKind literal, String value);

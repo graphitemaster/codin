@@ -1,8 +1,7 @@
 #ifndef CODIN_GEN_H
 #define CODIN_GEN_H
 #include "strbuf.h"
-
-typedef struct Tree Tree;
+#include "tree.h"
 
 typedef struct Generator Generator;
 
@@ -48,6 +47,12 @@ _Static_assert(INSTR_CMP_COUNT <= 64, "Too many instructions");
 _Static_assert(INSTR_REL_COUNT <= 64, "Too many instructions");
 _Static_assert(INSTR_BIT_COUNT <= 64, "Too many instructions");
 
+typedef struct Scope Scope;
+
+struct Scope {
+	Array(const DeferStatement*) defers;
+};
+
 struct Generator {
 	const Tree *tree;
 	Uint64 load_directive_id;
@@ -58,9 +63,12 @@ struct Generator {
 	Uint64 used_cmp;
 	Uint64 used_rel;
 	Uint64 used_bit;
+
+	Array(Scope*) scopes;
 };
 
 Bool gen_init(Generator *generator, const Tree *tree);
+void gen_free(Generator *generator);
 Bool gen_run(Generator *generator, StrBuf *strbuf);
 
 #endif // CODIN_GEN_H

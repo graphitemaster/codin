@@ -1144,20 +1144,6 @@ static Node *parse_if_statement(Parser *parser) {
 	const Sint32 depth = parser->expression_depth;
 	parser->expression_depth = -1;
 
-/*
-	// TODO(dweiler): init; cond
-	// TODO(dweiler): init; cond; post
-	Node *init = parse_simple_statement(parser);
-	Node *condition = 0;
-	if (is_kind(parser->this_token, KIND_LBRACE)) {
-		condition = convert_statement_to_expression(parser, init);
-		init = 0;
-	} else {
-		expect_semicolon(parser);
-		condition = parse_expression(parser, false);
-	}
-*/
-
 	Node *init = parse_simple_statement(parser);
 	Node *cond = 0;
 	if (accepted_control_statement_separator(parser)) {
@@ -1278,6 +1264,25 @@ static Node *parse_for_statement(Parser *parser) {
 	return cond;
 }
 
+static Node *parse_defer_statement(Parser *parser) {
+	TRACE_ENTER();
+	expect_keyword(parser, KEYWORD_DEFER);
+	Node *node = parse_statement(parser);
+	switch (node->statement.kind) {
+	case STATEMENT_EMPTY:
+		ERROR("Empty statement in defer");
+	case STATEMENT_DEFER:
+		ERROR("Cannot defer a defer statement");
+	case STATEMENT_RETURN:
+		ERROR("Cannot defer a return statement");
+	default:
+		break;
+	}
+	node = tree_new_defer_statement(parser->tree, node);
+	TRACE_LEAVE();
+	return node;
+}
+
 static Node *parse_return_statement(Parser *parser) {
 	TRACE_ENTER();
 
@@ -1362,7 +1367,9 @@ static Node *parse_statement(Parser *parser) {
 		case KEYWORD_SWITCH:
 			UNIMPLEMENTED("Switch statement");
 		case KEYWORD_DEFER:
-			UNIMPLEMENTED("Defer statement");
+			node = parse_defer_statement(parser);
+			TRACE_LEAVE();
+			return node;
 		case KEYWORD_RETURN:
 			node = parse_return_statement(parser);
 			TRACE_LEAVE();
