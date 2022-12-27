@@ -121,7 +121,7 @@ static Bool gen_unary_expression(Generator *generator, const UnaryExpression *ex
 }
 
 static Bool gen_binary_instruction(Generator *generator, const BinaryExpression *expression, StrBuf *strbuf) {
-	const char *what = "unknown";
+	const char *what = "lti32";
 	strbuf_put_formatted(strbuf, "%s(", what);
 	if (!gen_node(generator, expression->lhs, strbuf, 0)) return false;
 	strbuf_put_string(strbuf, SCLIT(", "));
@@ -210,6 +210,80 @@ static Bool gen_return_statement(Generator *generator, const ReturnStatement *st
 	}
 	strbuf_put_rune(strbuf, ';');
 	strbuf_put_rune(strbuf, '\n');
+	return true;
+}
+
+static Bool gen_for_statement(Generator *generator, const ForStatement *statement, StrBuf *strbuf, Sint32 depth) {
+	gen_padding(depth, strbuf);
+
+	// We convert the following Odin
+	//
+	//	for init; cond; post {
+	//		body
+	//	}
+	//
+	//
+	// Into the following C
+	//
+	//	{
+	//		init;
+	//		while cond {
+	//			body
+	//			post
+	//		}
+	//	}
+	strbuf_put_rune(strbuf, '{');
+	strbuf_put_rune(strbuf, '\n');
+
+	if (statement->init) {
+		gen_node(generator, statement->init, strbuf, depth + 1);
+	}
+
+	gen_padding(depth + 1, strbuf);
+
+	strbuf_put_string(strbuf, SCLIT("while ("));
+	if (statement->cond) {
+		gen_node(generator, statement->cond, strbuf, 0);
+	} else {
+		strbuf_put_rune(strbuf, '1');
+	}
+	strbuf_put_string(strbuf, SCLIT(") "));
+
+	// HACK(dweiler): We inject the post statement as the last statement in
+	// the body of the loop. This needs to be done in a smarter way because
+	// continue within the loop still needs to execute the post statement!
+	if (statement->post) {
+		array_push(statement->body->statement.block.statements, statement->post);
+	}	
+
+	gen_node(generator, statement->body, strbuf, depth + 1);
+	strbuf_put_rune(strbuf, '\n');
+
+	// TODO(dweiler): See above for how to reintroduce this later.
+	// if (statement->post) {
+	// 	gen_node(generator, statement->post, strbuf, depth + 1);
+	// }
+
+	gen_padding(depth, strbuf);
+	strbuf_put_rune(strbuf, '}');
+	strbuf_put_rune(strbuf, '\n');
+
+	return true;
+}
+
+static Bool gen_assignment_statement(Generator *generator, const AssignmentStatement *statement, StrBuf *strbuf, Sint32 depth) {
+	gen_padding(depth, strbuf);
+	switch (statement->assignment) {
+	case ASSIGNMENT_ADDEQ:
+		gen_node(generator, statement->lhs[0], strbuf, depth);
+		strbuf_put_string(strbuf, SCLIT(" += "));
+		gen_node(generator, statement->rhs[0], strbuf, 0);
+		strbuf_put_rune(strbuf, ';');
+		strbuf_put_rune(strbuf, '\n');
+		break;
+	default:
+		return false;
+	}
 	return true;
 }
 
@@ -303,6 +377,10 @@ static Bool gen_statement(Generator *generator, const Statement *statement, StrB
 		return gen_return_statement(generator, &statement->return_, strbuf, depth);
 	case STATEMENT_BLOCK:
 		return gen_block_statement(generator, &statement->block, strbuf, depth);
+	case STATEMENT_FOR:
+		return gen_for_statement(generator, &statement->for_, strbuf, depth);
+	case STATEMENT_ASSIGNMENT:
+		return gen_assignment_statement(generator, &statement->assignment, strbuf, depth);
 	default:
 		printf("Unimplemented statement\n");
 		return false;
@@ -516,9 +594,20 @@ static Bool gen_c0_cmp(CmpInstruction instr, StrBuf *strbuf) {
 }
 
 static Bool gen_c0_rel(RelInstruction instr, StrBuf *strbuf) {
-	(void)instr;
-	(void)strbuf;
-	return false;
+	#define REL(ignore, name, c_op, bits) { (name), (c_op), (bits) },
+	static const InstructionInfo INFOS[] = {
+		#include "instructions.h"
+	};
+
+	const InstructionInfo info = INFOS[instr];
+
+	strbuf_put_formatted(strbuf, "static FORCE_INLINE i%d %si%d(i%d lhs, i%d rhs) {\n",
+		info.bits, info.name, info.bits, info.bits, info.bits);
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "return lhs %s rhs;\n", info.c_op);
+	strbuf_put_formatted(strbuf, "}\n\n");
+
+	return true;
 }
 
 static Bool gen_c0_bit(BitInstruction instr, StrBuf *strbuf) {
@@ -882,7 +971,7 @@ Bool gen_init(Generator *generator, const Tree *tree) {
 	generator->used_int = 0;
 	generator->used_flt = 0;
 	generator->used_cmp = 0;
-	generator->used_rel = 0;
+	generator->used_rel = 1 << INSTR_LTI32;
 	generator->used_bit = 0;
 	generator->used_flt = 0;
 	return true;

@@ -1103,7 +1103,9 @@ static Node *convert_statement_to_body(Parser *parser, Node *statement) {
 }
 
 static Node *convert_statement_to_expression(Parser *parser, Node *statement) {
-	ASSERT(statement->kind == NODE_STATEMENT);
+	if (!statement) {
+		return 0;
+	}
 	const StatementKind kind = statement->statement.kind;
 	if (kind == STATEMENT_EXPRESSION) {
 		return statement->statement.expression.expression;
@@ -1123,6 +1125,17 @@ static Node *parse_do_body(Parser *parser) {
 	return body;
 }
 
+static Bool accepted_control_statement_separator(Parser *parser) {
+	const Token token = peek(parser);
+	if (!is_kind(token, KIND_LBRACE)) {
+		return accepted_kind(parser, KIND_SEMICOLON);
+	}
+	if (string_compare(parser->this_token.string, SCLIT("\n"))) {
+		return accepted_kind(parser, KIND_SEMICOLON);
+	}
+	return false;
+}
+
 static Node *parse_if_statement(Parser *parser) {
 	TRACE_ENTER();
 
@@ -1131,6 +1144,7 @@ static Node *parse_if_statement(Parser *parser) {
 	const Sint32 depth = parser->expression_depth;
 	parser->expression_depth = -1;
 
+/*
 	// TODO(dweiler): init; cond
 	// TODO(dweiler): init; cond; post
 	Node *init = parse_simple_statement(parser);
@@ -1142,10 +1156,20 @@ static Node *parse_if_statement(Parser *parser) {
 		expect_semicolon(parser);
 		condition = parse_expression(parser, false);
 	}
+*/
+
+	Node *init = parse_simple_statement(parser);
+	Node *cond = 0;
+	if (accepted_control_statement_separator(parser)) {
+		cond = parse_expression(parser, false);
+	} else {
+		cond = convert_statement_to_expression(parser, init);
+		init = 0;
+	}
 
 	parser->expression_depth = depth;
 
-	if (!condition) {
+	if (!cond) {
 		ERROR("Expected condition in if statement");
 	}
 
@@ -1173,9 +1197,85 @@ static Node *parse_if_statement(Parser *parser) {
 		}
 	}
 
-	Node *node = tree_new_if_statement(parser->tree, init, condition, body, elif);
+	Node *node = tree_new_if_statement(parser->tree, init, cond, body, elif);
 	TRACE_LEAVE();
 	return node;
+}
+
+static Node *parse_for_statement(Parser *parser) {
+	TRACE_ENTER();
+
+	Node *init = 0;
+	Node *cond = 0;
+	Node *body = 0;
+	Node *post = 0;
+
+	expect_keyword(parser, KEYWORD_FOR);
+
+	const Token token = parser->this_token;
+	if (!is_kind(token, KIND_LBRACE) && !is_keyword(token, KEYWORD_DO)) {
+		const Sint32 depth = parser->expression_depth;
+		parser->expression_depth = -1;
+		if (is_operator(token, OPERATOR_IN)) {
+			expect_operator(parser, OPERATOR_IN);
+			// for x in y <block>
+			// for x in y do <body>
+			Node *rhs = parse_expression(parser, false);
+			if (accepted_keyword(parser, KEYWORD_DO)) {
+				body = parse_do_body(parser);
+			} else {
+				body = parse_block_statement(parser, false);
+			}
+			parser->expression_depth = depth;
+			TRACE_LEAVE();
+			return 0;
+		}
+
+		// for x
+		Bool range = false;
+		if (!is_kind(token, KIND_SEMICOLON)) {
+			cond = parse_simple_statement(parser);
+			// TODO(dweiler): "in"
+		}
+
+		if (!range && accepted_control_statement_separator(parser)) {
+			init = cond;
+			cond = 0;
+		
+			const Token token = parser->this_token;
+		
+			if (is_kind(token, KIND_LBRACE) || is_keyword(token, KEYWORD_DO)) {
+				ERROR("Expected ';'");
+			} else {
+				if (!is_kind(token, KIND_SEMICOLON)) {
+					cond = parse_simple_statement(parser);
+				}
+				if (!is_kind(parser->this_token, KIND_SEMICOLON)) {
+					ERROR("Expected ';'");
+				} else {
+					expect_kind(parser, KIND_SEMICOLON);
+				}
+				if (!is_kind(parser->this_token, KIND_LBRACE) && !is_keyword(parser->this_token, KEYWORD_DO)) {
+					post = parse_simple_statement(parser);
+				}
+			}
+		}
+		parser->expression_depth = depth;
+	}
+
+	if (accepted_keyword(parser, KEYWORD_DO)) {
+		body = parse_do_body(parser);
+	} else {
+		body = parse_block_statement(parser, false);
+	}
+
+	cond = convert_statement_to_expression(parser, cond);
+
+	cond = tree_new_for_statement(parser->tree, init, cond, body, post);
+
+	TRACE_LEAVE();
+
+	return cond;
 }
 
 static Node *parse_return_statement(Parser *parser) {
@@ -1256,7 +1356,9 @@ static Node *parse_statement(Parser *parser) {
 		case KEYWORD_WHEN:
 			UNIMPLEMENTED("When statement");
 		case KEYWORD_FOR:
-			UNIMPLEMENTED("For statement");
+			node = parse_for_statement(parser);
+			TRACE_LEAVE();
+			return node;
 		case KEYWORD_SWITCH:
 			UNIMPLEMENTED("Switch statement");
 		case KEYWORD_DEFER:

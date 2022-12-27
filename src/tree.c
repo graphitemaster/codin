@@ -156,6 +156,16 @@ Node *tree_new_if_statement(Tree *tree, Node *init, Node *condition, Node *body,
 	return node;
 }
 
+Node *tree_new_for_statement(Tree *tree, Node *init, Node *cond, Node *body, Node *post) {
+	Node *node = new_statement(tree, STATEMENT_FOR);
+	ForStatement *statement = &node->statement.for_;
+	statement->init = init;
+	statement->cond = cond;
+	statement->body = body;
+	statement->post = post;
+	return node;
+}
+
 Node *tree_new_return_statement(Tree *tree, Array(Node*) results) {
 	Node *node = new_statement(tree, STATEMENT_RETURN);
 	ReturnStatement *statement = &node->statement.return_;
@@ -415,6 +425,7 @@ static void tree_dump_block_statement(const BlockStatement *statement, Sint32 de
 		}
 	}
 	if (n_statements == 0) {
+		tree_dump_pad(depth + 1);
 		printf("<empty>");
 	}
 	printf(")");
@@ -497,7 +508,6 @@ static void tree_dump_if_statement(const IfStatement *statement, Sint32 depth) {
 }
 
 static void tree_dump_return_statement(const ReturnStatement *statement, Sint32 depth) {
-	(void)depth;
 	printf("(return\n");
 	const Uint64 n_results = array_size(statement->results);
 	for (Uint64 i = 0; i < n_results; i++) {
@@ -507,6 +517,32 @@ static void tree_dump_return_statement(const ReturnStatement *statement, Sint32 
 			putchar('\n');
 		}
 	}
+	putchar(')');
+}
+
+static void tree_dump_for_statement(const ForStatement *statement, Sint32 depth) {
+	printf("(for\n");
+	if (statement->init) {
+		tree_dump_pad(depth + 1);
+		printf("(init\n");
+		tree_dump_node(statement->init, depth + 2);
+		putchar(')');
+		putchar('\n');
+	}
+	if (statement->cond) {
+		tree_dump_pad(depth + 1);
+		printf("(cond\n");
+		tree_dump_node(statement->cond, depth + 2);
+		putchar(')');
+		putchar('\n');
+	}
+	if (statement->body) {
+		// tree_dump_pad(depth + 1);
+		tree_dump_node(statement->body, depth + 1);
+	}
+	// if (statement->post) {
+	// 	tree_dump_node(statement->post, depth + 2);
+	// }
 	putchar(')');
 }
 
@@ -529,6 +565,8 @@ static void tree_dump_statement(const Statement *statement, Sint32 depth) {
 		return tree_dump_if_statement(&statement->if_, depth);
 	case STATEMENT_RETURN:
 		return tree_dump_return_statement(&statement->return_, depth);
+	case STATEMENT_FOR:
+		return tree_dump_for_statement(&statement->for_, depth);
 	}
 }
 
@@ -579,6 +617,7 @@ static void tree_dump_field_list(const FieldList* field_list, Sint32 depth) {
 	tree_dump_pad(depth);
 	printf("(fields\n");
 	if (n_fields == 0) {
+		tree_dump_pad(depth + 1);
 		printf("<empty>");
 	}
 	for (Uint64 i = 0; i < n_fields; i++) {

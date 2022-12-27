@@ -29,6 +29,7 @@ typedef struct AssignmentStatement AssignmentStatement;
 typedef struct DeclarationStatement DeclarationStatement;
 typedef struct IfStatement IfStatement;
 typedef struct ReturnStatement ReturnStatement;
+typedef struct ForStatement ForStatement;
 
 typedef struct Identifier Identifier;
 typedef struct Value Value;
@@ -70,6 +71,7 @@ enum StatementKind {
 	STATEMENT_DECLARATION,
 	STATEMENT_IF,
 	STATEMENT_RETURN,
+	STATEMENT_FOR,
 };
 
 struct UnaryExpression {
@@ -154,6 +156,13 @@ struct ReturnStatement {
 	Array(Node*) results;
 };
 
+struct ForStatement {
+	Node *init;
+	Node *cond;
+	Node *body;
+	Node *post;
+};
+
 struct Statement {
 	StatementKind kind;
 	union {
@@ -165,6 +174,7 @@ struct Statement {
 		DeclarationStatement declaration;
 		IfStatement          if_;
 		ReturnStatement      return_;
+		ForStatement         for_;
 	};
 };
 
@@ -264,6 +274,7 @@ Node *tree_new_import_statement(Tree *tree, String package);
 Node *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, Array(Node*) lhs, Array(Node*) rhs);
 Node *tree_new_declaration_statement(Tree *tree, Node *type, Array(Node*) names, Array(Node*) values);
 Node *tree_new_if_statement(Tree *tree, Node *init, Node *condition, Node *body, Node *elif);
+Node *tree_new_for_statement(Tree *tree, Node *init, Node *cond, Node *body, Node *post);
 Node *tree_new_return_statement(Tree *tree, Array(Node*) results);
 Node *tree_new_identifier(Tree *tree, String contents);
 Node *tree_new_value(Tree *tree, Node *field, Node *val);
