@@ -10,10 +10,9 @@
 static Bool gen_value(Generator *generator, const Node *type, const Node *node, StrBuf *strbuf);
 static Bool gen_node(Generator *generator, const Node *node, StrBuf *strbuf, Sint32 depth);
 
-static Bool gen_padding(Generator *generator, Sint32 depth, StrBuf *strbuf) {
-	(void)generator;
-	for (Sint32 i = 0; i < depth; i++) {
-		strbuf_put_rune(strbuf, '\t');
+static Bool gen_padding(Sint32 depth, StrBuf *strbuf) {
+	for (Sint32 i = 0; i < depth * 2; i++) {
+		strbuf_put_rune(strbuf, ' ');
 	}
 	return true;
 }
@@ -105,6 +104,8 @@ static Bool gen_call_expression(Generator *generator, const CallExpression *expr
 
 static Bool gen_unary_expression(Generator *generator, const UnaryExpression *expression, StrBuf *strbuf, Sint32 depth) {
 	(void)depth;
+	// There's only three.
+	// -, +, !
 	switch (expression->operation) {
 	case OPERATOR_SUB:
 		strbuf_put_string(strbuf, SCLIT("negi32("));
@@ -120,7 +121,8 @@ static Bool gen_unary_expression(Generator *generator, const UnaryExpression *ex
 }
 
 static Bool gen_binary_instruction(Generator *generator, const BinaryExpression *expression, StrBuf *strbuf) {
-	strbuf_put_formatted(strbuf, "addf16(");
+	const char *what = "unknown";
+	strbuf_put_formatted(strbuf, "%s(", what);
 	if (!gen_node(generator, expression->lhs, strbuf, 0)) return false;
 	strbuf_put_string(strbuf, SCLIT(", "));
 	if (!gen_node(generator, expression->rhs, strbuf, 0)) return false;
@@ -149,16 +151,24 @@ static Bool gen_expression(Generator *generator, const Expression *expression, S
 }
 
 static Bool gen_expression_statement(Generator *generator, const ExpressionStatement *statement, StrBuf *strbuf, Sint32 depth) {
-	gen_padding(generator, depth, strbuf);
+	gen_padding(depth, strbuf);
 	const Node *node = statement->expression;
 	ASSERT(node->kind == NODE_EXPRESSION);
 	if (!gen_expression(generator, &node->expression, strbuf, depth)) return false;
 	strbuf_put_rune(strbuf, ';');
+	strbuf_put_rune(strbuf, '\n');
 	return true;
 }
 
 static Bool gen_if_statement(Generator *generator, const IfStatement *statement, StrBuf *strbuf, Sint32 depth) {
-	gen_padding(generator, depth, strbuf);
+	gen_padding(depth, strbuf);
+	if (statement->init) {
+		strbuf_put_rune(strbuf, '{');
+		strbuf_put_rune(strbuf, '\n');
+		gen_node(generator, statement->init, strbuf, depth + 1);
+		depth++;
+		gen_padding(depth, strbuf);
+	}
 	strbuf_put_string(strbuf, SCLIT("if ("));
 	if (!gen_node(generator, statement->condition, strbuf, 0)) {
 		return false;
@@ -169,15 +179,31 @@ static Bool gen_if_statement(Generator *generator, const IfStatement *statement,
 	}
 	if (statement->elif) {
 		strbuf_put_string(strbuf, SCLIT(" else "));
-		if (!gen_node(generator, statement->elif, strbuf, depth)) {
-			return false;
+		if (statement->elif->kind == NODE_STATEMENT && statement->elif->statement.kind == STATEMENT_IF) {
+			strbuf_put_string(strbuf, SCLIT("{\n"));
+			if (!gen_node(generator, statement->elif, strbuf, depth + 1)) {
+				return false;
+			}
+			gen_padding(depth, strbuf);
+			strbuf_put_rune(strbuf, '}');
+		} else {
+			if (!gen_node(generator, statement->elif, strbuf, depth)) {
+				return false;
+			}
 		}
+	}
+	strbuf_put_rune(strbuf, '\n');
+	if (statement->init) {
+		depth--;
+		gen_padding(depth, strbuf);
+		strbuf_put_rune(strbuf, '}');
+		strbuf_put_rune(strbuf, '\n');
 	}
 	return true;
 }
 
 static Bool gen_return_statement(Generator *generator, const ReturnStatement *statement, StrBuf *strbuf, Sint32 depth) {
-	gen_padding(generator, depth, strbuf);
+	gen_padding(depth, strbuf);
 	strbuf_put_string(strbuf, SCLIT("return "));
 	if (!gen_node(generator, statement->results[0], strbuf, 0)) {
 		return false;
@@ -188,7 +214,7 @@ static Bool gen_return_statement(Generator *generator, const ReturnStatement *st
 }
 
 static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf, Sint32 depth) {
-	gen_padding(generator, depth, strbuf);
+	gen_padding(depth, strbuf);
 	const Uint64 n_decls = array_size(statement->names);
 	const Uint64 n_values = array_size(statement->values);
 	const Node *type = statement->type;
@@ -227,7 +253,6 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 				strbuf_put_string(strbuf, SCLIT(" = "));
 			}
 
-		
 			if (!gen_value(generator, type, value, strbuf)) {
 				return false;
 			}
@@ -242,7 +267,7 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 		strbuf_put_rune(strbuf, '\n');
 
 		if (i != n_decls - 1) {
-			gen_padding(generator, depth, strbuf);
+			gen_padding(depth, strbuf);
 		}
 	}
 
@@ -260,11 +285,8 @@ static Bool gen_block_statement(Generator *generator, const BlockStatement *stat
 		if (!gen_statement(generator, &node->statement, strbuf, depth + 1)) {
 			return false;
 		}
-		if (i != n_statements - 1) {
-			strbuf_put_rune(strbuf, '\n');
-		}
 	}
-	gen_padding(generator, depth, strbuf);
+	gen_padding(depth, strbuf);
 	strbuf_put_rune(strbuf, '}');
 	return true;
 }
@@ -376,6 +398,8 @@ static Bool gen_value(Generator *generator, const Node *type, const Node *node, 
 		return gen_literal_value(generator, type, &node->literal_value, strbuf);
 	} else if (node->kind == NODE_EXPRESSION) {
 		return gen_expression(generator, &node->expression, strbuf, 0);
+	} else if (node->kind == NODE_IDENTIFIER) {
+		return strbuf_put_string(strbuf, node->identifier.contents);
 	}
 	return false;
 }
@@ -422,7 +446,8 @@ static Bool gen_c0_int(IntInstruction instr, StrBuf *strbuf) {
 
 	strbuf_put_formatted(strbuf, "static FORCE_INLINE u%d %su%d(u%d lhs, u%d rhs) {\n",
 		info.bits, info.name, info.bits, info.bits, info.bits);
-	strbuf_put_formatted(strbuf, "\treturn lhs %s rhs;\n", info.c_op);
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "return lhs %s rhs;\n", info.c_op);
 	strbuf_put_formatted(strbuf, "}\n\n");
 
 	// We can get wrapping signed integer arithmetic simply by casting to unsigned
@@ -430,7 +455,8 @@ static Bool gen_c0_int(IntInstruction instr, StrBuf *strbuf) {
 	// signed integers.
 	strbuf_put_formatted(strbuf, "static FORCE_INLINE i%d %si%d(i%d lhs, i%d rhs) {\n",
 		info.bits, info.name, info.bits, info.bits, info.bits);
-	strbuf_put_formatted(strbuf, "\treturn %su%d(lhs, rhs);\n", info.name, info.bits);
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "return %su%d(lhs, rhs);\n", info.name, info.bits);
 	strbuf_put_formatted(strbuf, "}\n\n");
 
 	return true;
@@ -447,14 +473,18 @@ static Bool gen_c0_flt(FltInstruction instr, StrBuf *strbuf) {
 		// Special behavior needed to emulate half-float
 		strbuf_put_formatted(strbuf, "static FORCE_INLINE f%d %sf%d(f%d lhs, f%d rhs) {\n",
 			info.bits, info.name, info.bits, info.bits, info.bits);
-		strbuf_put_string(strbuf, SCLIT("\tconst f32 a = CODIN_f16_to_f32(lhs);\n"));
-		strbuf_put_string(strbuf, SCLIT("\tconst f32 b = CODIN_f16_to_f32(rhs);\n"));
-		strbuf_put_formatted(strbuf, "\treturn CODIN_f32_to_f16(a %s b);\n", info.c_op);
+		gen_padding(1, strbuf);
+		strbuf_put_string(strbuf, SCLIT("const f32 a = CODIN_f16_to_f32(lhs);\n"));
+		gen_padding(1, strbuf);
+		strbuf_put_string(strbuf, SCLIT("const f32 b = CODIN_f16_to_f32(rhs);\n"));
+		gen_padding(1, strbuf);
+		strbuf_put_formatted(strbuf, "return CODIN_f32_to_f16(a %s b);\n", info.c_op);
 		strbuf_put_string(strbuf, SCLIT("}\n\n"));
 	} else {
 		strbuf_put_formatted(strbuf, "static FORCE_INLINE f%d %sf%d(f%d lhs, f%d rhs) {\n",
 			info.bits, info.name, info.bits, info.bits, info.bits);
-		strbuf_put_formatted(strbuf, "\treturn lhs %s rhs;\n", info.c_op);
+		gen_padding(1, strbuf);
+		strbuf_put_formatted(strbuf, "return lhs %s rhs;\n", info.c_op);
 		strbuf_put_string(strbuf, SCLIT("}\n\n"));
 	}
 
@@ -471,16 +501,30 @@ static Bool gen_c0_cmp(CmpInstruction instr, StrBuf *strbuf) {
 
 	strbuf_put_formatted(strbuf, "static FORCE_INLINE u%d %su%d(u%d lhs, u%d rhs) {\n",
 		info.bits, info.name, info.bits, info.bits, info.bits);
-	strbuf_put_formatted(strbuf, "\treturn lhs %s rhs;\n", info.c_op);
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "return lhs %s rhs;\n", info.c_op);
 	strbuf_put_formatted(strbuf, "}\n\n");
 
 	// In 2s complement representation comparisons are the same instruction.
 	strbuf_put_formatted(strbuf, "static FORCE_INLINE i%d %si%d(i%d lhs, i%d rhs) {\n",
 		info.bits, info.name, info.bits, info.bits, info.bits);
-	strbuf_put_formatted(strbuf, "\treturn %su%d(lhs, rhs);\n", info.name, info.bits);
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "return %su%d(lhs, rhs);\n", info.name, info.bits);
 	strbuf_put_formatted(strbuf, "}\n\n");
 
 	return true;
+}
+
+static Bool gen_c0_rel(RelInstruction instr, StrBuf *strbuf) {
+	(void)instr;
+	(void)strbuf;
+	return false;
+}
+
+static Bool gen_c0_bit(BitInstruction instr, StrBuf *strbuf) {
+	(void)instr;
+	(void)strbuf;
+	return false;
 }
 
 static Bool gen_c0_int_prelude(Uint64 used, StrBuf *strbuf) {
@@ -498,6 +542,39 @@ static Bool gen_c0_flt_prelude(Uint64 used, StrBuf *strbuf) {
 	for (Uint64 i = 0; i < INSTR_FLT_COUNT; i++) {
 		if (used & (CAST(Uint64, 1) << i)) {
 			if (!gen_c0_flt(CAST(FltInstruction, i), strbuf)) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+static Bool gen_c0_cmp_prelude(Uint64 used, StrBuf *strbuf) {
+	for (Uint64 i = 0; i < INSTR_FLT_COUNT; i++) {
+		if (used & (CAST(Uint64, 1) << i)) {
+			if (!gen_c0_cmp(CAST(CmpInstruction, i), strbuf)) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+static Bool gen_c0_rel_prelude(Uint64 used, StrBuf *strbuf) {
+	for (Uint64 i = 0; i < INSTR_REL_COUNT; i++) {
+		if (used & (CAST(Uint64, 1) << i)) {
+			if (!gen_c0_rel(CAST(RelInstruction, i), strbuf)) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+static Bool gen_c0_bit_prelude(Uint64 used, StrBuf *strbuf) {
+	for (Uint64 i = 0; i < INSTR_BIT_COUNT; i++) {
+		if (used & (CAST(Uint64, 1) << i)) {
+			if (!gen_c0_bit(CAST(BitInstruction, i), strbuf)) {
 				return false;
 			}
 		}
@@ -562,7 +639,7 @@ static Bool gen_c0_f16_prelude(StrBuf *strbuf) {
 
 	// Write out the base table.
 	strbuf_put_string(strbuf, SCLIT("static const u32 CODIN_f16_base[] = {\n"));
-	strbuf_put_rune(strbuf, '\t');
+	gen_padding(1, strbuf);
 	for (Uint64 i = 0;; i++) {
 		const Uint64 word = base[i];
 		strbuf_put_formatted(strbuf, "0x%08x", word);
@@ -577,14 +654,14 @@ static Bool gen_c0_f16_prelude(StrBuf *strbuf) {
 			strbuf_put_rune(strbuf, ' ');
 		} else {
 			strbuf_put_rune(strbuf, '\n');
-			strbuf_put_rune(strbuf, '\t');
+			gen_padding(1, strbuf);
 		}
 	}
 	strbuf_put_string(strbuf, SCLIT("};\n\n"));
 
 	// Write out the shift table.
 	strbuf_put_string(strbuf, SCLIT("static const u8 CODIN_f16_shift[] = {\n"));
-	strbuf_put_rune(strbuf, '\t');
+	gen_padding(1, strbuf);
 	for (Uint64 i = 0;; i++) {
 		const Uint8 byte = shift[i];
 		strbuf_put_formatted(strbuf, "0x%02x", byte);
@@ -599,28 +676,40 @@ static Bool gen_c0_f16_prelude(StrBuf *strbuf) {
 			strbuf_put_rune(strbuf, ' ');
 		} else {
 			strbuf_put_rune(strbuf, '\n');
-			strbuf_put_rune(strbuf, '\t');
+			gen_padding(1, strbuf);
 		}
 	}
 	strbuf_put_string(strbuf, SCLIT("};\n\n"));
 
 	strbuf_put_string(strbuf, SCLIT("static FORCE_INLINE f16 CODIN_f32_to_f16(f32 f) {\n"));
-	strbuf_put_string(strbuf, SCLIT("\tconst union { f32 f; u32 u; } s = { f };\n"));
-	strbuf_put_string(strbuf, SCLIT("\tconst u32 e = s.u >> 23;\n"));
-	strbuf_put_string(strbuf, SCLIT("\tconst u32 base = CODIN_f16_base[e & 0x1ff];\n"));
-	strbuf_put_string(strbuf, SCLIT("\tconst u8 shift = CODIN_f16_shift[e & 0x1ff];\n"));
-	strbuf_put_string(strbuf, SCLIT("\treturn base + ((s.u & 0x007fffff) >> shift);\n"));
+	gen_padding(1, strbuf);
+	strbuf_put_string(strbuf, SCLIT("const union { f32 f; u32 u; } s = { f };\n"));
+	gen_padding(1, strbuf);
+	strbuf_put_string(strbuf, SCLIT("const u32 e = s.u >> 23;\n"));
+	gen_padding(1, strbuf);
+	strbuf_put_string(strbuf, SCLIT("const u32 base = CODIN_f16_base[e & 0x1ff];\n"));
+	gen_padding(1, strbuf);
+	strbuf_put_string(strbuf, SCLIT("const u8 shift = CODIN_f16_shift[e & 0x1ff];\n"));
+	gen_padding(1, strbuf);
+	strbuf_put_string(strbuf, SCLIT("return base + ((s.u & 0x007fffff) >> shift);\n"));
 	strbuf_put_string(strbuf, SCLIT("}\n\n"));
 
 	static const union { Uint32 u; float f; } MAGIC = { 113 << 23 };
 	strbuf_put_string(strbuf, SCLIT("static FORCE_INLINE f32 CODIN_f16_to_f32(f16 f) {\n"));
-	strbuf_put_string(strbuf, SCLIT("\tunion { u32 u; f32 f; } o = { (u32)(f & 0x7fff) << 13 };\n"));
-	strbuf_put_formatted(strbuf, "\tconst u32 exp = 0x%08x & o.u;\n", 0x7c00 << 13);
-	strbuf_put_formatted(strbuf, "\to.u += 0x%08x;\n", (127 - 15) << 23);
-	strbuf_put_formatted(strbuf, "\tif (exp == 0x%08x) o.u += 0x%08x;\n", 0x7c00 << 13, (128 - 16) << 23);
-	strbuf_put_formatted(strbuf, "\tif (exp == 0x%08x) o.u += 0x%08x, o.f -= %a;\n", MAGIC.f);
-	strbuf_put_formatted(strbuf, "\to.u |= (f & 0x8000) << 16;\n");
-	strbuf_put_formatted(strbuf, "\treturn o.f;\n");
+	gen_padding(1, strbuf);
+	strbuf_put_string(strbuf, SCLIT("union { u32 u; f32 f; } o = { (u32)(f & 0x7fff) << 13 };\n"));
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "const u32 exp = 0x%08x & o.u;\n", 0x7c00 << 13);
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "o.u += 0x%08x;\n", (127 - 15) << 23);
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "if (exp == 0x%08x) o.u += 0x%08x;\n", 0x7c00 << 13, (128 - 16) << 23);
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "if (exp == 0x%08x) o.u += 0x%08x, o.f -= %a;\n", MAGIC.f);
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "o.u |= (f & 0x8000) << 16;\n");
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "return o.f;\n");
 	strbuf_put_string(strbuf, SCLIT("}\n\n"));
 
 	return true;
@@ -667,9 +756,11 @@ static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 
 	strbuf_put_rune(strbuf, '\n');
 	strbuf_put_string(strbuf, SCLIT("#if defined(_MSC_VER)\n"));
-	strbuf_put_string(strbuf, SCLIT("	#define FORCE_INLINE __forceinline\n"));
+	gen_padding(1, strbuf);
+	strbuf_put_string(strbuf, SCLIT("#define FORCE_INLINE __forceinline\n"));
 	strbuf_put_string(strbuf, SCLIT("#else\n"));
-	strbuf_put_string(strbuf, SCLIT("	#define FORCE_INLINE __attribute__((always_inline)) inline\n"));
+	gen_padding(1, strbuf);
+	strbuf_put_string(strbuf, SCLIT("#define FORCE_INLINE __attribute__((always_inline)) inline\n"));
 	strbuf_put_string(strbuf, SCLIT("#endif\n"));
 	strbuf_put_rune(strbuf, '\n');
 
@@ -679,9 +770,9 @@ static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 
 	gen_c0_int_prelude(generator->used_int, strbuf);
 	gen_c0_flt_prelude(generator->used_flt, strbuf);
-	// gen_c0_cmp_prelude(generator->used_cmp, strbuf);
-	// gen_c0_rel_prelude(generator->used_rel, strbuf);
-	// gen_c0_bit_prelude(generator->used_bit, strbuf);
+	gen_c0_cmp_prelude(generator->used_cmp, strbuf);
+	gen_c0_rel_prelude(generator->used_rel, strbuf);
+	gen_c0_bit_prelude(generator->used_bit, strbuf);
 
 	return true;
 }
@@ -731,7 +822,7 @@ static Bool gen_load_directive_prelude(Generator *generator, const CallExpressio
 	// Limit the generated output to 80 columns by limiting the number of byte
 	// columns to 13 max.
 	enum { MAX_COLUMNS = 13 };
-	strbuf_put_rune(strbuf, '\t');
+	gen_padding(1, strbuf);
 	const Uint64 n_bytes = array_size(contents);
 	for (Uint64 i = 0;; i++) {
 		const Uint8 byte = contents[i];
@@ -747,7 +838,7 @@ static Bool gen_load_directive_prelude(Generator *generator, const CallExpressio
 			strbuf_put_rune(strbuf, ' ');
 		} else {
 			strbuf_put_rune(strbuf, '\n');
-			strbuf_put_rune(strbuf, '\t');
+			gen_padding(1, strbuf);
 		}
 	}
 
@@ -793,7 +884,7 @@ Bool gen_init(Generator *generator, const Tree *tree) {
 	generator->used_cmp = 0;
 	generator->used_rel = 0;
 	generator->used_bit = 0;
-	generator->used_flt |= (1 << INSTR_ADDF16);
+	generator->used_flt = 0;
 	return true;
 }
 

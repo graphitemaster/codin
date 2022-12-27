@@ -218,6 +218,7 @@ Bool lexer_init(Lexer *lexer, const Source *source) {
 	lexer->here = lexer->input.cur;
 	lexer->rune = 0;
 	lexer->asi = false;
+	lexer->peek.kind = KIND_INVALID;
 
 	advancel(lexer);
 	if (lexer->rune == RUNE_BOM) {
@@ -233,7 +234,20 @@ static Bool unescape(Lexer *lexer) {
 	return false;
 }
 
+Token lexer_peek(Lexer *lexer) {
+	ASSERT(lexer->peek.kind == KIND_INVALID);
+	const Token peek = lexer_next(lexer);
+	lexer->peek = peek;
+	return peek;
+}
+
 Token lexer_next(Lexer *lexer) {
+	if (lexer->peek.kind != KIND_INVALID) {
+		const Token token = lexer->peek;
+		lexer->peek.kind = KIND_INVALID;
+		return token;
+	}
+
 	skip_whitespace(lexer, lexer->asi);
 
 	Token token;

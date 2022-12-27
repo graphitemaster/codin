@@ -59,22 +59,24 @@ struct Parser {
 	Token this_token; // This token is being processed
 	Token last_token; // Last token processed
 	Node *this_procedure;
-	int trace;
+	Sint32 trace_depth;
+	Sint32 expression_depth;
 	jmp_buf jmp;
 };
 
+
 static void parser_trace_enter(Parser *parser, const char *function) {
 	if (TRACE) {
-		if (parser->trace) {
-			printf("%*c", parser->trace * 2, ' ');
+		if (parser->trace_depth) {
+			printf("%*c", parser->trace_depth * 2, ' ');
 		}
 		puts(function);
 	}
-	parser->trace++;
+	parser->trace_depth++;
 }
 
 static void parser_trace_leave(Parser *parser) {
-	parser->trace--;
+	parser->trace_depth--;
 }
 
 #define TRACE_ENTER() parser_trace_enter(parser, __FUNCTION__)
@@ -85,7 +87,8 @@ static Bool parser_init(Parser *parser, const char *filename) {
 		if (lexer_init(&parser->lexer, &parser->source)) {
 			parser->this_token.kind = KIND_INVALID;
 			parser->last_token.kind = KIND_INVALID;
-			parser->trace = 0;
+			parser->trace_depth = 0;
+			parser->expression_depth = 0;
 			return true;
 		}
 	}
@@ -109,12 +112,83 @@ static FORCE_INLINE Bool is_literal(Token token, LiteralKind literal) {
 	return is_kind(token, KIND_LITERAL) && token.as_literal == literal;
 }
 
+static Token advancep(Parser *parser);
+
+static Bool accepted_operator(Parser *parser, OperatorKind op) {
+	if (is_operator(parser->this_token, op)) {
+		advancep(parser);
+		return true;
+	}
+	return false;
+}
+
+static Bool accepted_kind(Parser *parser, Kind kind) {
+	if (is_kind(parser->this_token, kind)) {
+		advancep(parser);
+		return true;
+	}
+	return false;
+}
+
+static Bool accepted_keyword(Parser *parser, KeywordKind keyword) {
+	if (is_keyword(parser->this_token, keyword)) {
+		advancep(parser);
+		return true;
+	}
+	return false;
+}
+
+static Bool ignore_newline(const Parser *parser) {
+	return parser->expression_depth > 0;
+}
+
+static Token peek(Parser *parser) {
+	const Token token = lexer_peek(&parser->lexer);
+	if (is_kind(token, KIND_COMMENT)) {
+		return peek(parser);
+	}
+	return token;
+}
+
+static Bool advance_possible_newline(Parser *parser, Bool literal) {
+	const Token token = parser->this_token;
+
+	Bool skip = false;
+
+	if (is_kind(token, KIND_SEMICOLON) && string_compare(token.string, SCLIT("\n"))) {
+		if (literal) {
+			const Token next = peek(parser);
+			const Location this_location = token.location;
+			const Location next_location = next.location;
+			if (this_location.line + 1 >= next_location.line) {
+				skip = is_keyword(next, KEYWORD_ELSE)  ||
+				       is_keyword(next, KEYWORD_WHERE) ||
+				       is_kind(next, KIND_LBRACE);
+			}
+		} else {
+			skip = true;
+		}
+	}
+
+	if (skip) {
+		advancep(parser);
+		return true;
+	}
+
+	return false;
+}
+
 static Token advancep(Parser *parser) {
 	const Token last = parser->this_token;
 	parser->last_token = last;
 	parser->this_token = lexer_next(&parser->lexer);
 	while (is_kind(parser->this_token, KIND_COMMENT)) {
 		parser->this_token = lexer_next(&parser->lexer);
+	}
+	if (is_kind(parser->this_token, KIND_SEMICOLON)) {
+		if (ignore_newline(parser) && string_compare(parser->this_token.string, SCLIT("\n"))) {
+			advancep(parser);
+		}
 	}
 	return last;
 }
@@ -169,12 +243,19 @@ static Token expect_literal(Parser *parser, LiteralKind literal) {
 	return advancep(parser);
 }
 
-static FORCE_INLINE Token expect_semicolon(Parser *parser) {
-	// TODO(dweiler): Odin's ridicolous ASI
-	if (is_kind(parser->this_token, KIND_SEMICOLON)) {
-		return advancep(parser);
+static void expect_semicolon(Parser *parser) {
+	if (accepted_kind(parser, KIND_SEMICOLON)) {
+		return;
 	}
-	return (Token){ .kind = KIND_INVALID };
+
+	const Token token = parser->this_token;
+	if (is_kind(token, KIND_LBRACE) || is_kind(token, KIND_EOF)) {
+		return;
+	}
+
+	if (token.location.line == parser->last_token.location.line) {
+		ERROR("Expected ';'");
+	}
 }
 
 static CallingConvention string_to_calling_convention(String string) {
@@ -210,8 +291,11 @@ static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs);
 
 static Node *parse_type_or_identifier(Parser *parser) {
 	TRACE_ENTER();
+	const Sint32 depth = parser->expression_depth;
+	parser->expression_depth = -1;
 	Node *operand = parse_operand(parser, true);
 	Node *type = parse_atom_expression(parser, operand, true);
+	parser->expression_depth = depth;
 	TRACE_LEAVE();
 	return type;
 }
@@ -225,30 +309,6 @@ static Node *parse_type(Parser *parser) {
 	}
 	TRACE_LEAVE();
 	return type;
-}
-
-static Bool accepted_operator(Parser *parser, OperatorKind op) {
-	if (is_operator(parser->this_token, op)) {
-		advancep(parser);
-		return true;
-	}
-	return false;
-}
-
-static Bool accepted_kind(Parser *parser, Kind kind) {
-	if (is_kind(parser->this_token, kind)) {
-		advancep(parser);
-		return true;
-	}
-	return false;
-}
-
-static Bool accepted_keyword(Parser *parser, KeywordKind keyword) {
-	if (is_keyword(parser->this_token, keyword)) {
-		advancep(parser);
-		return true;
-	}
-	return false;
 }
 
 static Node *parse_literal_value(Parser *parser, Node *type);
@@ -275,6 +335,8 @@ static Node *parse_results(Parser *parser, Bool *diverging) {
 		return 0;
 	}
 
+	const Sint32 depth = parser->expression_depth;
+
 	Node *list = 0;
 	if (is_operator(parser->this_token, OPERATOR_OPENPAREN)) {
 		// Multiple results '(...)'.
@@ -289,6 +351,7 @@ static Node *parse_results(Parser *parser, Bool *diverging) {
 		array_push(fields, type);
 		list = tree_new_field_list(parser->tree, fields);
 	}
+	parser->expression_depth = depth;
 
 	TRACE_LEAVE();
 	ASSERT(list);
@@ -332,10 +395,15 @@ static Node *parse_body(Parser *parser);
 static Node *parse_procedure(Parser *parser) {
 	TRACE_ENTER();
 	Node *type = parse_procedure_type(parser);
+
+	advance_possible_newline(parser, true);
+
 	if (is_keyword(parser->this_token, KEYWORD_WHERE)) {
 		expect_keyword(parser, KEYWORD_WHERE);
 		UNIMPLEMENTED("where specialization for procedures");
 	}
+
+	advance_possible_newline(parser, true);
 
 	// TODO(dweiler): Check for procedure directives like "#no_bounds_check"
 
@@ -368,6 +436,8 @@ static Node *parse_call_expression(Parser *parser, Node *operand);
 
 static Node *parse_directive(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
+
+	(void)lhs;
 
 	expect_kind(parser, KIND_DIRECTIVE);
 
@@ -470,14 +540,20 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 	case KIND_OPERATOR:
 		switch (token.as_operator) {
 		case OPERATOR_OPENPAREN:
-			expect_operator(parser, OPERATOR_OPENPAREN);
-			if (is_operator(parser->last_token, OPERATOR_CLOSEPAREN)) {
-				ERROR("Empty parenthesized expression");
+			{
+				expect_operator(parser, OPERATOR_OPENPAREN);
+				if (is_operator(parser->last_token, OPERATOR_CLOSEPAREN)) {
+					ERROR("Empty parenthesized expression");
+				}
+
+				const Sint32 depth = parser->expression_depth;
+				parser->expression_depth = (depth > 0 ? depth : 0) + 1;
+				node = parse_expression(parser, false);
+				parser->expression_depth = depth;
+				expect_operator(parser, OPERATOR_CLOSEPAREN);
+				TRACE_LEAVE();
+				return node;
 			}
-			node = parse_expression(parser, false);
-			expect_operator(parser, OPERATOR_CLOSEPAREN);
-			TRACE_LEAVE();
-			return node;
 		case OPERATOR_POINTER:
 			UNIMPLEMENTED("^");
 		case OPERATOR_OPENBRACKET:
@@ -507,6 +583,8 @@ static Node *parse_value(Parser *parser) {
 static Node *parse_call_expression(Parser *parser, Node *operand) {
 	TRACE_ENTER();
 	Array(Node*) arguments = 0;
+	const Sint32 depth = parser->expression_depth;
+	parser->expression_depth = 0;
 	expect_operator(parser, OPERATOR_OPENPAREN);
 	while (!is_operator(parser->this_token, OPERATOR_CLOSEPAREN) && !is_kind(parser->this_token, KIND_EOF)) {
 		if (is_operator(parser->this_token, OPERATOR_COMMA)) {
@@ -537,11 +615,23 @@ static Node *parse_call_expression(Parser *parser, Node *operand) {
 			// ...
 		}
 	}
+	parser->expression_depth = depth;
 	expect_operator(parser, OPERATOR_CLOSEPAREN);
 
 	Node *node = tree_new_call_expression(parser->tree, operand, arguments);
 	TRACE_LEAVE();
 	return node;
+}
+
+static Bool accepted_separator(Parser *parser) {
+	const Token token = parser->this_token;
+	if (accepted_operator(parser, OPERATOR_COMMA)) {
+		return true;
+	}
+	if (is_kind(token, KIND_SEMICOLON) && !string_compare(token.string, SCLIT("\n"))) {
+		ERROR("Expected a comma");
+	}
+	return false;
 }
 
 static Array(Node*) parse_element_list(Parser *parser) {
@@ -554,21 +644,37 @@ static Array(Node*) parse_element_list(Parser *parser) {
 			Node *value = parse_value(parser);
 			element = tree_new_value(parser->tree, element, value);
 		}
+		ASSERT(element);
 		array_push(elements, element);
-		// TODO(dweiler): Handle field separators.
+		if (!accepted_separator(parser)) {
+			break;
+		}
 	}
 	TRACE_LEAVE();
 	return elements;
+}
+
+static Token expect_closing(Parser *parser, Kind kind) {
+	const Token token = parser->this_token;
+	if (!is_kind(token, kind) && is_kind(token, KIND_SEMICOLON) &&
+		(string_compare(token.string, SCLIT("\n"))))
+	{
+		advancep(parser);
+	}
+	return expect_kind(parser, kind);
 }
 
 static Node *parse_literal_value(Parser *parser, Node *type) {
 	TRACE_ENTER();
 	Array(Node*) elements = 0;
 	expect_kind(parser, KIND_LBRACE);
+	const Sint32 depth = parser->expression_depth;
+	parser->expression_depth = 0;
 	if (!is_kind(parser->this_token, KIND_RBRACE)) {
 		elements = parse_element_list(parser);
 	}
-	expect_kind(parser, KIND_RBRACE);
+	parser->expression_depth = depth;
+	expect_closing(parser, KIND_RBRACE);
 	TRACE_LEAVE();
 	return tree_new_compound_literal(parser->tree, type, elements);
 }
@@ -645,7 +751,7 @@ static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
 			}
 			break;
 		case KIND_LBRACE:
-			if (!lhs) {
+			if (!lhs && tree_is_node_literal(operand) && parser->expression_depth >= 0) {
 				operand = parse_literal_value(parser, operand);
 			} else {
 				TRACE_LEAVE();
@@ -850,9 +956,12 @@ static Array(Node*) parse_statement_list(Parser *parser) {
 
 static Node *parse_body(Parser *parser) {
 	TRACE_ENTER();
+	const Sint32 depth = parser->expression_depth;
+	parser->expression_depth = 0;
 	expect_kind(parser, KIND_LBRACE);
 	Array(Node*) statements = parse_statement_list(parser);
 	expect_kind(parser, KIND_RBRACE);
+	parser->expression_depth = depth;
 	Node *node = tree_new_block_statement(parser->tree, statements);
 	TRACE_LEAVE();
 	return node;
@@ -861,12 +970,18 @@ static Node *parse_body(Parser *parser) {
 static Node *parse_block_statement(Parser *parser, Bool when) {
 	// The block statement may be part of a compile-time when statement.
 	TRACE_ENTER();
+
+	advance_possible_newline(parser, true);
+
 	if (when) {
 		UNIMPLEMENTED("when block");
 	}
+
 	// TODO(dweiler) Check that we're inside a procedure.
 	Node *body = parse_body(parser);
+
 	TRACE_LEAVE();
+
 	return body;
 }
 
@@ -889,8 +1004,15 @@ static Node *parse_declaration_statement(Parser *parser, Array(Node*) names) {
 			ERROR("Expected %d values on the right-hand side of this declaration", CAST(Sint32, n_names));
 		}
 	}
-	(void)constant;
-	// TODO(dweiler): Robustness.
+
+	if (constant && array_size(values) == 0) {
+		ERROR("Expected constant initializer");
+	}
+
+	if (parser->expression_depth >= 0) {
+		expect_semicolon(parser);
+	}
+
 	Node *node = tree_new_declaration_statement(parser->tree, type, names, values);
 	TRACE_LEAVE();
 	return node;
@@ -937,7 +1059,7 @@ static Node *parse_simple_statement(Parser* parser) {
 		break;
 	}
 
-	if (array_size(lhs) > 1) {
+	if (array_size(lhs) == 0 || array_size(lhs) > 1) {
 		ERROR("Expected one expression on the left-hand side");
 		return 0;
 	}
@@ -992,8 +1114,11 @@ static Node *convert_statement_to_expression(Parser *parser, Node *statement) {
 
 static Node *parse_do_body(Parser *parser) {
 	TRACE_ENTER();
+	const Sint32 depth = parser->expression_depth;
+	parser->expression_depth = 0;
 	Node *statement = parse_statement(parser);
 	Node *body = convert_statement_to_body(parser, statement);
+	parser->expression_depth = depth;
 	TRACE_LEAVE();
 	return body;
 }
@@ -1003,11 +1128,22 @@ static Node *parse_if_statement(Parser *parser) {
 
 	expect_keyword(parser, KEYWORD_IF);
 
+	const Sint32 depth = parser->expression_depth;
+	parser->expression_depth = -1;
+
 	// TODO(dweiler): init; cond
 	// TODO(dweiler): init; cond; post
 	Node *init = parse_simple_statement(parser);
-	Node *condition = convert_statement_to_expression(parser, init);
-	// Node *condition = parse_expression(parser, false);
+	Node *condition = 0;
+	if (is_kind(parser->this_token, KIND_LBRACE)) {
+		condition = convert_statement_to_expression(parser, init);
+		init = 0;
+	} else {
+		expect_semicolon(parser);
+		condition = parse_expression(parser, false);
+	}
+
+	parser->expression_depth = depth;
 
 	if (!condition) {
 		ERROR("Expected condition in if statement");
@@ -1019,6 +1155,8 @@ static Node *parse_if_statement(Parser *parser) {
 	} else {
 		body = parse_block_statement(parser, false);
 	}
+
+	advance_possible_newline(parser, true);
 
 	Node *elif = 0;
 	if (is_keyword(parser->this_token, KEYWORD_ELSE)) {
@@ -1035,7 +1173,7 @@ static Node *parse_if_statement(Parser *parser) {
 		}
 	}
 
-	Node *node = tree_new_if_statement(parser->tree, condition, body, elif);
+	Node *node = tree_new_if_statement(parser->tree, init, condition, body, elif);
 	TRACE_LEAVE();
 	return node;
 }
@@ -1044,6 +1182,10 @@ static Node *parse_return_statement(Parser *parser) {
 	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_RETURN);
+
+	if (parser->expression_depth > 0) {
+		ERROR("Cannot use return statement within expression");
+	}
 
 	Array(Node*) results = 0;
 	while (!is_kind(parser->this_token, KIND_SEMICOLON) &&
@@ -1057,7 +1199,7 @@ static Node *parse_return_statement(Parser *parser) {
 		advancep(parser);
 	}
 
-	expect_kind(parser, KIND_SEMICOLON);
+	expect_semicolon(parser);
 
 	Node *result = tree_new_return_statement(parser->tree, results);
 

@@ -26,6 +26,25 @@ static Node *new_statement(Tree *tree, StatementKind kind) {
 	return node;
 }
 
+Bool tree_is_node_literal(const Node *node) {
+	switch (node->kind) {
+	case NODE_IDENTIFIER:
+		return true;
+	case NODE_EXPRESSION:
+		switch (node->expression.kind) {
+		case EXPRESSION_SELECTOR:
+			return true;
+		case EXPRESSION_CALL:
+			return true;
+		default:
+			return false;
+		}
+	default:
+		return false;
+	}
+	UNREACHABLE();
+}
+
 Node *tree_new_unary_expression(Tree *tree, OperatorKind operation, Node *operand) {
 	Node *node = new_expression(tree, EXPRESSION_UNARY);
 	UnaryExpression *expression = &node->expression.unary;
@@ -127,10 +146,11 @@ Node *tree_new_declaration_statement(Tree *tree, Node *type, Array(Node*) names,
 	return node;
 }
 
-Node *tree_new_if_statement(Tree *tree, Node *condition, Node *body, Node *elif) {
+Node *tree_new_if_statement(Tree *tree, Node *init, Node *condition, Node *body, Node *elif) {
 	Node *node = new_statement(tree, STATEMENT_IF);
 	IfStatement *statement = &node->statement.if_;
 	statement->condition = condition;
+	statement->init = init;
 	statement->body = body;
 	statement->elif = elif;
 	return node;
@@ -460,6 +480,12 @@ static void tree_dump_declaration_statement(const DeclarationStatement *statemen
 
 static void tree_dump_if_statement(const IfStatement *statement, Sint32 depth) {
 	printf("(if\n");
+	if (statement->init) {
+		tree_dump_pad(depth + 1);
+		printf("(init\n");
+		tree_dump_node(statement->init, depth + 2);
+		printf(")\n");
+	}
 	tree_dump_node(statement->condition, depth + 1);
 	putchar('\n');
 	tree_dump_node(statement->body, depth + 1);

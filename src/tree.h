@@ -144,6 +144,7 @@ struct DeclarationStatement {
 };
 
 struct IfStatement {
+	Node *init;
 	Node *condition;
 	Node *body;
 	Node *elif;
@@ -239,6 +240,8 @@ struct Node {
 	};
 };
 
+Bool tree_is_node_literal(const Node *node);
+
 _Static_assert(sizeof(Node) <= 64, "Too big");
 
 struct Tree {
@@ -260,7 +263,7 @@ Node *tree_new_block_statement(Tree *tree, Array(Node*) statements);
 Node *tree_new_import_statement(Tree *tree, String package);
 Node *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, Array(Node*) lhs, Array(Node*) rhs);
 Node *tree_new_declaration_statement(Tree *tree, Node *type, Array(Node*) names, Array(Node*) values);
-Node *tree_new_if_statement(Tree *tree, Node *condition, Node *body, Node *elif);
+Node *tree_new_if_statement(Tree *tree, Node *init, Node *condition, Node *body, Node *elif);
 Node *tree_new_return_statement(Tree *tree, Array(Node*) results);
 Node *tree_new_identifier(Tree *tree, String contents);
 Node *tree_new_value(Tree *tree, Node *field, Node *val);

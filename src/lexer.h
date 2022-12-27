@@ -98,9 +98,11 @@ struct Lexer {
 	const Uint8 *here;
 	Rune rune;
 	Bool asi;
+	Token peek;
 };
 
 Bool lexer_init(Lexer *lexer, const Source *source);
 Token lexer_next(Lexer *lexer);
+Token lexer_peek(Lexer *lexer);
 
 #endif // CODIN_LEXER_H
