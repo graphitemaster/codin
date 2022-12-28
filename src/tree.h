@@ -124,6 +124,7 @@ struct EmptyStatement {
 };
 
 struct ImportStatement {
+	String name;
 	String package;
 };
 
@@ -262,6 +263,7 @@ Bool tree_is_node_literal(const Node *node);
 _Static_assert(sizeof(Node) <= 64, "Too big");
 
 struct Tree {
+	String package;
 	Source source;
 	Array(Node*) nodes;
 	Array(Node*) statements;
@@ -274,10 +276,9 @@ Node *tree_new_selector_expression(Tree *tree, Node *operand, Node *identifier);
 Node *tree_new_call_expression(Tree *tree, Node *operand, Array(Node*) arguments);
 Node *tree_new_assertion_expression(Tree *tree, Node *operand, Node *type);
 Node *tree_new_empty_statement(Tree *tree);
-Node *tree_new_import_statement(Tree *tree, String package);
+Node *tree_new_import_statement(Tree *tree, String name, String package);
 Node *tree_new_expression_statement(Tree *tree, Node *expression);
 Node *tree_new_block_statement(Tree *tree, Array(Node*) statements);
-Node *tree_new_import_statement(Tree *tree, String package);
 Node *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, Array(Node*) lhs, Array(Node*) rhs);
 Node *tree_new_declaration_statement(Tree *tree, Node *type, Array(Node*) names, Array(Node*) values);
 Node *tree_new_if_statement(Tree *tree, Node *init, Node *condition, Node *body, Node *elif);

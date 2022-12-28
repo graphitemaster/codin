@@ -26,8 +26,13 @@ static Bool gen_identifier(Generator *generator, const Identifier *identifier, S
 static Bool gen_type(Generator *generator, const Node *node, StrBuf *strbuf) {
 	if (node->kind == NODE_PROCEDURE_TYPE) {
 		const ProcedureType *procedure_type = &node->procedure_type;
-		// TODO(dweiler): Return structure!?
-		return gen_type(generator, procedure_type->results, strbuf);
+		if (procedure_type->results) {
+			return gen_type(generator, procedure_type->results, strbuf);
+		} else {
+			strbuf_put_string(strbuf, SCLIT("void"));
+			// TODO(dweiler): When there is no results we should generate "void",
+			return true;
+		}
 	} else if (node->kind == NODE_FIELD_LIST) {
 		const FieldList *field_list = &node->field_list;
 		return gen_type(generator, field_list->fields[0], strbuf);
@@ -121,7 +126,9 @@ static Bool gen_unary_expression(Generator *generator, const UnaryExpression *ex
 }
 
 static Bool gen_binary_instruction(Generator *generator, const BinaryExpression *expression, StrBuf *strbuf) {
-	const char *what = "lti32";
+	const char *what = "unknown";
+	if (expression->operation == OPERATOR_LT) what = "lti32";
+	if (expression->operation == OPERATOR_GT) what = "gti32";
 	strbuf_put_formatted(strbuf, "%s(", what);
 	if (!gen_node(generator, expression->lhs, strbuf, 0)) return false;
 	strbuf_put_string(strbuf, SCLIT(", "));
@@ -249,9 +256,12 @@ static Bool gen_return_statement(Generator *generator, const ReturnStatement *st
 	// Emit all defers up to this return point.
 	gen_defers(generator, strbuf, depth);
 	gen_padding(depth, strbuf);
-	strbuf_put_string(strbuf, SCLIT("return "));
-	if (!gen_node(generator, statement->results[0], strbuf, 0)) {
-		return false;
+	strbuf_put_string(strbuf, SCLIT("return"));
+	if (array_size(statement->results) != 0) {
+		strbuf_put_rune(strbuf, ' ');
+		if (!gen_node(generator, statement->results[0], strbuf, 0)) {
+			return false;
+		}
 	}
 	strbuf_put_rune(strbuf, ';');
 	strbuf_put_rune(strbuf, '\n');
@@ -420,7 +430,7 @@ static Bool gen_block_statement(Generator *generator, const BlockStatement *stat
 	// the return statement would've accounted for it already and one cannot
 	// execute any statements after a return.
 	if (statement->statements[n_statements - 1]->statement.kind != STATEMENT_RETURN) {
-		gen_defer_statements(generator, scope, strbuf, depth);
+		gen_defer_statements(generator, scope, strbuf, depth + 1);
 	}
 	free(scope);
 	array_meta(generator->scopes)->size--;
@@ -445,6 +455,9 @@ static Bool gen_statement(Generator *generator, const Statement *statement, StrB
 		return gen_for_statement(generator, &statement->for_, strbuf, depth);
 	case STATEMENT_ASSIGNMENT:
 		return gen_assignment_statement(generator, &statement->assignment, strbuf, depth);
+	case STATEMENT_IMPORT:
+		// Handled else-where.
+		return true;
 	default:
 		printf("Unimplemented statement\n");
 		return false;
@@ -897,9 +910,6 @@ static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 		{ "rawptr",  "void*"              },
 	};
 
-	// Hack for now
-	strbuf_put_string(strbuf, SCLIT("#include <stdio.h>\n\n"));
-
 	// Emit the typedefs for mapping Odin types to C ones.
 	for (Uint64 i = 0; i < sizeof(TYPES)/sizeof(*TYPES); i++) {
 		strbuf_put_formatted(strbuf, "typedef %s %s;\n",
@@ -1028,13 +1038,30 @@ static Bool gen_load_directives_prelude(Generator *generator, StrBuf *strbuf) {
 	return true;
 }
 
+static Bool gen_import_prelude(Generator *generator, StrBuf *strbuf) {
+	const Tree *tree = generator->tree;
+	const Uint64 n_nodes = array_size(tree->nodes);
+	for (Uint64 i = 0; i < n_nodes; i++) {
+		const Node *node = tree->nodes[i];
+		if (node->kind != NODE_STATEMENT || node->statement.kind != STATEMENT_IMPORT) {
+			continue;
+		}
+		// HACK(dweiler): When we see "core:fmt" just import <stdio.h> for now.
+		const ImportStatement *import = &node->statement.import;
+		if (string_compare(import->package, SCLIT("core:fmt"))) {
+			strbuf_put_string(strbuf, SCLIT("#include <stdio.h>\n"));
+		}
+	}
+	return true;
+}
+
 Bool gen_init(Generator *generator, const Tree *tree) {
 	generator->tree = tree;
 	// HACK(dweiler): Use all instructions for now.
 	generator->used_int = 0;
 	generator->used_flt = 0;
 	generator->used_cmp = 0;
-	generator->used_rel = 1 << INSTR_LTI32;
+	generator->used_rel = (1 << INSTR_GTI32) | (1 << INSTR_LTI32);
 	generator->used_bit = 0;
 	generator->used_flt = 0;
 	generator->scopes = 0;
@@ -1048,6 +1075,7 @@ void gen_free(Generator *generator) {
 
 Bool gen_run(Generator *generator, StrBuf *strbuf) {
 	gen_c0_prelude(generator, strbuf);
+	gen_import_prelude(generator, strbuf);
 
 	generator->load_directive_id = 0;
 	if (!gen_load_directives_prelude(generator, strbuf)) {

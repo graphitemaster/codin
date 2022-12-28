@@ -82,6 +82,8 @@ struct Token {
 	};
 };
 
+extern const Token TOKEN_NIL;
+
 _Static_assert(sizeof(Token) <= 64, "Too big");
 
 String token_to_string(Token token);

@@ -100,9 +100,10 @@ Node *tree_new_empty_statement(Tree *tree) {
 	return node;
 }
 
-Node *tree_new_import_statement(Tree *tree, String package) {
+Node *tree_new_import_statement(Tree *tree, String name, String package) {
 	Node *node = new_statement(tree, STATEMENT_IMPORT);
 	ImportStatement *statement = &node->statement.import;
+	statement->name = name;
 	statement->package = package;
 	return node;
 }
@@ -517,6 +518,10 @@ static void tree_dump_if_statement(const IfStatement *statement, Sint32 depth) {
 static void tree_dump_return_statement(const ReturnStatement *statement, Sint32 depth) {
 	printf("(return\n");
 	const Uint64 n_results = array_size(statement->results);
+	if (n_results == 0) {
+		tree_dump_pad(depth + 1);
+		printf("<empty>");
+	}
 	for (Uint64 i = 0; i < n_results; i++) {
 		tree_dump_node(statement->results[i], depth + 1);
 		if (i != n_results - 1) {

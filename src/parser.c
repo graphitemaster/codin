@@ -325,7 +325,6 @@ static Node *parse_results(Parser *parser, Bool *diverging) {
 	TRACE_ENTER();
 	if (!accepted_operator(parser, OPERATOR_ARROW)) {
 		TRACE_LEAVE();
-		ASSERT(false && "no arrow");
 		return 0;
 	}
 
@@ -1077,7 +1076,8 @@ static Node *parse_simple_statement(Parser* parser) {
 static Node *parse_import_declaration(Parser *parser) {
 	TRACE_ENTER();
 	expect_keyword(parser, KEYWORD_IMPORT);
-	Token name;
+
+	Token name = TOKEN_NIL;
 	switch (parser->this_token.kind) {
 	case KIND_IDENTIFIER:
 		name = advancep(parser);
@@ -1085,8 +1085,11 @@ static Node *parse_import_declaration(Parser *parser) {
 	default:
 		break;
 	}
+
+	const Token path = expect_literal(parser, LITERAL_STRING);
+
 	expect_semicolon(parser);
-	Node *result = tree_new_import_statement(parser->tree, name.string);
+	Node *result = tree_new_import_statement(parser->tree, string_unquote(name.string, "\""), string_unquote(path.string, "\""));
 	TRACE_LEAVE();
 	return result;
 }
@@ -1446,29 +1449,57 @@ static Node *parse_statement(Parser *parser) {
 }
 
 Tree *parse(const char *filename) {
-	Parser parser;
-	if (!parser_init(&parser, filename)) {
+	Parser parse;
+	Parser *parser = &parse;
+	if (!parser_init(parser, filename)) {
 		return 0;
 	}
 
-	parser_trace_enter(&parser, "parse");
+	TRACE_ENTER();
 
 	Tree *tree = malloc(sizeof *tree);
 	tree_init(tree);
 
-	tree->source = parser.source;
+	tree->source = parser->source;
 
-	parser.tree = tree;	
-	advancep(&parser);
+	parser->tree = tree;	
+	advancep(parser);
 
-	if (setjmp(parser.jmp) != 0) {
-		parser_trace_leave(&parser);
+	if (setjmp(parser->jmp) != 0) {
+		TRACE_LEAVE();
 		tree_free(tree);
 		return 0;
 	}
 
-	while (!is_kind(parser.this_token, KIND_EOF)) {
-		Node *statement = parse_statement(&parser);
+	// Every Odin source file must begin with the package it's part of.
+	if (!is_keyword(parser->this_token, KEYWORD_PACKAGE)) {
+		ERROR("Expected a package declaration at the beginning of the file");
+	}
+
+	static const String RESERVED_PACKAGES[] = {
+		SLIT("builtin"),
+		SLIT("runtime"),
+		SLIT("intrinsics")
+	};
+
+	// "package <ident>"
+	expect_keyword(parser, KEYWORD_PACKAGE);
+	const Token package = expect_kind(parser, KIND_IDENTIFIER);
+	if (string_compare(package.string, SCLIT("_"))) {
+		ERROR("Cannot name package '_'");
+	}
+
+	for (Uint64 i = 0; i < sizeof(RESERVED_PACKAGES)/sizeof(*RESERVED_PACKAGES); i++) {
+		const String name = RESERVED_PACKAGES[i];
+		if (string_compare(package.string, name)) {
+			ERROR("Use of reserved package name '%.*s'", SFMT(name));
+		}
+	}
+
+	tree->package = package.string;
+
+	while (!is_kind(parser->this_token, KIND_EOF)) {
+		Node *statement = parse_statement(parser);
 		if (statement) {
 			ASSERT(statement->kind = NODE_STATEMENT);
 			if (statement->statement.kind != STATEMENT_EMPTY) {
@@ -1477,6 +1508,6 @@ Tree *parse(const char *filename) {
 		}
 	}
 
-	parser_trace_leave(&parser);
+	TRACE_LEAVE();
 	return tree;
 }

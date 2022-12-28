@@ -10,6 +10,8 @@
 #undef ERROR
 #endif
 
+const Token TOKEN_NIL = { KIND_INVALID };
+
 #define ERROR(...) \
 	do { \
 		report_error(lexer->input.source, &lexer->location, __VA_ARGS__); \
