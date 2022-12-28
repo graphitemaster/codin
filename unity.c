@@ -8,5 +8,6 @@
 #include "src/report.c"
 #include "src/strbuf.c"
 #include "src/string.c"
+#include "src/threadpool.c"
 #include "src/tree.c"
 #include "src/utility.c"
