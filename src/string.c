@@ -3,9 +3,16 @@
 
 #include "string.h"
 
+static void *our_memrrchr(const void *m, int c, size_t n) {
+	const unsigned char *s = m;
+	c = CAST(unsigned char, c);
+	while (n--) if (s[n] == c) return CAST(void *, s + n);
+	return 0;
+}
+
 const String STRING_NIL = { 0, 0 };
 
-String string_from_data(const Uint8 *data, Uint64 length) {
+String string_copy_from_data(const Uint8 *data, Uint64 length) {
 	if (length == 0) {
 		return STRING_NIL;
 	}
@@ -17,16 +24,20 @@ String string_from_data(const Uint8 *data, Uint64 length) {
 	return (String) { storage, length };
 }
 
-String string_from_null(const char *string) {
+String string_copy_from_null(const char *string) {
 	if (string == 0) {
 		return STRING_NIL;
 	}
 	const Uint64 length = strlen(string);
-	return string_from_data(CAST(const Uint8 *, string), length);
+	return string_copy_from_data(CAST(const Uint8 *, string), length);
+}
+
+String string_from_null(const char *string) {
+	return (String) { CAST(Uint8*, string), strlen(string) };
 }
 
 String string_copy(String string) {
-	return string_from_data(string.contents, string.length);
+	return string_copy_from_data(string.contents, string.length);
 }
 
 Bool string_compare(String lhs, String rhs) {
@@ -58,6 +69,38 @@ char* string_to_null(String string) {
 		return result;
 	}
 	return 0;
+}
+
+Bool string_starts_with(String string, String prefix) {
+	return string.length >= prefix.length &&
+		memcmp(string.contents, prefix.contents, prefix.length) == 0;
+}
+
+Bool string_ends_with(String string, String suffix) {
+	return string.length >= suffix.length &&
+		memcmp(string.contents + (string.length - suffix.length), suffix.contents, suffix.length) == 0;
+}
+
+Bool string_find_first_byte(String string, Uint8 byte, Uint64 *index) {
+	const Uint8 *find = memchr(string.contents, byte, string.length);
+	if (find) {
+		*index = find - string.contents;
+		return true;
+	}
+	return false;
+}
+
+Bool string_find_last_byte(String string, Uint8 byte, Uint64 *index) {
+	const Uint8 *find = our_memrrchr(string.contents, byte, string.length);
+	if (find) {
+		*index = find - string.contents;
+		return true;
+	}
+	return false;
+}
+
+String string_slice(String string, Uint64 from, Uint64 to) {
+	return (String) { string.contents + from, to - from };
 }
 
 static void utf8_to_utf16_core(const char *const source, Uint16 *destination, Uint64 *const length) {

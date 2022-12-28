@@ -31,10 +31,13 @@ void source_free(Source *source) {
 	string_free(source->name);
 }
 
-static Bool source_read(Source *source, const char *filename) {
-	source->name = string_from_null(filename);
+static Bool source_read(Source *source, String filename) {
+	source->contents = STRING_NIL;
+	source->name = STRING_NIL;
 	String *contents = &source->contents;
-	FILE *fp = fopen(filename, "rb");
+	char *terminated = string_to_null(filename);
+	FILE *fp = fopen(terminated, "rb");
+	free(terminated);
 	if (!fp) goto L_error;
 	if (fseek(fp, 0, SEEK_END) != 0) goto L_error;
 	contents->length = ftell(fp);
@@ -43,10 +46,10 @@ static Bool source_read(Source *source, const char *filename) {
 	if (!contents->contents) goto L_error;
 	if (fread(contents->contents, contents->length, 1, fp) != 1) goto L_error;
 	fclose(fp);
+	source->name = string_copy(filename);
 	return true;
 L_error:
 	if (fp) fclose(fp);
-	source_free(source);
 	return false;
 }
 
@@ -82,7 +85,7 @@ static void parser_trace_leave(Parser *parser) {
 #define TRACE_ENTER() parser_trace_enter(parser, __FUNCTION__)
 #define TRACE_LEAVE() parser_trace_leave(parser)
 
-static Bool parser_init(Parser *parser, const char *filename) {
+static Bool parser_init(Parser *parser, String filename) {
 	if (source_read(&parser->source, filename)) {
 		if (lexer_init(&parser->lexer, &parser->source)) {
 			parser->this_token.kind = KIND_INVALID;
@@ -1448,7 +1451,7 @@ static Node *parse_statement(Parser *parser) {
 	return 0;
 }
 
-Tree *parse(const char *filename) {
+Tree *parse(String filename) {
 	Parser parse;
 	Parser *parser = &parse;
 	if (!parser_init(parser, filename)) {

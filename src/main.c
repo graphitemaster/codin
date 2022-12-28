@@ -1,41 +1,30 @@
-#include <stdio.h>
-#include <string.h> // strrchr
+#include <stdio.h> // fprintf
 #include <stdlib.h> // system
+#include <string.h> // strcmp
 
-#include "parser.h"
-#include "tree.h"
+#include "string.h" // String, SCLIT, SFMT
 #include "gen.h"
 #include "path.h"
+#include "parser.h"
+#include "threadpool.h"
 
 typedef struct Command Command;
 
 struct Command {
-	const char *name;
-	const char *description;
+	String name;
+	String description;
 };
-
-// Cannot believe strdup is not part of standard C.
-static char *string_dup(const char *string) {
-	const size_t len = strlen(string) + 1;
-	char *data = malloc(len);
-	if (!data) return 0;
-	return memcpy(data, string, len);
-}
 
 static const Command COMMANDS[] = {
-	{ "build",    "compile directory of .odin files, as an executable\n\t\t\tone must contain the program's entry point, all must be the same package." },
-	{ "run",      "same as 'build', but also runs the newly compiled executable." },
-	{ "dump-ast", "dump the generated syntax tree to stdout." },
-	{ "dump-c",   "dump the generated c to stdout." },
+	{ SCLIT("build"),    SCLIT("compile directory of .odin files, as an executable\n\t\t\tone must contain the program's entry point, all must be the same package.") },
+	{ SCLIT("run"),      SCLIT("same as 'build', but also runs the newly compiled executable.") },
+	{ SCLIT("dump-ast"), SCLIT("dump the generated syntax tree to stdout.") },
+	{ SCLIT("dump-c"),   SCLIT("dump the generated c to stdout.") },
 };
 
-static char *project_name(const char *path) {
-	const char *stem = strrchr(path, '/');
-	if (!stem) stem = strrchr(path, '\\');
-	char *name = string_dup(stem ? stem + 1 : path);
-	char *odin = strstr(name, ".odin");
-	if (odin) *odin = '\0';
-	return name;
+String project_name(String path) {
+	(void)path;
+	return SCLIT("main");
 }
 
 static int usage(const char *app) {
@@ -44,14 +33,15 @@ static int usage(const char *app) {
 	printf("Commands:\n");
 	Uint64 max = 0;
 	for (Uint32 i = 0; i < sizeof(COMMANDS)/sizeof(*COMMANDS); i++) {
-		const Uint64 len = strlen(COMMANDS[i].name);
-		if (len > max) max = len;
+		const Command *command = &COMMANDS[i];
+		if (command->name.length > max) max = command->name.length;
 	}
 	for (Uint32 i = 0; i < sizeof(COMMANDS)/sizeof(*COMMANDS); i++) {
 		const Command *command = &COMMANDS[i];
-		putchar('\t');
-		const Uint64 len = strlen(command->name);
-		printf("%s%*c\t%s\n", command->name, CAST(Sint32, max - len), ' ', command->description);
+		printf("\t%.*s%*c\t%.*s\n",
+			SFMT(command->name),
+			CAST(Sint32, max - command->name.length), ' ',
+			SFMT(command->description));
 	}
 	printf("\n");
 	printf("For further details on a command, invoke command help:\n");
@@ -76,15 +66,9 @@ static Bool generate(const Tree *tree, StrBuf *strbuf) {
 	return true;
 }
 
-static Bool build(const char *path, Bool is_file) {
-	if (!is_file) {
-		fprintf(stderr, "Compiling directories is not yet supported. Use -file.\n");
-		return false;
-	}
-
+static Bool transpile(String path) {
 	Tree *tree = parse(path);
 	if (!tree) {
-		// PARSE ERROR.
 		return false;
 	}
 
@@ -97,11 +81,21 @@ static Bool build(const char *path, Bool is_file) {
 
 	tree_free(tree);
 
-	char *project = project_name(path);
-	// Write this source file out to ".build/%s.c"
+	Uint64 slash = 0;
+	if (!string_find_last_byte(path, '/', &slash)) {
+		if (!string_find_last_byte(path, '\\', &slash)) {
+			return false;
+		}
+	}
+	Uint64 dot = 0;
+	if (!string_find_last_byte(path, '.', &dot)) {
+		return false;
+	}
+	
+	const String name = string_slice(path, slash + 1, dot);
 	StrBuf file;
 	strbuf_init(&file);
-	strbuf_put_formatted(&file, ".build/%s.c", project);
+	strbuf_put_formatted(&file, ".build/%.*s.c", SFMT(name));
 	strbuf_put_rune(&file, '\0');
 
 	// Ensure a build directory exists to shove the generated C0.
@@ -111,7 +105,6 @@ static Bool build(const char *path, Bool is_file) {
 	FILE *fp = fopen(CAST(const char *, filename.contents), "wb");
 	if (!fp) {
 		fprintf(stderr, "Failed to write C0\n");
-		free(project);
 		strbuf_free(&file);
 		strbuf_free(&strbuf);
 		return false;
@@ -122,19 +115,66 @@ static Bool build(const char *path, Bool is_file) {
 	fwrite(source.contents, source.length, 1, fp);
 	fclose(fp);
 
-	strbuf_clear(&strbuf);
+	return true;
+}
+
+static void transpile_worker(void *user) {
+	const String *path = CAST(const String *, user);
+	transpile(*path);
+	string_free(*path);
+}
+
+static Bool build(const char *app, String path, Uint64 n_threads, Bool is_file) {
+	StrBuf strbuf;
+
+	if (is_file) {
+		// Transpile a single file.
+		if (!transpile(path)) {
+			return false;
+		}
+	} else {
+		// Transpile many files.
+		Array(String) files = path_list(path);
+		const Uint64 n_files = array_size(files);
+		if (n_files == 0) {
+			fprintf(stderr, "ERROR: `%s build` takes a package as its first argument.\n", app);
+			fprintf(stderr, "Did you mean `%s build %.*s -file`?\n", app, SFMT(path));
+			fprintf(stderr, "The `-file` flag tells it to treat a file as a self-contained package.\n");
+			return false;
+		}
+		ThreadPool pool;
+		threadpool_init(&pool, n_threads);
+		for (Uint64 i = 0; i < n_files; i++) {
+			const String name = files[i];
+			if (string_ends_with(name, SCLIT(".odin"))) {
+				strbuf_init(&strbuf);
+				strbuf_put_formatted(&strbuf, "%.*s/%.*s", SFMT(path), SFMT(name));
+				String *result = malloc(sizeof *result);
+				*result = string_copy(strbuf_result(&strbuf));
+				strbuf_clear(&strbuf);
+				threadpool_queue(&pool, transpile_worker, result, free);
+			}
+		}
+		threadpool_free(&pool);
+
+		for (Uint64 i = 0; i < n_files; i++) {
+			string_free(files[i]);
+		}
+		array_free(files);
+	}
 
 	// Generate one of the following commands to build the C0.
 	//
-	//	"gcc .build/%s.c -O1 -o %s" or
-	//	"cl.exe .build/%s.c /O1 /OUT:%s"
+	//	"gcc .build/*.c -O1 -o %s" or
+	//	"cl.exe .build/*.c /O1 /OUT:%s"
+	const String project = project_name(path);
+
 #if defined(OS_WINDOWS)
-	strbuf_put_formatted(&strbuf, "cl.exe .build/%s.c /O1 /OUT:%s.exe", project, project);
+	strbuf_put_formatted(&strbuf, "cl.exe .build/*.c /O1 /OUT:%.*s.exe >nul 2>nul", SFMT(project));
 #elif defined(OS_LINUX)
-	strbuf_put_formatted(&strbuf, "gcc .build/%s.c -O1 -o %s.bin", project, project);
+	strbuf_put_formatted(&strbuf, "gcc .build/*.c -O1 -o %.*s.bin >/dev/null 2>/dev/null", SFMT(project));
 #endif
 	strbuf_put_rune(&strbuf, '\0');
-	free(project);
 
 	// Compile it.
 	const String compile = strbuf_result(&strbuf);
@@ -144,23 +184,22 @@ static Bool build(const char *path, Bool is_file) {
 	return status;
 }
 
-static Bool run(const char *path) {
-	char *project = project_name(path);
+static Bool run(String path) {
+	String project = project_name(path);
 	StrBuf strbuf;
 	strbuf_init(&strbuf);
 #if defined(OS_WINDOWS)
-	strbuf_put_formatted(&strbuf, ",\\%s.exe", project);
+	strbuf_put_formatted(&strbuf, ",\\%.*s.exe", SFMT(project));
 #elif defined(OS_LINUX)
-	strbuf_put_formatted(&strbuf, "./%s.bin", project);
+	strbuf_put_formatted(&strbuf, "./%.*s.bin", SFMT(project));
 #endif
 	strbuf_put_rune(&strbuf, '\0');
-	free(project);
 	const Bool result = system(CAST(const char *, strbuf.contents)) == 0;
 	strbuf_free(&strbuf);
 	return result;
 }
 
-static Bool dump_ast(const char *file) {
+static Bool dump_ast(String file) {
 	Tree *tree = parse(file);
 	if (tree) {
 		tree_dump(tree);
@@ -170,7 +209,7 @@ static Bool dump_ast(const char *file) {
 	return false;
 }
 
-static Bool dump_c(const char *file) {
+static Bool dump_c(String file) {
 	Tree *tree = parse(file);
 	if (!tree) {
 		return false;
@@ -201,13 +240,13 @@ int main(int argc, char **argv) {
 	const Bool file = argc >= 3 && !strcmp(argv[2], "-file");
 
 	if (!strcmp(argv[0], "build")) {
-		return build(argv[1], file) ? 0 : 1;
+		return build(app, string_from_null(argv[1]), 8, file) ? 0 : 1;
 	} else if (!strcmp(argv[0], "run")) {
-		return (build(argv[1], file) && run(argv[1])) ? 0 : 1;
+		return (build(app, string_from_null(argv[1]), 8, file) && run(string_from_null(argv[1]))) ? 0 : 1;
 	} else if (!strcmp(argv[0], "dump-ast")) {
-		return dump_ast(argv[1]) ? 0 : 1;
+		return dump_ast(string_from_null(argv[1])) ? 0 : 1;
 	} else if (!strcmp(argv[0], "dump-c")) {
-		return dump_c(argv[1]) ? 0 : 1;
+		return dump_c(string_from_null(argv[1])) ? 0 : 1;
 	}
 
 	return usage(app);

@@ -10,7 +10,10 @@ main :: proc() {
 	}
 	for x: i32 = 0; x < 10; x += 1 {
 		fmt.printf("%d\n", x);
-		if x > 1 do return;
+		if x > 1 {
+			fmt.printf("hey %d\n", foo());
+			return;
+		}
 	}
 	defer fmt.printf("hi\n");
 }

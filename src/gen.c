@@ -432,6 +432,7 @@ static Bool gen_block_statement(Generator *generator, const BlockStatement *stat
 	if (statement->statements[n_statements - 1]->statement.kind != STATEMENT_RETURN) {
 		gen_defer_statements(generator, scope, strbuf, depth + 1);
 	}
+	array_free(scope->defers);
 	free(scope);
 	array_meta(generator->scopes)->size--;
 	gen_padding(depth, strbuf);

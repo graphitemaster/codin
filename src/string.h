@@ -30,13 +30,23 @@ struct String {
 
 extern const String STRING_NIL;
 
-String string_from_data(const Uint8 *data, Uint64 size);
+String string_copy_from_data(const Uint8 *data, Uint64 size);
+String string_copy_from_null(const char *string);
+
 String string_from_null(const char *string);
+
 String string_copy(String string);
 Bool string_compare(String lhs, String rhs);
 String string_unquote(String string, const char *quote_set);
 void string_free(String string);
 char* string_to_null(String string);
+Bool string_starts_with(String string, String prefix);
+Bool string_ends_with(String string, String suffix);
+
+Bool string_find_first_byte(String String, Uint8 byte, Uint64 *index);
+Bool string_find_last_byte(String string, Uint8 byte, Uint64 *index);
+
+String string_slice(String string, Uint64 from, Uint64 to);
 
 Bool utf8_to_utf16(const char *source, Uint16 **const destination);
 
