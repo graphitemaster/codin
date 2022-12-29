@@ -54,16 +54,11 @@ static Bool generate(const Tree *tree, StrBuf *strbuf) {
 	if (!gen_init(&gen, tree)) {
 		return false;
 	}
-
 	strbuf_init(strbuf);
-	if (!gen_run(&gen, strbuf, true)) {
-		strbuf_free(strbuf);
-		gen_free(&gen);
-		return false;
-	}
-
+	const Bool result = gen_run(&gen, strbuf, true);
+	strbuf_free(strbuf);
 	gen_free(&gen);
-	return true;
+	return result;
 }
 
 static Bool transpile(String path) {
@@ -126,6 +121,7 @@ static void transpile_worker(void *user) {
 
 static Bool build(const char *app, String path, Uint64 n_threads, Bool is_file) {
 	StrBuf strbuf;
+	strbuf_init(&strbuf);
 
 	if (is_file) {
 		// Transpile a single file.
@@ -147,7 +143,6 @@ static Bool build(const char *app, String path, Uint64 n_threads, Bool is_file) 
 		for (Uint64 i = 0; i < n_files; i++) {
 			const String name = files[i];
 			if (string_ends_with(name, SCLIT(".odin"))) {
-				strbuf_init(&strbuf);
 				strbuf_put_formatted(&strbuf, "%.*s/%.*s", SFMT(path), SFMT(name));
 				String *result = malloc(sizeof *result);
 				*result = string_copy(strbuf_result(&strbuf));

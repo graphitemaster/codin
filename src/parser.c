@@ -88,8 +88,8 @@ static void parser_trace_leave(Parser *parser) {
 static Bool parser_init(Parser *parser, String filename) {
 	if (source_read(&parser->source, filename)) {
 		if (lexer_init(&parser->lexer, &parser->source)) {
-			parser->this_token.kind = KIND_INVALID;
-			parser->last_token.kind = KIND_INVALID;
+			parser->this_token = TOKEN_NIL;
+			parser->last_token = TOKEN_NIL;
 			parser->trace_depth = 0;
 			parser->expression_depth = 0;
 			return true;
@@ -396,6 +396,7 @@ static Node *parse_parameter_list(Parser *parser) {
 			break;
 		}
 	}
+	array_free(names);
 	Node *node = tree_new_field_list(parser->tree, fields);
 	TRACE_LEAVE();
 	return node;
