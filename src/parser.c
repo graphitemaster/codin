@@ -373,6 +373,34 @@ static Node *parse_results(Parser *parser, Bool *diverging) {
 	return list;
 }
 
+static Node *parse_parameter_list(Parser *parser) {
+	TRACE_ENTER();
+	Array(Node*) fields = 0;
+	Array(Node*) names = 0;
+	while (!is_operator(parser->this_token, OPERATOR_CLOSEPAREN) &&
+	       !is_kind(parser->this_token, KIND_EOF))
+	{
+		Node *identifier = parse_identifier(parser);
+		array_push(names, identifier);
+		if (is_operator(parser->this_token, OPERATOR_COLON)) {
+			expect_operator(parser, OPERATOR_COLON);
+			Node *type = parse_identifier(parser);
+			const Uint64 n_names = array_size(names);
+			for (Uint64 i = 0; i < n_names; i++) {
+				Node *field = tree_new_field(parser->tree, names[i], type);
+				array_push(fields, field);
+			}
+			array_clear(names);
+		}
+		if (!accepted_separator(parser)) {
+			break;
+		}
+	}
+	Node *node = tree_new_field_list(parser->tree, fields);
+	TRACE_LEAVE();
+	return node;
+}
+
 static Node *parse_procedure_type(Parser *parser) {
 	TRACE_ENTER();
 	CallingConvention convention = CCONV_INVALID;
@@ -390,7 +418,7 @@ static Node *parse_procedure_type(Parser *parser) {
 	}
 
 	expect_operator(parser, OPERATOR_OPENPAREN);
-	Node *params = 0; // parse_parameters(parser);
+	Node *params = parse_parameter_list(parser);
 	expect_operator(parser, OPERATOR_CLOSEPAREN);
 
 	Uint64 flags = 0;

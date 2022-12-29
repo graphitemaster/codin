@@ -36,6 +36,7 @@ typedef struct Identifier Identifier;
 typedef struct Value Value;
 typedef struct LiteralValue LiteralValue;
 typedef struct CompoundLiteral CompoundLiteral;
+typedef struct Field Field;
 typedef struct FieldList FieldList;
 typedef struct Procedure Procedure;
 typedef struct ProcedureType ProcedureType;
@@ -49,6 +50,7 @@ enum NodeKind {
 	NODE_VALUE,
 	NODE_LITERAL_VALUE,
 	NODE_COMPOUND_LITERAL,
+	NODE_FIELD,
 	NODE_FIELD_LIST,
 	NODE_PROCEDURE,
 	NODE_PROCEDURE_TYPE,
@@ -207,6 +209,12 @@ struct CompoundLiteral {
 	Array(Node*) elements;
 };
 
+struct Field {
+	Node *name;
+	Node *type;
+	// TODO(dweiler): default value, flags, etc.
+};
+
 struct FieldList {
 	Array(Node*) fields;
 };
@@ -257,6 +265,7 @@ struct Node {
 		Value           value;
 		LiteralValue    literal_value;
 		CompoundLiteral compound_literal;
+		Field           field;
 		FieldList       field_list;
 		Procedure       procedure;
 		ProcedureType   procedure_type;
@@ -298,6 +307,7 @@ Node *tree_new_identifier(Tree *tree, String contents);
 Node *tree_new_value(Tree *tree, Node *field, Node *val);
 Node *tree_new_literal_value(Tree *tree, LiteralKind literal, String value);
 Node *tree_new_compound_literal(Tree *tree, Node *type, Array(Node*) elements);
+Node *tree_new_field(Tree *tree, Node* name, Node *type);
 Node *tree_new_field_list(Tree *tree, Array(Node*) list);
 
 Node *tree_new_procedure(Tree *tree, Node *type, Node *body);

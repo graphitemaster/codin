@@ -2,15 +2,11 @@ package main
 
 import "core:fmt"
 
-foo :: proc() {
-	fmt.printf("Hello ");
-	bar();
-}
-
-bar :: proc() {
-	fmt.printf("world\n");
+factorial :: proc(n: i32) -> i32 {
+	if (n == 0) do return 1;
+	return n * factorial(n - 1);
 }
 
 main :: proc() {
-	foo();
+	fmt.printf("Factorial of 5 is: %d\n", factorial(5));
 }

@@ -109,26 +109,25 @@ static Bool gen_call_expression(Generator *generator, const CallExpression *expr
 
 static Bool gen_unary_expression(Generator *generator, const UnaryExpression *expression, StrBuf *strbuf, Sint32 depth) {
 	(void)depth;
-	// There's only three.
-	// -, +, !
-	switch (expression->operation) {
-	case OPERATOR_SUB:
-		strbuf_put_string(strbuf, SCLIT("negi32("));
-		if (!gen_node(generator, expression->operand, strbuf, 0)) {
-			return false;
-		}
-		strbuf_put_rune(strbuf, ')');
-		return true;
-	default:
+	const char *what = "";
+	if (expression->operation == OPERATOR_SUB) what = "negi32";
+	if (expression->operation == OPERATOR_NOT) what = "noti32";
+	strbuf_put_formatted(strbuf, "%s(", what);
+	if (!gen_node(generator, expression->operand, strbuf, 0)) {
 		return false;
 	}
-	UNREACHABLE();
+	strbuf_put_rune(strbuf, ')');
+	return true;
 }
 
 static Bool gen_binary_instruction(Generator *generator, const BinaryExpression *expression, StrBuf *strbuf) {
 	const char *what = "unknown";
-	if (expression->operation == OPERATOR_LT) what = "lti32";
-	if (expression->operation == OPERATOR_GT) what = "gti32";
+	if (expression->operation == OPERATOR_LT)    what = "lti32";
+	if (expression->operation == OPERATOR_GT)    what = "gti32";
+	if (expression->operation == OPERATOR_ADD)   what = "addi32";
+	if (expression->operation == OPERATOR_SUB)   what = "subi32";
+	if (expression->operation == OPERATOR_MUL)   what = "muli32";
+	if (expression->operation == OPERATOR_CMPEQ) what = "eqi32";
 	strbuf_put_formatted(strbuf, "%s(", what);
 	if (!gen_node(generator, expression->lhs, strbuf, 0)) return false;
 	strbuf_put_string(strbuf, SCLIT(", "));
@@ -349,6 +348,10 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 
 	for (Uint64 i = 0; i < n_decls; i++) {
 		const Node *name = statement->names[i];
+		if (prototype) {
+			strbuf_put_string(strbuf, SCLIT("extern "));
+		}
+
 		if (type) {
 			if (!gen_type(generator, type, strbuf)) {
 				return false;
@@ -383,6 +386,26 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 			// Generate procedure parameter list.
 			if (value->kind == NODE_PROCEDURE) {
 				strbuf_put_rune(strbuf, '(');
+				const Node *type = value->procedure.type;
+				ASSERT(type->kind == NODE_PROCEDURE_TYPE);
+				const Node *params = type->procedure_type.params;
+				ASSERT(params->kind == NODE_FIELD_LIST);
+				const Uint64 n_params = array_size(params->field_list.fields);
+				if (n_params == 0) {
+					strbuf_put_string(strbuf, SCLIT("void"));
+				}
+				for (Uint64 i = 0; i < n_params; i++) {
+					const Node *node = params->field_list.fields[i];
+					ASSERT(node);
+					const Field *field = &node->field;
+					gen_node(generator, field->type, strbuf, 0);
+					strbuf_put_rune(strbuf, ' ');
+					gen_node(generator, field->name, strbuf, 0);
+					if (i != n_params - 1) {
+						strbuf_put_rune(strbuf, ',');
+						strbuf_put_rune(strbuf, ' ');
+					}
+				}
 				strbuf_put_rune(strbuf, ')');
 				if (!prototype) {
 					strbuf_put_rune(strbuf, ' ');
@@ -1069,9 +1092,9 @@ static Bool gen_import_prelude(Generator *generator, StrBuf *strbuf) {
 Bool gen_init(Generator *generator, const Tree *tree) {
 	generator->tree = tree;
 	// HACK(dweiler): Use all instructions for now.
-	generator->used_int = 0;
+	generator->used_int = (1 << INSTR_SUBI32) | (1 << INSTR_MULI32);
 	generator->used_flt = 0;
-	generator->used_cmp = 0;
+	generator->used_cmp = (1 << INSTR_EQI32);
 	generator->used_rel = (1 << INSTR_GTI32) | (1 << INSTR_LTI32);
 	generator->used_bit = 0;
 	generator->used_flt = 0;
@@ -1096,8 +1119,8 @@ Bool gen_run(Generator *generator, StrBuf *strbuf, Bool generate_main) {
 	const Tree *tree = generator->tree;
 	const Uint64 n_statements = array_size(tree->statements);
 
-	// Odin allows use before declaration, C does not. Emit declarations
-	// before everything else.
+	// Odin allows use before declaration, C does not. Emit declarations before
+	// everything else.
 	for (Uint64 i = 0; i < n_statements; i++) {
 		const Node *node = tree->statements[i];
 		const Statement *statement = &node->statement;
@@ -1119,11 +1142,12 @@ Bool gen_run(Generator *generator, StrBuf *strbuf, Bool generate_main) {
 			continue;
 		}
 		const DeclarationStatement *declaration = &statement->declaration;
-		const Uint64 n_count = array_size(declaration->names);
-		for (Uint64 i = 0; i < n_count; i++) {
+		const Uint64 n_names = array_size(declaration->names);
+		const Uint64 n_values = array_size(declaration->values);
+		for (Uint64 i = 0; i < n_names; i++) {
 			const Node *name = declaration->names[i];
-			const Node *value = declaration->values[i];
-			if (value->kind == NODE_PROCEDURE && string_compare(name->identifier.contents, SCLIT("main"))) {
+			const Node *value = i < n_values ? declaration->values[i] : 0;
+			if (value && value->kind == NODE_PROCEDURE && string_compare(name->identifier.contents, SCLIT("main"))) {
 				main = &value->procedure;
 				break;
 			}

@@ -205,6 +205,14 @@ Node *tree_new_compound_literal(Tree *tree, Node *type, Array(Node*) elements) {
 	return node;
 }
 
+Node *tree_new_field(Tree *tree, Node* name, Node *type) {
+	Node *node = new_node(tree, NODE_FIELD);
+	Field *field = &node->field;
+	field->name = name;
+	field->type = type;
+	return node;
+}
+
 Node *tree_new_field_list(Tree *tree, Array(Node*) fields) {
 	Node *node = new_node(tree, NODE_FIELD_LIST);
 	FieldList *field_list = &node->field_list;
@@ -635,6 +643,15 @@ static void tree_dump_compound_literal(const CompoundLiteral *compound_literal, 
 	putchar(')');
 }
 
+static void tree_dump_field(const Field *field, Sint32 depth) {
+	tree_dump_pad(depth);
+	printf("(field\n");
+	tree_dump_node(field->type, depth + 1);
+	putchar('\n');
+	tree_dump_node(field->name, depth + 1);
+	putchar(')');
+}
+
 static void tree_dump_field_list(const FieldList* field_list, Sint32 depth) {
 	const Uint64 n_fields = array_size(field_list->fields);
 	tree_dump_pad(depth);
@@ -738,6 +755,9 @@ void tree_dump_node(const Node *node, Sint32 depth) {
 		break;
 	case NODE_COMPOUND_LITERAL:
 		tree_dump_compound_literal(&node->compound_literal, depth);
+		break;
+	case NODE_FIELD:
+		tree_dump_field(&node->field, depth);
 		break;
 	case NODE_FIELD_LIST:
 		tree_dump_field_list(&node->field_list, depth);
