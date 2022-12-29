@@ -230,6 +230,13 @@ Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 fl
 	return node;
 }
 
+Node *tree_new_procedure_group(Tree *tree, Array(Node*) procedures) {
+	Node *node = new_node(tree, NODE_PROCEDURE_GROUP);
+	ProcedureGroup *procedure_group = &node->procedure_group;
+	procedure_group->procedures = procedures;
+	return node;
+}
+
 Node *tree_new_directive(Tree *tree, DirectiveKind kind) {
 	Node *node = new_node(tree, NODE_DIRECTIVE);
 	node->directive.kind = kind;
@@ -692,6 +699,20 @@ static void tree_dump_procedure_type(const ProcedureType *procedure, Sint32 dept
 	putchar(')');
 }
 
+static void tree_dump_procedure_group(const ProcedureGroup *group, Sint32 depth) {
+	tree_dump_pad(depth);
+	const Uint64 n_procedures = array_size(group->procedures);
+	printf("(procgroup\n");
+	for (Uint64 i = 0; i < n_procedures; i++) {
+		const Node *procedure = group->procedures[i];
+		tree_dump_node(procedure, depth + 1);
+		if (i != n_procedures - 1) {
+			putchar('\n');
+		}
+	}
+	putchar(')');
+}
+
 static void tree_dump_directive(const Directive *directive, Sint32 depth) {
 	tree_dump_pad(depth);
 	const String string = directive_to_string(directive->kind);
@@ -726,6 +747,9 @@ void tree_dump_node(const Node *node, Sint32 depth) {
 		break;
 	case NODE_PROCEDURE_TYPE:
 		tree_dump_procedure_type(&node->procedure_type, depth);
+		break;
+	case NODE_PROCEDURE_GROUP:
+		tree_dump_procedure_group(&node->procedure_group, depth);
 		break;
 	case NODE_DIRECTIVE:
 		tree_dump_directive(&node->directive, depth);

@@ -40,6 +40,7 @@ typedef struct FieldList FieldList;
 typedef struct Procedure Procedure;
 typedef struct ProcedureType ProcedureType;
 typedef struct Directive Directive;
+typedef struct ProcedureGroup ProcedureGroup;
 
 enum NodeKind {
 	NODE_EXPRESSION,
@@ -51,6 +52,7 @@ enum NodeKind {
 	NODE_FIELD_LIST,
 	NODE_PROCEDURE,
 	NODE_PROCEDURE_TYPE,
+	NODE_PROCEDURE_GROUP,
 	NODE_DIRECTIVE,
 };
 
@@ -238,6 +240,10 @@ struct ProcedureType {
 	CallingConvention convention;
 };
 
+struct ProcedureGroup {
+	Array(Node*) procedures;
+};
+
 struct Directive {
 	DirectiveKind kind;
 };
@@ -254,6 +260,7 @@ struct Node {
 		FieldList       field_list;
 		Procedure       procedure;
 		ProcedureType   procedure_type;
+		ProcedureGroup  procedure_group;
 		Directive      	directive;
 	};
 };
@@ -275,6 +282,7 @@ Node *tree_new_cast_expression(Tree *tree, Node *type, Node *expr);
 Node *tree_new_selector_expression(Tree *tree, Node *operand, Node *identifier);
 Node *tree_new_call_expression(Tree *tree, Node *operand, Array(Node*) arguments);
 Node *tree_new_assertion_expression(Tree *tree, Node *operand, Node *type);
+
 Node *tree_new_empty_statement(Tree *tree);
 Node *tree_new_import_statement(Tree *tree, String name, String package);
 Node *tree_new_expression_statement(Tree *tree, Node *expression);
@@ -285,13 +293,16 @@ Node *tree_new_if_statement(Tree *tree, Node *init, Node *condition, Node *body,
 Node *tree_new_for_statement(Tree *tree, Node *init, Node *cond, Node *body, Node *post);
 Node *tree_new_return_statement(Tree *tree, Array(Node*) results);
 Node *tree_new_defer_statement(Tree *tree, Node *statement);
+
 Node *tree_new_identifier(Tree *tree, String contents);
 Node *tree_new_value(Tree *tree, Node *field, Node *val);
 Node *tree_new_literal_value(Tree *tree, LiteralKind literal, String value);
 Node *tree_new_compound_literal(Tree *tree, Node *type, Array(Node*) elements);
 Node *tree_new_field_list(Tree *tree, Array(Node*) list);
+
 Node *tree_new_procedure(Tree *tree, Node *type, Node *body);
 Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags, CallingConvention convention);
+Node *tree_new_procedure_group(Tree *tree, Array(Node*) procedures);
 Node *tree_new_directive(Tree *tree, DirectiveKind directive);
 
 void tree_init(Tree *tree);

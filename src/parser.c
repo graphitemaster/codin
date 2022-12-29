@@ -141,8 +141,21 @@ static Bool accepted_keyword(Parser *parser, KeywordKind keyword) {
 	return false;
 }
 
+static Bool accepted_separator(Parser *parser) {
+	const Token token = parser->this_token;
+	if (accepted_operator(parser, OPERATOR_COMMA)) {
+		return true;
+	}
+	if (is_kind(token, KIND_SEMICOLON) && !string_compare(token.string, SCLIT("\n"))) {
+		ERROR("Expected a comma");
+	}
+	return false;
+}
+
 static Bool ignore_newline(const Parser *parser) {
-	return parser->expression_depth > 0;
+	// BUG(dweiler): Determine why this has to be >= and not > in the case of
+	// procedure groups.
+	return parser->expression_depth >= 0;
 }
 
 static Token peek(Parser *parser) {
@@ -429,9 +442,27 @@ static Node *parse_procedure(Parser *parser) {
 
 static Node *parse_procedure_group(Parser *parser) {
 	TRACE_ENTER();
-	UNIMPLEMENTED("parse_procedure_group");
+	expect_kind(parser, KIND_LBRACE);
+	Array(Node*) procedures = 0;
+	while (!is_kind(parser->this_token, KIND_RBRACE) &&
+	       !is_kind(parser->this_token, KIND_EOF))
+	{
+		Node *element = parse_expression(parser, false);
+		if (!element) {
+			break;
+		}
+		array_push(procedures, element);
+		if (!accepted_separator(parser)) {
+			break;
+		}
+	}
+	if (array_size(procedures) == 0) {
+		ERROR("Expected at least one procedure in procedure group");
+	}
+	expect_kind(parser, KIND_RBRACE);
+	Node *group = tree_new_procedure_group(parser->tree, procedures);
 	TRACE_LEAVE();
-	return 0;
+	return group;
 }
 
 static Node *parse_call_expression(Parser *parser, Node *operand);
@@ -619,21 +650,10 @@ static Node *parse_call_expression(Parser *parser, Node *operand) {
 	}
 	parser->expression_depth = depth;
 	expect_operator(parser, OPERATOR_CLOSEPAREN);
-
 	Node *node = tree_new_call_expression(parser->tree, operand, arguments);
+	// TODO(dweiler): Handle selector call expressions.
 	TRACE_LEAVE();
 	return node;
-}
-
-static Bool accepted_separator(Parser *parser) {
-	const Token token = parser->this_token;
-	if (accepted_operator(parser, OPERATOR_COMMA)) {
-		return true;
-	}
-	if (is_kind(token, KIND_SEMICOLON) && !string_compare(token.string, SCLIT("\n"))) {
-		ERROR("Expected a comma");
-	}
-	return false;
 }
 
 static Array(Node*) parse_element_list(Parser *parser) {
@@ -677,8 +697,9 @@ static Node *parse_literal_value(Parser *parser, Node *type) {
 	}
 	parser->expression_depth = depth;
 	expect_closing(parser, KIND_RBRACE);
+	Node *node = tree_new_compound_literal(parser->tree, type, elements);
 	TRACE_LEAVE();
-	return tree_new_compound_literal(parser->tree, type, elements);
+	return node;
 }
 
 static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {

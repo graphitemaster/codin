@@ -1,6 +1,6 @@
 #ifndef CODIN_TYPE_H
 #define CODIN_TYPE_H
-#include "support.h"
+#include "string.h"
 
 typedef enum TypeKind TypeKind;
 typedef enum TypeFlag TypeFlag;

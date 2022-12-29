@@ -69,6 +69,6 @@ struct Generator {
 
 Bool gen_init(Generator *generator, const Tree *tree);
 void gen_free(Generator *generator);
-Bool gen_run(Generator *generator, StrBuf *strbuf);
+Bool gen_run(Generator *generator, StrBuf *strbuf, Bool generate_main);
 
 #endif // CODIN_GEN_H

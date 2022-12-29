@@ -341,7 +341,7 @@ static Bool gen_assignment_statement(Generator *generator, const AssignmentState
 	return true;
 }
 
-static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf, Sint32 depth) {
+static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf, Bool prototype, Sint32 depth) {
 	gen_padding(depth, strbuf);
 	const Uint64 n_decls = array_size(statement->names);
 	const Uint64 n_values = array_size(statement->values);
@@ -358,17 +358,25 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 
 		// Generate return type for procedure.
 		const Node *value = i < n_values ? statement->values[i] : 0;
+		String rename = STRING_NIL;
 		if (value && value->kind == NODE_PROCEDURE) {
 			const Procedure *procedure = &value->procedure;
 			if (!gen_type(generator, procedure->type, strbuf)) {
 				return false;
 			}
+
 			strbuf_put_rune(strbuf, ' ');
+
+			// When encountering "main" rename it to "CODIN_main".
+			if (string_compare(name->identifier.contents, SCLIT("main"))) {
+				rename = SCLIT("CODIN_main");
+			}
 		}
 
-		// Generate name.
-		if (!gen_name(generator, name, strbuf)) {
-			return false;
+		if (!string_compare(rename, STRING_NIL)) {
+			strbuf_put_string(strbuf, rename);
+		} else {
+			gen_name(generator, name, strbuf);
 		}
 
 		if (value) {
@@ -376,16 +384,18 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 			if (value->kind == NODE_PROCEDURE) {
 				strbuf_put_rune(strbuf, '(');
 				strbuf_put_rune(strbuf, ')');
-				strbuf_put_rune(strbuf, ' ');
+				if (!prototype) {
+					strbuf_put_rune(strbuf, ' ');
+				}
 			} else {
 				strbuf_put_string(strbuf, SCLIT(" = "));
 			}
 
-			if (!gen_value(generator, type, value, strbuf)) {
+			if (!prototype && !gen_value(generator, type, value, strbuf)) {
 				return false;
 			}
 
-			if (value->kind != NODE_PROCEDURE) {
+			if (value->kind != NODE_PROCEDURE || prototype) {
 				strbuf_put_rune(strbuf, ';');
 			}
 		} else {
@@ -429,7 +439,7 @@ static Bool gen_block_statement(Generator *generator, const BlockStatement *stat
 	// Don't bother generating defers if our last statement was a return since
 	// the return statement would've accounted for it already and one cannot
 	// execute any statements after a return.
-	if (statement->statements[n_statements - 1]->statement.kind != STATEMENT_RETURN) {
+	if (n_statements && statement->statements[n_statements - 1]->statement.kind != STATEMENT_RETURN) {
 		gen_defer_statements(generator, scope, strbuf, depth + 1);
 	}
 	array_free(scope->defers);
@@ -445,7 +455,7 @@ static Bool gen_statement(Generator *generator, const Statement *statement, StrB
 	case STATEMENT_EXPRESSION:
 		return gen_expression_statement(generator, &statement->expression, strbuf, depth);
 	case STATEMENT_DECLARATION:
-		return gen_declaration_statement(generator, &statement->declaration, strbuf, depth);
+		return gen_declaration_statement(generator, &statement->declaration, strbuf, false, depth);
 	case STATEMENT_IF:
 		return gen_if_statement(generator, &statement->if_, strbuf, depth);
 	case STATEMENT_RETURN:
@@ -1074,7 +1084,7 @@ void gen_free(Generator *generator) {
 	array_free(generator->scopes);
 }
 
-Bool gen_run(Generator *generator, StrBuf *strbuf) {
+Bool gen_run(Generator *generator, StrBuf *strbuf, Bool generate_main) {
 	gen_c0_prelude(generator, strbuf);
 	gen_import_prelude(generator, strbuf);
 
@@ -1085,10 +1095,57 @@ Bool gen_run(Generator *generator, StrBuf *strbuf) {
 
 	const Tree *tree = generator->tree;
 	const Uint64 n_statements = array_size(tree->statements);
+
+	// Odin allows use before declaration, C does not. Emit declarations
+	// before everything else.
 	for (Uint64 i = 0; i < n_statements; i++) {
+		const Node *node = tree->statements[i];
+		const Statement *statement = &node->statement;
+		if (statement->kind != STATEMENT_DECLARATION) {
+			continue;
+		}
+		if (!gen_declaration_statement(generator, &statement->declaration, strbuf, true, 0)) {
+			return false;
+		}
+	}
+	strbuf_put_rune(strbuf, '\n');
+
+	// Check for a main procedure.
+	const Procedure *main = 0;
+	for (Uint64 i = 0; i < n_statements; i++) {
+		const Node *node = tree->statements[i];
+		const Statement *statement = &node->statement;
+		if (statement->kind != STATEMENT_DECLARATION) {
+			continue;
+		}
+		const DeclarationStatement *declaration = &statement->declaration;
+		const Uint64 n_count = array_size(declaration->names);
+		for (Uint64 i = 0; i < n_count; i++) {
+			const Node *name = declaration->names[i];
+			const Node *value = declaration->values[i];
+			if (value->kind == NODE_PROCEDURE && string_compare(name->identifier.contents, SCLIT("main"))) {
+				main = &value->procedure;
+				break;
+			}
+		}
+	}
+
+	for (Uint64 i = 0; i < n_statements; i++) {
+		const Node *statement = tree->statements[i];
+		ASSERT(statement->kind == NODE_STATEMENT);
 		if (!gen_node(generator, tree->statements[i], strbuf, 0)) {
 			return false;
 		}
+	}
+
+	// Emit an int main() which calls our CODIN_main.
+	if (generate_main && main) {
+		strbuf_put_string(strbuf, SCLIT("int main(int argc, char **argv) {\n"));
+		gen_padding(1, strbuf);
+		strbuf_put_string(strbuf, SCLIT("CODIN_main();\n"));
+		gen_padding(1, strbuf);
+		strbuf_put_string(strbuf, SCLIT("return 0;\n"));
+		strbuf_put_string(strbuf, SCLIT("}\n"));
 	}
 
 	return true;
