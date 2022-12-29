@@ -56,7 +56,6 @@ static Bool generate(const Tree *tree, StrBuf *strbuf) {
 	}
 	strbuf_init(strbuf);
 	const Bool result = gen_run(&gen, strbuf, true);
-	strbuf_free(strbuf);
 	gen_free(&gen);
 	return result;
 }
@@ -70,6 +69,7 @@ static Bool transpile(String path) {
 	StrBuf strbuf;
 	if (!generate(tree, &strbuf)) {
 		fprintf(stderr, "Failed to generate C0\n");
+		strbuf_free(&strbuf);
 		tree_free(tree);
 		return false;
 	}
@@ -109,6 +109,7 @@ static Bool transpile(String path) {
 	const String source = strbuf_result(&strbuf);
 	fwrite(source.contents, source.length, 1, fp);
 	fclose(fp);
+	strbuf_free(&strbuf);
 
 	return true;
 }

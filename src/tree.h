@@ -8,6 +8,7 @@ typedef enum ExpressionKind ExpressionKind;
 typedef enum StatementKind StatementKind;
 
 typedef enum CallingConvention CallingConvention;
+typedef enum BlockFlag BlockFlag;
 
 typedef struct Tree Tree;
 typedef struct Node Node;
@@ -136,7 +137,13 @@ struct ExpressionStatement {
 	Node *expression;
 };
 
+enum BlockFlag {
+	BLOCK_FLAG_BOUNDS_CHECK = 1 << 0,
+	BLOCK_FLAG_TYPE_ASSERT  = 1 << 1,
+};
+
 struct BlockStatement {
+	BlockFlag flags;
 	Array(Node*) statements;
 };
 
@@ -219,15 +226,20 @@ struct FieldList {
 	Array(Node*) fields;
 };
 
-struct Procedure {
-	Node *type;
-	Node *body;
-};
-
 typedef enum ProcedureFlag ProcedureFlag;
 
 enum ProcedureFlag {
-	PROC_FLAG_DIVERGING = 1 << 0,
+	PROC_FLAG_DIVERGING                 = 1 << 0,
+	PROC_FLAG_OPTIONAL_OK               = 1 << 1,
+	PROC_FLAG_OPTIONAL_ALLOCATION_ERROR = 1 << 2,
+	PROC_FLAG_BOUNDS_CHECK              = 1 << 3,
+	PROC_FLAG_TYPE_ASSERT               = 1 << 4,
+};
+
+struct Procedure {
+	ProcedureFlag flags;
+	Node *type;
+	Node *body;
 };
 
 enum CallingConvention {
@@ -276,6 +288,10 @@ struct Node {
 
 Bool tree_is_node_literal(const Node *node);
 
+FORCE_INLINE Bool tree_is_node_statement(const Node *node, StatementKind kind) {
+	return node->kind == NODE_STATEMENT && node->statement.kind == kind;
+}
+
 _Static_assert(sizeof(Node) <= 64, "Too big");
 
 struct Tree {
@@ -295,7 +311,7 @@ Node *tree_new_assertion_expression(Tree *tree, Node *operand, Node *type);
 Node *tree_new_empty_statement(Tree *tree);
 Node *tree_new_import_statement(Tree *tree, String name, String package);
 Node *tree_new_expression_statement(Tree *tree, Node *expression);
-Node *tree_new_block_statement(Tree *tree, Array(Node*) statements);
+Node *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Node*) statements);
 Node *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, Array(Node*) lhs, Array(Node*) rhs);
 Node *tree_new_declaration_statement(Tree *tree, Node *type, Array(Node*) names, Array(Node*) values);
 Node *tree_new_if_statement(Tree *tree, Node *init, Node *condition, Node *body, Node *elif);
@@ -310,7 +326,7 @@ Node *tree_new_compound_literal(Tree *tree, Node *type, Array(Node*) elements);
 Node *tree_new_field(Tree *tree, Node* name, Node *type);
 Node *tree_new_field_list(Tree *tree, Array(Node*) list);
 
-Node *tree_new_procedure(Tree *tree, Node *type, Node *body);
+Node *tree_new_procedure(Tree *tree, ProcedureFlag flags, Node *type, Node *body);
 Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags, CallingConvention convention);
 Node *tree_new_procedure_group(Tree *tree, Array(Node*) procedures);
 Node *tree_new_directive(Tree *tree, DirectiveKind directive);

@@ -115,9 +115,10 @@ Node *tree_new_expression_statement(Tree *tree, Node *expression) {
 	return node;
 }
 
-Node *tree_new_block_statement(Tree *tree, Array(Node*) statements) {
+Node *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Node*) statements) {
 	Node *node = new_statement(tree, STATEMENT_BLOCK);
 	BlockStatement *statement = &node->statement.block;
+	statement->flags = flags;
 	statement->statements = statements;
 	return node;
 }
@@ -220,9 +221,10 @@ Node *tree_new_field_list(Tree *tree, Array(Node*) fields) {
 	return node;
 }
 
-Node *tree_new_procedure(Tree *tree, Node *type, Node *body) {
+Node *tree_new_procedure(Tree *tree, ProcedureFlag flags, Node *type, Node *body) {
 	Node *node = new_node(tree, NODE_PROCEDURE);
 	Procedure *procedure = &node->procedure;
+	procedure->flags = flags;
 	procedure->type = type;
 	procedure->body = body;
 	return node;
@@ -480,7 +482,7 @@ static void tree_dump_assignment_statement(const AssignmentStatement *statement,
 		tree_dump_node(lhs, depth + 1);
 		putchar('\n');
 		tree_dump_node(rhs, depth + 1);
-		if (i != n_assignments) {
+		if (i != n_assignments - 1) {
 			putchar('\n');
 		}
 	}
@@ -627,18 +629,18 @@ static void tree_dump_literal_value(const LiteralValue *literal_value, Sint32 de
 static void tree_dump_compound_literal(const CompoundLiteral *compound_literal, Sint32 depth) {
 	const Uint64 n_elements = array_size(compound_literal->elements);
 	tree_dump_pad(depth);
-	printf("(compound\n");
+	printf("(compound");
 	if (compound_literal->type) {
-		tree_dump_node(compound_literal->type, depth + 1);
-	} else {
-		printf("<unknown>");
+		putchar(' ');
+		tree_dump_node(compound_literal->type, 0);
 	}
-	if (n_elements != 0) {
-		putchar('\n');
-	}
+	putchar('\n');
 	for (Uint64 i = 0; i < n_elements; i++) {
 		const Node *const element = compound_literal->elements[i];
 		tree_dump_node(element, depth + 1);
+		if (i != n_elements - 1) {
+			putchar('\n');
+		}
 	}
 	putchar(')');
 }
@@ -663,6 +665,9 @@ static void tree_dump_field_list(const FieldList* field_list, Sint32 depth) {
 	for (Uint64 i = 0; i < n_fields; i++) {
 		const Node *field = field_list->fields[i];
 		tree_dump_node(field, depth + 1);
+		if (i != n_fields - 1) {
+			putchar('\n');
+		}
 	}
 	putchar(')');
 }

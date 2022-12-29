@@ -40,6 +40,7 @@ static Bool gen_type(Generator *generator, const Node *node, StrBuf *strbuf) {
 		const Identifier *identifier = &node->identifier;
 		return gen_identifier(generator, identifier, strbuf);
 	}
+	printf("Unimplemented type\n");
 	return false;
 }
 
@@ -87,6 +88,7 @@ static Bool gen_call_expression(Generator *generator, const CallExpression *expr
 	case NODE_DIRECTIVE:
 		return gen_directive(generator, &operand->directive, strbuf);
 	default:
+		printf("Unimplemented call expression\n");
 		return false;
 	}
 
@@ -335,6 +337,7 @@ static Bool gen_assignment_statement(Generator *generator, const AssignmentState
 		strbuf_put_rune(strbuf, '\n');
 		break;
 	default:
+		printf("Unimplemented assignment\n");
 		return false;
 	}
 	return true;
@@ -565,6 +568,7 @@ static Bool gen_directive(Generator *generator, const Directive *directive, StrB
 					return true;
 				}
 			}
+			printf("Malformed load directive\n");
 			return false;
 		}
 	default:
@@ -589,6 +593,7 @@ static Bool gen_value(Generator *generator, const Node *type, const Node *node, 
 	} else if (node->kind == NODE_IDENTIFIER) {
 		return strbuf_put_string(strbuf, node->identifier.contents);
 	}
+	printf("Unimplemented value\n");
 	return false;
 }
 

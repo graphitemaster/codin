@@ -293,8 +293,11 @@ static CallingConvention string_to_calling_convention(String string) {
 static Node *parse_identifier(Parser *parser) {
 	TRACE_ENTER();
 	const Token token = parser->this_token;
-	if (is_kind(token, KIND_IDENTIFIER)) {
+	if (is_kind(token, KIND_IDENTIFIER) || is_keyword(token, KEYWORD_TYPEID)) {
+		// NOTE(dweiler): Should write this a different way?
 		advancep(parser);
+	} else {
+		ERROR("Expected identifier or 'typeid'");
 	}
 	Node *identifier = tree_new_identifier(parser->tree, token.string);
 	TRACE_LEAVE();
@@ -396,6 +399,9 @@ static Node *parse_parameter_list(Parser *parser) {
 			break;
 		}
 	}
+	if (array_size(names) != 0) {
+		ERROR("Expected type");
+	}
 	array_free(names);
 	Node *node = tree_new_field_list(parser->tree, fields);
 	TRACE_LEAVE();
@@ -449,7 +455,37 @@ static Node *parse_procedure(Parser *parser) {
 
 	advance_possible_newline(parser, true);
 
-	// TODO(dweiler): Check for procedure directives like "#no_bounds_check"
+	// We start each procedure with these flags.
+	ProcedureFlag flags = 0;
+	flags |= PROC_FLAG_BOUNDS_CHECK;
+	flags |= PROC_FLAG_TYPE_ASSERT;
+
+	while (is_kind(parser->this_token, KIND_DIRECTIVE)) {
+		const Token token = expect_kind(parser, KIND_DIRECTIVE);
+		const String name = directive_to_string(token.as_directive);
+		switch (token.as_directive) {
+		case DIRECTIVE_OPTIONAL_OK:
+			flags |= PROC_FLAG_OPTIONAL_OK;
+			break;
+		case DIRECTIVE_OPTIONAL_ALLOCATOR_ERROR:
+			flags |= PROC_FLAG_OPTIONAL_ALLOCATION_ERROR;
+			break;
+		case DIRECTIVE_BOUNDS_CHECK:
+			flags |= PROC_FLAG_BOUNDS_CHECK;
+			break;
+		case DIRECTIVE_NO_BOUNDS_CHECK:
+			flags &= ~PROC_FLAG_BOUNDS_CHECK;
+			break;
+		case DIRECTIVE_TYPE_ASSERT:
+			flags |= PROC_FLAG_TYPE_ASSERT;
+			break;
+		case DIRECTIVE_NO_TYPE_ASSERT:
+			flags &= ~PROC_FLAG_TYPE_ASSERT;
+			break;
+		default:
+			ERROR("Cannot use directive '%.*s' on procedure", SFMT(name));
+		}
+	}
 
 	if (accepted_kind(parser, KIND_UNDEFINED)) {
 		UNIMPLEMENTED("Undefined procedure literal");
@@ -459,7 +495,7 @@ static Node *parse_procedure(Parser *parser) {
 		Node *body = parse_body(parser);
 		parser->this_procedure = last_procedure;
 		ASSERT(type);
-		Node *procedure = tree_new_procedure(parser->tree, type, body);
+		Node *procedure = tree_new_procedure(parser->tree, flags, type, body);
 		TRACE_LEAVE();
 		return procedure;
 	}
@@ -496,7 +532,8 @@ static Node *parse_procedure_group(Parser *parser) {
 
 static Node *parse_call_expression(Parser *parser, Node *operand);
 
-static Node *parse_directive(Parser *parser, Bool lhs) {
+static Node *parse_statement(Parser *parser);
+static Node *parse_directive(Parser *parser, Bool statement, Bool lhs) {
 	TRACE_ENTER();
 
 	(void)lhs;
@@ -509,12 +546,15 @@ static Node *parse_directive(Parser *parser, Bool lhs) {
 	case DIRECTIVE_LOAD:
 		operand = tree_new_directive(parser->tree, token.as_directive);
 		break;
+	case DIRECTIVE_FORCE_INLINE:
+		FALLTHROUGH();
+	case DIRECTIVE_FORCE_NO_INLINE:
+		operand = tree_new_directive(parser->tree, token.as_directive);
+		break;
 	default:
 		{
-			// const String string = directive_to_string(token.as_directive);
-			// ERROR("Unimplemented directive '%.*s'",
-			// 	CAST(Sint32,      string.size),
-			// 	CAST(const char*, string.data));
+			const String string = directive_to_string(token.as_directive);
+			ERROR("Unimplemented directive '%.*s'", SFMT(string));
 		}
 		break;
 	}
@@ -561,7 +601,7 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 		}
 		break;
 	case KIND_DIRECTIVE:
-		node = parse_directive(parser, lhs);
+		node = parse_directive(parser, false, lhs);
 		TRACE_LEAVE();
 		return node;
 	case KIND_KEYWORD:
@@ -1014,7 +1054,14 @@ static Node *parse_body(Parser *parser) {
 	Array(Node*) statements = parse_statement_list(parser);
 	expect_kind(parser, KIND_RBRACE);
 	parser->expression_depth = depth;
-	Node *node = tree_new_block_statement(parser->tree, statements);
+	// NOTE(dweiler): We should be inheriting the flags from the parent block
+	// but we don't have access to that here.
+	BlockFlag flags = 0;
+	// Convert the procedure flags to block flags.
+	const ProcedureFlag proc_flags = parser->this_procedure->procedure.flags;
+	if (proc_flags & PROC_FLAG_BOUNDS_CHECK) flags |= BLOCK_FLAG_BOUNDS_CHECK;
+	if (proc_flags & PROC_FLAG_TYPE_ASSERT)  flags |= BLOCK_FLAG_TYPE_ASSERT;
+	Node *node = tree_new_block_statement(parser->tree, flags, statements);
 	TRACE_LEAVE();
 	return node;
 }
@@ -1029,7 +1076,10 @@ static Node *parse_block_statement(Parser *parser, Bool when) {
 		UNIMPLEMENTED("when block");
 	}
 
-	// TODO(dweiler) Check that we're inside a procedure.
+	if (!when && !parser->this_procedure) {
+		ERROR("Cannot use block statement at file scope");
+	}
+
 	Node *body = parse_body(parser);
 
 	TRACE_LEAVE();
@@ -1076,7 +1126,9 @@ static Node *parse_simple_statement(Parser* parser) {
 	const Token token = parser->this_token;
 	switch (token.kind) {
 	case KIND_ASSIGNMENT:
-		// TODO(dweiler): Ensure we're inside a procedure.
+		if (!parser->this_procedure) {
+			ERROR("Cannot use assignment statement at file scope");
+		}
 		advancep(parser);
 		Array(Node*) rhs = parse_rhs_expression_list(parser);
 		if (array_size(rhs) == 0) {
@@ -1155,7 +1207,7 @@ static Node *convert_statement_to_body(Parser *parser, Node *statement) {
 	}
 	Array(Node*) statements = 0;
 	array_push(statements, statement);
-	return tree_new_block_statement(parser->tree, statements);
+	return tree_new_block_statement(parser->tree, 0, statements);
 }
 
 static Node *convert_statement_to_expression(Parser *parser, Node *statement) {
@@ -1477,7 +1529,9 @@ static Node *parse_statement(Parser *parser) {
 	case KIND_ATTRIBUTE:
 		UNIMPLEMENTED("Attribute");
 	case KIND_DIRECTIVE:
-		UNIMPLEMENTED("Directive");
+		node = parse_directive(parser, true, false);
+		TRACE_LEAVE();
+		return node;
 	case KIND_LBRACE:
 		node = parse_block_statement(parser, false);
 		TRACE_LEAVE();
