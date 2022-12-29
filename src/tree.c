@@ -26,7 +26,7 @@ static Node *new_statement(Tree *tree, StatementKind kind) {
 	return node;
 }
 
-Bool tree_is_node_literal(const Node *node) {
+Bool node_is_literal(const Node *node) {
 	switch (node->kind) {
 	case NODE_IDENTIFIER:
 		return true;

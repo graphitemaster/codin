@@ -124,12 +124,20 @@ static Bool gen_unary_expression(Generator *generator, const UnaryExpression *ex
 
 static Bool gen_binary_instruction(Generator *generator, const BinaryExpression *expression, StrBuf *strbuf) {
 	const char *what = "unknown";
-	if (expression->operation == OPERATOR_LT)    what = "lti32";
-	if (expression->operation == OPERATOR_GT)    what = "gti32";
-	if (expression->operation == OPERATOR_ADD)   what = "addi32";
-	if (expression->operation == OPERATOR_SUB)   what = "subi32";
-	if (expression->operation == OPERATOR_MUL)   what = "muli32";
-	if (expression->operation == OPERATOR_CMPEQ) what = "eqi32";
+	switch (expression->operation) {
+	case OPERATOR_LT:    what = "lti32";  break;
+	case OPERATOR_GT:    what = "gti32";  break;
+	case OPERATOR_ADD:   what = "addi32"; break;
+	case OPERATOR_SUB:   what = "subi32"; break;
+	case OPERATOR_MUL:   what = "muli32"; break;
+	case OPERATOR_CMPEQ: what = "eqi32";  break;
+	case OPERATOR_NOTEQ: what = "nei32";  break;
+	case OPERATOR_GTEQ:  what = "gtei32"; break;
+	case OPERATOR_LTEQ:  what = "ltei32"; break;
+	case OPERATOR_AND:   what = "andi32"; break;
+	default:
+		printf("Unimplemented binary instructon\n");
+	}
 	strbuf_put_formatted(strbuf, "%s(", what);
 	if (!gen_node(generator, expression->lhs, strbuf, 0)) return false;
 	strbuf_put_string(strbuf, SCLIT(", "));
@@ -327,19 +335,24 @@ static Bool gen_for_statement(Generator *generator, const ForStatement *statemen
 }
 
 static Bool gen_assignment_statement(Generator *generator, const AssignmentStatement *statement, StrBuf *strbuf, Sint32 depth) {
-	gen_padding(depth, strbuf);
+	const char *what = "";
 	switch (statement->assignment) {
-	case ASSIGNMENT_ADDEQ:
-		gen_node(generator, statement->lhs[0], strbuf, depth);
-		strbuf_put_string(strbuf, SCLIT(" += "));
-		gen_node(generator, statement->rhs[0], strbuf, 0);
-		strbuf_put_rune(strbuf, ';');
-		strbuf_put_rune(strbuf, '\n');
-		break;
+	case ASSIGNMENT_ADDEQ: what = "addi32"; break;
+	case ASSIGNMENT_SUBEQ: what = "subi32"; break;
 	default:
-		printf("Unimplemented assignment\n");
+		printf("Unimplemented assignment");
 		return false;
 	}
+
+	// generate lhs = op(lhs, rhs)
+	gen_padding(depth, strbuf);
+	gen_node(generator, statement->lhs[0], strbuf, depth);
+	strbuf_put_formatted(strbuf, " = %s(", what);
+	gen_node(generator, statement->lhs[0], strbuf, 0);
+	strbuf_put_formatted(strbuf, ", ");
+	gen_node(generator, statement->rhs[0], strbuf, 0);
+	strbuf_put_string(strbuf, SCLIT(");\n"));
+
 	return true;
 }
 
@@ -367,6 +380,9 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 		String rename = STRING_NIL;
 		if (value && value->kind == NODE_PROCEDURE) {
 			const Procedure *procedure = &value->procedure;
+			if (procedure->flags & PROC_FLAG_FORCE_INLINE) {
+				strbuf_put_string(strbuf, SCLIT("FORCE_INLINE "));
+			}
 			if (!gen_type(generator, procedure->type, strbuf)) {
 				return false;
 			}
@@ -726,9 +742,20 @@ static Bool gen_c0_rel(RelInstruction instr, StrBuf *strbuf) {
 }
 
 static Bool gen_c0_bit(BitInstruction instr, StrBuf *strbuf) {
-	(void)instr;
-	(void)strbuf;
-	return false;
+	#define BIT(ignore, name, c_op, bits) { (name), (c_op), (bits) },
+	static const InstructionInfo INFOS[] = {
+		#include "instructions.h"
+	};
+
+	const InstructionInfo info = INFOS[instr];
+
+	strbuf_put_formatted(strbuf, "static FORCE_INLINE i%d %si%d(i%d lhs, i%d rhs) {\n",
+		info.bits, info.name, info.bits, info.bits, info.bits);
+	gen_padding(1, strbuf);
+	strbuf_put_formatted(strbuf, "return lhs %s rhs;\n", info.c_op);
+	strbuf_put_formatted(strbuf, "}\n\n");
+
+	return true;
 }
 
 static Bool gen_c0_int_prelude(Uint64 used, StrBuf *strbuf) {
@@ -1097,11 +1124,11 @@ static Bool gen_import_prelude(Generator *generator, StrBuf *strbuf) {
 Bool gen_init(Generator *generator, const Tree *tree) {
 	generator->tree = tree;
 	// HACK(dweiler): Use all instructions for now.
-	generator->used_int = (1 << INSTR_SUBI32) | (1 << INSTR_MULI32);
+	generator->used_int = (1 << INSTR_ADDI32) | (1 << INSTR_SUBI32) | (1 << INSTR_MULI32);
 	generator->used_flt = 0;
-	generator->used_cmp = (1 << INSTR_EQI32);
-	generator->used_rel = (1 << INSTR_GTI32) | (1 << INSTR_LTI32);
-	generator->used_bit = 0;
+	generator->used_cmp = (1 << INSTR_EQI32) | (1 << INSTR_NEI32);
+	generator->used_rel = (1 << INSTR_GTI32) | (1 << INSTR_LTI32) | (1 << INSTR_GTEI32);
+	generator->used_bit = (1 << INSTR_ANDI32);
 	generator->used_flt = 0;
 	generator->scopes = 0;
 	return true;

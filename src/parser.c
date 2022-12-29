@@ -483,7 +483,7 @@ static Node *parse_procedure(Parser *parser) {
 			flags &= ~PROC_FLAG_TYPE_ASSERT;
 			break;
 		default:
-			ERROR("Cannot use directive '%.*s' on procedure", SFMT(name));
+			ERROR("Cannot use directive '%.*s' on a procedure", SFMT(name));
 		}
 	}
 
@@ -533,34 +533,113 @@ static Node *parse_procedure_group(Parser *parser) {
 static Node *parse_call_expression(Parser *parser, Node *operand);
 
 static Node *parse_statement(Parser *parser);
-static Node *parse_directive(Parser *parser, Bool statement, Bool lhs) {
+static Node *parse_unary_expression(Parser *parser, Bool lhs);
+static Node *parse_directive_for_operand(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
 
 	(void)lhs;
 
-	expect_kind(parser, KIND_DIRECTIVE);
-
-	const Token token = parser->last_token;
-	Node *operand = 0;
+	const Token token = expect_kind(parser, KIND_DIRECTIVE);
+	Node *node = 0;
 	switch (token.as_directive) {
-	case DIRECTIVE_LOAD:
-		operand = tree_new_directive(parser->tree, token.as_directive);
+	case DIRECTIVE_TYPE:
+		FALLTHROUGH();
+	case DIRECTIVE_SIMD:
+		FALLTHROUGH();
+	case DIRECTIVE_SOA:
+		FALLTHROUGH();
+	case DIRECTIVE_PARTIAL:
+		FALLTHROUGH();
+	case DIRECTIVE_SPARSE:
+		node = parse_type(parser);
+		break;
+	case DIRECTIVE_RELATIVE:
+		node = parse_type(parser);
+		break;
+	case DIRECTIVE_BOUNDS_CHECK:
+		node = parse_expression(parser, lhs);
+		ASSERT(node->kind == NODE_STATEMENT);
+		break;
+	case DIRECTIVE_NO_BOUNDS_CHECK:
+		node = parse_expression(parser, lhs);
+		ASSERT(node->kind == NODE_STATEMENT);
+		break;
+	case DIRECTIVE_TYPE_ASSERT:
+		node = parse_expression(parser, lhs);
+		ASSERT(node->kind == NODE_STATEMENT);
+		break;
+	case DIRECTIVE_NO_TYPE_ASSERT:
+		node = parse_expression(parser, lhs);
+		ASSERT(node->kind == NODE_STATEMENT);
 		break;
 	case DIRECTIVE_FORCE_INLINE:
 		FALLTHROUGH();
 	case DIRECTIVE_FORCE_NO_INLINE:
-		operand = tree_new_directive(parser->tree, token.as_directive);
-		break;
+		node = parse_unary_expression(parser, false);
+		if (node->kind != NODE_PROCEDURE && !node_is_expression(node, EXPRESSION_CALL)) {
+			ERROR("Directive '%.*s' must be followed by a procedure literal or call expression");
+		}
+		switch (token.as_directive) {
+		case DIRECTIVE_FORCE_INLINE:
+			node->procedure.flags |= PROC_FLAG_FORCE_INLINE;
+			break;
+		case DIRECTIVE_FORCE_NO_INLINE:
+			node->procedure.flags &= PROC_FLAG_FORCE_INLINE;
+			break;
+		default:
+			break;
+		}
+		return node;
 	default:
 		{
-			const String string = directive_to_string(token.as_directive);
-			ERROR("Unimplemented directive '%.*s'", SFMT(string));
+			const String directive = directive_to_string(token.as_directive);
+			ERROR("Cannot use directive '%.*s' on a expression", SFMT(directive));
+		}
+	}
+
+	TRACE_LEAVE();
+	return 0;
+}
+
+static Node *parse_directive_for_statement(Parser *parser) {
+	TRACE_ENTER();
+
+	const Token token = expect_kind(parser, KIND_DIRECTIVE);
+	Node *statement = 0;
+	switch (token.as_directive) {
+	case DIRECTIVE_BOUNDS_CHECK:
+		statement = parse_statement(parser);
+		break;
+	case DIRECTIVE_NO_BOUNDS_CHECK:
+		statement = parse_statement(parser);
+		break;
+	case DIRECTIVE_TYPE_ASSERT:
+		statement = parse_statement(parser);
+		break;
+	case DIRECTIVE_NO_TYPE_ASSERT:
+		statement = parse_statement(parser);
+		break;
+	case DIRECTIVE_PARTIAL:
+		UNIMPLEMENTED("#partial");
+	case DIRECTIVE_ASSERT:
+		FALLTHROUGH();
+	case DIRECTIVE_PANIC:
+		statement = tree_new_directive(parser->tree, token.as_directive);
+		statement = tree_new_expression_statement(parser->tree, parse_call_expression(parser, statement));
+		expect_semicolon(parser);
+		break;
+	case DIRECTIVE_UNROLL:
+		UNIMPLEMENTED("#unroll");
+	default:
+		{
+			const String directive = directive_to_string(token.as_directive);
+			ERROR("Unsupported directive '%.*s' in statement", SFMT(directive));
 		}
 		break;
 	}
 
 	TRACE_LEAVE();
-	return operand;
+	return statement;
 }
 
 static Node *parse_operand(Parser *parser, Bool lhs) {
@@ -601,7 +680,7 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 		}
 		break;
 	case KIND_DIRECTIVE:
-		node = parse_directive(parser, false, lhs);
+		node = parse_directive_for_operand(parser, lhs);
 		TRACE_LEAVE();
 		return node;
 	case KIND_KEYWORD:
@@ -843,7 +922,7 @@ static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
 			}
 			break;
 		case KIND_LBRACE:
-			if (!lhs && tree_is_node_literal(operand) && parser->expression_depth >= 0) {
+			if (!lhs && node_is_literal(operand) && parser->expression_depth >= 0) {
 				operand = parse_literal_value(parser, operand);
 			} else {
 				TRACE_LEAVE();
@@ -952,9 +1031,13 @@ static Node *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec) {
 				break;
 			}
 		} 
+		const Token last = parser->last_token;
 		if (is_keyword(token, KEYWORD_IF) || is_keyword(token, KEYWORD_WHEN)) {
-			// TODO(dweiler): Ternary if and when expressions.
-			UNIMPLEMENTED("if when ternary");
+			// Needs to be on the same line to be a ternary usage.
+			if (last.location.line < token.location.line) {
+				return expr;
+			}
+			ERROR("Unimplemented ternary if or when expression");
 			break;
 		} else if (!is_kind(token, KIND_OPERATOR)) {
 			break;
@@ -1529,7 +1612,7 @@ static Node *parse_statement(Parser *parser) {
 	case KIND_ATTRIBUTE:
 		UNIMPLEMENTED("Attribute");
 	case KIND_DIRECTIVE:
-		node = parse_directive(parser, true, false);
+		node = parse_directive_for_statement(parser);
 		TRACE_LEAVE();
 		return node;
 	case KIND_LBRACE:

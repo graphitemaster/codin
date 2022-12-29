@@ -234,6 +234,7 @@ enum ProcedureFlag {
 	PROC_FLAG_OPTIONAL_ALLOCATION_ERROR = 1 << 2,
 	PROC_FLAG_BOUNDS_CHECK              = 1 << 3,
 	PROC_FLAG_TYPE_ASSERT               = 1 << 4,
+	PROC_FLAG_FORCE_INLINE              = 1 << 5,
 };
 
 struct Procedure {
@@ -286,10 +287,18 @@ struct Node {
 	};
 };
 
-Bool tree_is_node_literal(const Node *node);
+Bool node_is_literal(const Node *node);
 
-FORCE_INLINE Bool tree_is_node_statement(const Node *node, StatementKind kind) {
-	return node->kind == NODE_STATEMENT && node->statement.kind == kind;
+FORCE_INLINE Bool node_is_kind(const Node *node, NodeKind kind) {
+	return node->kind == kind;
+}
+
+FORCE_INLINE Bool node_is_statement(const Node *node, StatementKind kind) {
+	return node_is_kind(node, NODE_STATEMENT) && node->statement.kind == kind;
+}
+
+FORCE_INLINE Bool node_is_expression(const Node *node, ExpressionKind kind) {
+	return node_is_kind(node, NODE_EXPRESSION) && node->expression.kind == kind;
 }
 
 _Static_assert(sizeof(Node) <= 64, "Too big");
