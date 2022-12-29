@@ -584,7 +584,7 @@ static Node *parse_directive_for_operand(Parser *parser, Bool lhs) {
 			node->procedure.flags |= PROC_FLAG_FORCE_INLINE;
 			break;
 		case DIRECTIVE_FORCE_NO_INLINE:
-			node->procedure.flags &= PROC_FLAG_FORCE_INLINE;
+			node->procedure.flags &= ~PROC_FLAG_FORCE_INLINE;
 			break;
 		default:
 			break;
