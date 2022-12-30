@@ -2,25 +2,18 @@ package main
 
 import "core:fmt"
 
-main :: proc() {
-	for x in 0..=10 do fmt.printf("%d, ", x)
-	fmt.printf("\n")
-	for x in 0..<10 do fmt.printf("%d, ", x)
-	fmt.printf("\n")
-	for x: i64 = 0; x <= 10; x += 1 do fmt.printf("%d, ", x)
-	fmt.printf("\n")
-	for x: i64 = 0; x < 10; x += 1 do fmt.printf("%d, ", x)
-	fmt.printf("\n")
-	n: i32 = 16
-	for y: i32 = n - 1; y >= 0; y -= 1 {
+triangle :: #force_inline proc "contextless" (n: i64) {
+	for m in 0..<n {
+		y: i64 = n - 1 - m
 		defer fmt.printf("\n")
-		for i: i32 = 0; i < y; i += 1 do fmt.printf(" ")
-		for x: i32 = 0; x + y < n; x += 1 {
-			if (x & y) != 0 {
-				fmt.printf("  ")
-			} else {
-				fmt.printf("* ")
-			}
+		for in 0..<y do fmt.printf(" ")
+		for x in 0..<n {
+			if x & y != 0 do fmt.printf("  ")
+			else          do fmt.printf("* ")
 		}
 	}
+}
+
+main :: proc() {
+	triangle(16)
 }

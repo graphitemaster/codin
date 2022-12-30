@@ -65,6 +65,7 @@ struct Parser {
 	Sint32 trace_depth;
 	Sint32 expression_depth;
 	jmp_buf jmp;
+	Uint64 unique_id;
 };
 
 
@@ -92,6 +93,7 @@ static Bool parser_init(Parser *parser, String filename) {
 			parser->last_token = TOKEN_NIL;
 			parser->trace_depth = 0;
 			parser->expression_depth = 0;
+			parser->unique_id = 0;
 			return true;
 		}
 	}
@@ -1414,8 +1416,17 @@ static Node *parse_for_statement(Parser *parser) {
 				body = parse_block_statement(parser, false);
 			}
 			parser->expression_depth = depth;
+			// Generate a compiler identifier for the counter.
+			// TODO(dweiler): This introduces a leak. Create a proper ident pool.
+			char name[4096];
+			snprintf(name, sizeof name, "CODIN_%d", CAST(Sint32, parser->unique_id++));
+			Node *ident = tree_new_identifier(parser->tree, string_copy_from_null(name));
+			Array(Node*) lhs = 0;
+			array_push(lhs, ident);
+			cond = tree_new_in_expression(parser->tree, lhs, rhs);
+			Node *node = tree_new_for_statement(parser->tree, 0, cond, body, 0);
 			TRACE_LEAVE();
-			return 0;
+			return node;
 		}
 
 		if (!is_kind(token, KIND_SEMICOLON)) {
