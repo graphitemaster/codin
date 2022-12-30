@@ -1003,17 +1003,17 @@ static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
 					break;
 				}
 				break;
-
 			case OPERATOR_ARROW:
 				advancep(parser);
 				node = parse_identifier(parser);
 				operand = tree_new_selector_expression(parser->tree, operand, node);
 				break;
-
 			case OPERATOR_OPENBRACKET:
 				UNIMPLEMENTED("Bracket");
 			case OPERATOR_POINTER:
-				UNIMPLEMENTED("Dereference");
+				expect_operator(parser, OPERATOR_POINTER);
+				operand = tree_new_dereference_expression(parser->tree, operand);
+				break;
 			case OPERATOR_OR_RETURN:
 				UNIMPLEMENTED("or_return");
 			default:

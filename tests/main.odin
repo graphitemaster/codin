@@ -2,10 +2,12 @@ package main
 
 import "core:fmt"
 
-foo :: proc(#any_int x: int) #no_bounds_check {
-  printf("hello %d\n", x)
+foo :: proc(x: ^i32) {
+  x^ = 420;
 }
 
 main :: proc() {
-  foo(42)
+  y: i32;
+  foo(&y);
+  fmt.printf("%d\n", y);
 }

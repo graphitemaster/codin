@@ -131,16 +131,28 @@ static Bool gen_call_expression(Generator *generator, const CallExpression *expr
 	return true;
 }
 
+static Bool gen_dereference_expression(Generator *generator, const DereferenceExpression *expression, StrBuf *strbuf, Sint32 depth) {
+	(void)depth;
+	strbuf_put_rune(strbuf, '*');
+	return gen_node(generator, expression->operand, strbuf, 0);
+}
+
 static Bool gen_unary_expression(Generator *generator, const UnaryExpression *expression, StrBuf *strbuf, Sint32 depth) {
 	(void)depth;
 	const char *what = "";
 	if (expression->operation == OPERATOR_SUB) what = "negi32";
 	if (expression->operation == OPERATOR_NOT) what = "noti32";
-	strbuf_put_formatted(strbuf, "%s(", what);
+	if (expression->operation == OPERATOR_AND) {
+		strbuf_put_rune(strbuf, '&');
+	} else {
+		strbuf_put_formatted(strbuf, "%s(", what);
+	}
 	if (!gen_node(generator, expression->operand, strbuf, 0)) {
 		return false;
 	}
-	strbuf_put_rune(strbuf, ')');
+	if (expression->operation != OPERATOR_AND) {
+		strbuf_put_rune(strbuf, ')');
+	}
 	return true;
 }
 
@@ -181,6 +193,8 @@ static Bool gen_expression(Generator *generator, const Expression *expression, S
 		return gen_binary_expression(generator, &expression->binary, strbuf, depth);
 	case EXPRESSION_CALL:
 		return gen_call_expression(generator, &expression->call, strbuf, depth);
+	case EXPRESSION_DEREFERENCE:
+		return gen_dereference_expression(generator, &expression->dereference, strbuf, depth);
 	default:
 		printf("Unimplemented expression\n");
 		return false;
@@ -409,12 +423,49 @@ static Bool gen_for_statement(Generator *generator, const ForStatement *statemen
 }
 
 static Bool gen_assignment_statement(Generator *generator, const AssignmentStatement *statement, StrBuf *strbuf, Sint32 depth) {
+	// NOTE(dweiler): Need a type system, assumes i32 for now.
+
+	// Assignments in Odin behave more like memcpy unlike C which will not allow
+	// you to copy structure types with regular assignment. Here we emit memcpy
+	// instead.
+	if (statement->assignment == ASSIGNMENT_EQ) {
+		gen_padding(depth, strbuf);
+		strbuf_put_string(strbuf, SCLIT("memcpy("));
+		if (node_is_expression(statement->lhs[0], EXPRESSION_DEREFERENCE)) {
+			// Expressions like ptr^ = value should become memcpy(ptr, value, ...)
+			const DereferenceExpression *expression = &statement->lhs[0]->expression.dereference;
+			gen_node(generator, expression->operand, strbuf, depth);
+		} else {
+			// Expressions like obj = value should become memcpy(&obj, value, ...)
+			gen_padding(depth, strbuf);
+			strbuf_put_rune(strbuf, '&');
+			gen_node(generator, statement->lhs[0], strbuf, 0);
+		}
+		strbuf_put_string(strbuf, SCLIT(", "));
+		// The value be assigned might be a literal. Construct a compound literal
+		// on the C side to pass to memcpy.
+		if (node_is_kind(statement->rhs[0], NODE_LITERAL_VALUE)) {
+			strbuf_put_string(strbuf, SCLIT("&(i32){"));
+			gen_node(generator, statement->rhs[0], strbuf, 0);
+			strbuf_put_rune(strbuf, '}');
+		} else {
+			gen_node(generator, statement->rhs[0], strbuf, 0);
+		}
+		// NOTE(dweiler): We should probably evaluate the type size once we have a
+		// type system so we can pass a literal into here.
+		strbuf_put_string(strbuf, SCLIT(", sizeof("));
+		gen_node(generator, statement->lhs[0], strbuf, 0);
+		strbuf_put_string(strbuf, SCLIT("));\n"));
+		return true;
+	}
+
+	// Compound assignment.
 	const char *what = "";
 	switch (statement->assignment) {
 	case ASSIGNMENT_ADDEQ: what = "addi32"; break;
 	case ASSIGNMENT_SUBEQ: what = "subi32"; break;
 	default:
-		printf("Unimplemented assignment");
+		printf("Unimplemented assignment\n");
 		return false;
 	}
 
@@ -443,8 +494,8 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 		}
 
 		if (type) {
-			ASSERT(node_is_kind(type, NODE_TYPE));
-			if (!gen_type(generator, &type->type, strbuf)) {
+			ASSERT(node_is_kind(type, NODE_TYPE) || node_is_kind(type, NODE_IDENTIFIER));
+			if (!gen_node(generator, type, strbuf, 0)) {
 				return false;
 			}
 			strbuf_put_rune(strbuf, ' ');
@@ -1236,6 +1287,7 @@ static Bool gen_import_prelude(Generator *generator, StrBuf *strbuf) {
 		const ImportStatement *import = &node->statement.import;
 		if (string_compare(import->package, SCLIT("core:fmt"))) {
 			strbuf_put_string(strbuf, SCLIT("#include <stdio.h>\n"));
+			strbuf_put_string(strbuf, SCLIT("#include <string.h>\n"));
 		}
 	}
 	return true;
@@ -1254,7 +1306,7 @@ Bool gen_init(Generator *generator, const Tree *tree) {
 }
 
 void gen_free(Generator *generator) {
-	ASSERT(array_size(generator->scopes) == 0);
+	//ASSERT(array_size(generator->scopes) == 0);
 	array_free(generator->scopes);
 }
 

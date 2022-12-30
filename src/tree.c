@@ -109,6 +109,13 @@ Node *tree_new_in_expression(Tree *tree, Array(Node*) lhs, Node *rhs) {
 	return node;
 }
 
+Node *tree_new_dereference_expression(Tree *tree, Node *operand) {
+	Node *node = new_expression(tree, EXPRESSION_DEREFERENCE);
+	DereferenceExpression *expression = &node->expression.dereference;
+	expression->operand = operand;
+	return node;
+}
+
 Node *tree_new_empty_statement(Tree *tree) {
 	Node *node = new_statement(tree, STATEMENT_EMPTY);
 	return node;
@@ -480,6 +487,12 @@ static void tree_dump_in_expression(const InExpression *expression, Sint32 depth
 	putchar(')');
 }
 
+static void tree_dump_dereference_expression(const DereferenceExpression *expression, Sint32 depth) {;
+	printf("(dereference\n");
+	tree_dump_node(expression->operand, depth + 1);
+	putchar(')');
+}
+
 // expressions
 static void tree_dump_expression(const Expression *expression, Sint32 depth) {
 	tree_dump_pad(depth);
@@ -498,6 +511,8 @@ static void tree_dump_expression(const Expression *expression, Sint32 depth) {
 		return tree_dump_assertion_expression(&expression->assertion, depth);
 	case EXPRESSION_IN:
 		return tree_dump_in_expression(&expression->in, depth);
+	case EXPRESSION_DEREFERENCE:
+		return tree_dump_dereference_expression(&expression->dereference, depth);
 	}
 }
 
