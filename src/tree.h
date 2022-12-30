@@ -20,6 +20,7 @@ typedef struct CastExpression CastExpression;
 typedef struct SelectorExpression SelectorExpression;
 typedef struct CallExpression CallExpression;
 typedef struct AssertionExpression AssertionExpression;
+typedef struct InExpression InExpression;
 
 typedef struct Statement Statement;
 typedef struct EmptyStatement EmptyStatement;
@@ -66,6 +67,7 @@ enum ExpressionKind {
 	EXPRESSION_SELECTOR,
 	EXPRESSION_CALL,
 	EXPRESSION_ASSERTION,
+	EXPRESSION_IN,
 };
 
 enum StatementKind {
@@ -112,6 +114,11 @@ struct AssertionExpression {
 	Node *type;
 };
 
+struct InExpression {
+	Array(Node) *lhs;
+	Node *rhs;
+};
+
 struct Expression {
 	ExpressionKind kind;
 	union {
@@ -121,6 +128,7 @@ struct Expression {
 		SelectorExpression  selector;
 		CallExpression      call;
 		AssertionExpression assertion;
+		InExpression        in;
 	};
 };
 
@@ -316,6 +324,7 @@ Node *tree_new_cast_expression(Tree *tree, Node *type, Node *expr);
 Node *tree_new_selector_expression(Tree *tree, Node *operand, Node *identifier);
 Node *tree_new_call_expression(Tree *tree, Node *operand, Array(Node*) arguments);
 Node *tree_new_assertion_expression(Tree *tree, Node *operand, Node *type);
+Node *tree_new_in_expression(Tree *tree, Array(Node*) lhs, Node *rhs);
 
 Node *tree_new_empty_statement(Tree *tree);
 Node *tree_new_import_statement(Tree *tree, String name, String package);

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "gen.h"
 #include "tree.h"
@@ -302,22 +303,79 @@ static Bool gen_for_statement(Generator *generator, const ForStatement *statemen
 		gen_node(generator, statement->init, strbuf, depth + 1);
 	}
 
+	Bool has_in = statement->cond && node_is_expression(statement->cond, EXPRESSION_IN);
+	Bool has_range = false;
+	if (has_in) {
+		const InExpression *in = &statement->cond->expression.in;
+		if (node_is_expression(in->rhs, EXPRESSION_BINARY)) {
+			has_range = true;
+			const Node *b_lhs = in->rhs->expression.binary.lhs;
+			gen_padding(depth + 1, strbuf);
+			strbuf_put_string(strbuf, SCLIT("i64 "));
+			gen_node(generator, in->lhs[0], strbuf, 0);
+			strbuf_put_string(strbuf, SCLIT(" = "));
+			gen_node(generator, b_lhs, strbuf, 0);
+			strbuf_put_string(strbuf, SCLIT(";\n"));
+		} else {
+			return false;
+		}
+	}
+
 	gen_padding(depth + 1, strbuf);
 
 	strbuf_put_string(strbuf, SCLIT("while ("));
 	if (statement->cond) {
-		gen_node(generator, statement->cond, strbuf, 0);
+		Node *cond = statement->cond;
+		if (has_range) {
+			const InExpression *in = &cond->expression.in;
+			const BinaryExpression *binary = &in->rhs->expression.binary;
+			switch (binary->operation) {
+			case OPERATOR_ELLIPSIS:  // <lhs> .. <rhs>
+				FALLTHROUGH();
+			case OPERATOR_RANGEFULL: // <lhs> ..= <rhs>
+				strbuf_put_string(strbuf, SCLIT("ltei64("));
+				break;
+			case OPERATOR_RANGEHALF: // <lhs> ..< <rhs>
+				strbuf_put_string(strbuf, SCLIT("lti64("));
+				break;
+			default:
+				// Unsupported
+				return false;
+			}
+			if (!gen_node(generator, in->lhs[0], strbuf, 0)) {
+				return false;
+			}
+			strbuf_put_rune(strbuf, ',');
+			strbuf_put_rune(strbuf, ' ');
+			if (!gen_node(generator, binary->rhs, strbuf, 0)) {
+				return false;
+			}
+			strbuf_put_rune(strbuf, ')');
+		} else if (!gen_node(generator, statement->cond, strbuf, 0)) {
+			return false;
+		}
 	} else {
 		strbuf_put_rune(strbuf, '1');
 	}
 	strbuf_put_string(strbuf, SCLIT(") "));
 
-	// HACK(dweiler): We inject the post statement as the last statement in
-	// the body of the loop. This needs to be done in a smarter way because
-	// continue within the loop still needs to execute the post statement!
+	if (has_range) {
+		// Emit <lhs> += 1 by creating this assignment statement and putting it
+		// as the last statement on the block.
+		const InExpression *in = &statement->cond->expression.in;
+		Tree *tree = CAST(Tree *, generator->tree);
+		Array(Node*) lhs = 0;
+		Array(Node*) rhs = 0;
+		array_push(lhs, in->lhs[0]);
+		array_push(rhs, tree_new_literal_value(tree, LITERAL_INTEGER, SCLIT("1")));
+		Node *assignment = tree_new_assignment_statement(tree, ASSIGNMENT_ADDEQ, lhs, rhs);
+		array_push(statement->body->statement.block.statements, assignment);
+	}
+
+	// Inject the post statement as the last statement in the block.
 	if (statement->post) {
 		array_push(statement->body->statement.block.statements, statement->post);
-	}	
+	}
 
 	gen_node(generator, statement->body, strbuf, depth + 1);
 	strbuf_put_rune(strbuf, '\n');
@@ -732,8 +790,17 @@ static Bool gen_c0_rel(RelInstruction instr, StrBuf *strbuf) {
 
 	const InstructionInfo info = INFOS[instr];
 
-	strbuf_put_formatted(strbuf, "static FORCE_INLINE i%d %si%d(i%d lhs, i%d rhs) {\n",
-		info.bits, info.name, info.bits, info.bits, info.bits);
+	#define REL(enumerator, ...) #enumerator,
+	static const char *ENUMS[] = {
+		#include "instructions.h"
+	};
+
+	char bits[4]; // 128\0
+	snprintf(bits, sizeof bits, "%d", info.bits);
+	const Rune ts = tolower(strchr(ENUMS[instr], bits[0])[-1]);
+
+	strbuf_put_formatted(strbuf, "static FORCE_INLINE %c%d %s%c%d(%c%d lhs, %c%d rhs) {\n",
+		ts, info.bits, info.name, ts, info.bits, ts, info.bits, ts, info.bits);
 	gen_padding(1, strbuf);
 	strbuf_put_formatted(strbuf, "return lhs %s rhs;\n", info.c_op);
 	strbuf_put_formatted(strbuf, "}\n\n");
@@ -1127,7 +1194,7 @@ Bool gen_init(Generator *generator, const Tree *tree) {
 	generator->used_int = (1 << INSTR_ADDI32) | (1 << INSTR_SUBI32) | (1 << INSTR_MULI32);
 	generator->used_flt = 0;
 	generator->used_cmp = (1 << INSTR_EQI32) | (1 << INSTR_NEI32);
-	generator->used_rel = (1 << INSTR_GTI32) | (1 << INSTR_LTI32) | (1 << INSTR_GTEI32);
+	generator->used_rel = 0xffffffff; 
 	generator->used_bit = (1 << INSTR_ANDI32);
 	generator->used_flt = 0;
 	generator->scopes = 0;

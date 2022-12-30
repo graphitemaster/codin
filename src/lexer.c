@@ -69,6 +69,14 @@ static Bool is_digit(Rune ch) {
 	return false;
 }
 
+static Uint8 peek(Lexer *lexer) {
+	const Input *input = &lexer->input;
+	if (input->cur < input->end) {
+		return *input->cur;
+	}
+	return 0;
+}
+
 static void advancel(Lexer *lexer) {
 	if (lexer->rune == '\n') {
 		lexer->location.column = 1;
@@ -177,7 +185,12 @@ static Token scan_numeric(Lexer *lexer, Bool dot) {
 	scan(lexer, 10);
 
 	if (lexer->rune == '.') {
-		// TODO(dweiler): Check for '..' which is an ellipsis.
+		// .. is an operator
+		if (peek(lexer) == '.') {
+			token.string.length = lexer->here - token.string.contents;
+			return token;
+		}
+
 		advancel(lexer);
 		token.as_literal = LITERAL_FLOAT;
 		scan(lexer, 10);

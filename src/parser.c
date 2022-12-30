@@ -1203,7 +1203,7 @@ static Node *parse_declaration_statement(Parser *parser, Array(Node*) names) {
 	return node;
 }
 
-static Node *parse_simple_statement(Parser* parser) {
+static Node *parse_simple_statement(Parser* parser, Bool allow_in) {
 	TRACE_ENTER();
 	Array(Node*) lhs = parse_lhs_expression_list(parser);
 	const Token token = parser->this_token;
@@ -1224,7 +1224,15 @@ static Node *parse_simple_statement(Parser* parser) {
 	case KIND_OPERATOR:
 		switch (token.as_operator) {
 		case OPERATOR_IN:
-			UNIMPLEMENTED("in");
+			if (allow_in) {
+				// [lhs] in <Expression>
+				accepted_operator(parser, OPERATOR_IN);
+				Node *rhs = parse_expression(parser, true);
+				node = tree_new_in_expression(parser->tree, lhs, rhs);
+				TRACE_LEAVE();
+				return node;
+			}
+			break;
 		case OPERATOR_COLON:
 			expect_operator(parser, OPERATOR_COLON);
 			// TODO(dweiler): Label check.
@@ -1335,7 +1343,7 @@ static Node *parse_if_statement(Parser *parser) {
 	const Sint32 depth = parser->expression_depth;
 	parser->expression_depth = -1;
 
-	Node *init = parse_simple_statement(parser);
+	Node *init = parse_simple_statement(parser, false);
 	Node *cond = 0;
 	if (accepted_control_statement_separator(parser)) {
 		cond = parse_expression(parser, false);
@@ -1389,14 +1397,16 @@ static Node *parse_for_statement(Parser *parser) {
 
 	expect_keyword(parser, KEYWORD_FOR);
 
+	Bool range = false;
+
 	const Token token = parser->this_token;
 	if (!is_kind(token, KIND_LBRACE) && !is_keyword(token, KEYWORD_DO)) {
 		const Sint32 depth = parser->expression_depth;
 		parser->expression_depth = -1;
 		if (is_operator(token, OPERATOR_IN)) {
+			// for in [...] do <Statement>
+			// for in [...] <BlockStatement>
 			expect_operator(parser, OPERATOR_IN);
-			// for x in y <block>
-			// for x in y do <body>
 			Node *rhs = parse_expression(parser, false);
 			if (accepted_keyword(parser, KEYWORD_DO)) {
 				body = parse_do_body(parser);
@@ -1408,11 +1418,10 @@ static Node *parse_for_statement(Parser *parser) {
 			return 0;
 		}
 
-		// for x
-		Bool range = false;
 		if (!is_kind(token, KIND_SEMICOLON)) {
-			cond = parse_simple_statement(parser);
-			// TODO(dweiler): "in"
+			cond = parse_simple_statement(parser, true);
+			range = node_is_expression(cond, EXPRESSION_IN);
+			// for [...] in <Expression>
 		}
 
 		if (!range && accepted_control_statement_separator(parser)) {
@@ -1425,7 +1434,8 @@ static Node *parse_for_statement(Parser *parser) {
 				ERROR("Expected ';'");
 			} else {
 				if (!is_kind(token, KIND_SEMICOLON)) {
-					cond = parse_simple_statement(parser);
+					// for [...] <Statement>
+					cond = parse_simple_statement(parser, false);
 				}
 				if (!is_kind(parser->this_token, KIND_SEMICOLON)) {
 					ERROR("Expected ';'");
@@ -1433,7 +1443,8 @@ static Node *parse_for_statement(Parser *parser) {
 					expect_kind(parser, KIND_SEMICOLON);
 				}
 				if (!is_kind(parser->this_token, KIND_LBRACE) && !is_keyword(parser->this_token, KEYWORD_DO)) {
-					post = parse_simple_statement(parser);
+					// for [...] [...] <Statement>
+					post = parse_simple_statement(parser, false);
 				}
 			}
 		}
@@ -1441,12 +1452,16 @@ static Node *parse_for_statement(Parser *parser) {
 	}
 
 	if (accepted_keyword(parser, KEYWORD_DO)) {
+		// for [...] do <Statement>
 		body = parse_do_body(parser);
 	} else {
+		// for [...] <BlockStatement>
 		body = parse_block_statement(parser, false);
 	}
 
-	cond = convert_statement_to_expression(parser, cond);
+	if (!range) {
+		cond = convert_statement_to_expression(parser, cond);
+	}
 
 	cond = tree_new_for_statement(parser->tree, init, cond, body, post);
 
@@ -1521,7 +1536,7 @@ static Node *parse_statement(Parser *parser) {
 		case LITERAL_RUNE:
 			FALLTHROUGH();
 		case LITERAL_STRING:
-			node = parse_simple_statement(parser);
+			node = parse_simple_statement(parser, false);
 			expect_semicolon(parser);
 			TRACE_LEAVE();
 			return node;
@@ -1535,7 +1550,7 @@ static Node *parse_statement(Parser *parser) {
 			// Needed to support assignment to context.
 			FALLTHROUGH();
 		case KEYWORD_PROC:
-			node = parse_simple_statement(parser);
+			node = parse_simple_statement(parser, false);
 			expect_semicolon(parser);
 			TRACE_LEAVE();
 			return node;
@@ -1578,7 +1593,7 @@ static Node *parse_statement(Parser *parser) {
 		}
 		break;
 	case KIND_IDENTIFIER:
-		node = parse_simple_statement(parser);
+		node = parse_simple_statement(parser, false);
 		expect_semicolon(parser);
 		TRACE_LEAVE();
 		return node;
@@ -1597,7 +1612,7 @@ static Node *parse_statement(Parser *parser) {
 		case OPERATOR_NOT:
 			FALLTHROUGH();
 		case OPERATOR_AND:
-			node = parse_simple_statement(parser);
+			node = parse_simple_statement(parser, false);
 			expect_semicolon(parser);
 			TRACE_LEAVE();
 			return node;

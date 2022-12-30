@@ -95,6 +95,14 @@ Node *tree_new_assertion_expression(Tree *tree, Node *operand, Node *type) {
 	return node;
 }
 
+Node *tree_new_in_expression(Tree *tree, Array(Node*) lhs, Node *rhs) {
+	Node *node = new_expression(tree, EXPRESSION_IN);
+	InExpression *expression = &node->expression.in;
+	expression->lhs = lhs;
+	expression->rhs = rhs;
+	return node;
+}
+
 Node *tree_new_empty_statement(Tree *tree) {
 	Node *node = new_statement(tree, STATEMENT_EMPTY);
 	return node;
@@ -414,6 +422,22 @@ static void tree_dump_assertion_expression(const AssertionExpression *expression
 	putchar(')');
 }
 
+static void tree_dump_in_expression(const InExpression *expression, Sint32 depth) {
+	printf("(in\n");
+	tree_dump_pad(depth + 1);
+	printf("(lhs\n");
+	const Uint64 n_lhs = array_size(expression->lhs);
+	for (Uint64 i = 0; i < n_lhs; i++) {
+		const Node *node = expression->lhs[i];
+		tree_dump_node(node, depth + 2);
+		putchar('\n');
+	}
+	tree_dump_pad(depth + 1);
+	printf("(rhs\n");
+	tree_dump_node(expression->rhs, depth + 2);
+	putchar(')');
+}
+
 // expressions
 static void tree_dump_expression(const Expression *expression, Sint32 depth) {
 	tree_dump_pad(depth);
@@ -430,6 +454,8 @@ static void tree_dump_expression(const Expression *expression, Sint32 depth) {
 		return tree_dump_call_expression(&expression->call, depth);
 	case EXPRESSION_ASSERTION:
 		return tree_dump_assertion_expression(&expression->assertion, depth);
+	case EXPRESSION_IN:
+		return tree_dump_in_expression(&expression->in, depth);
 	}
 }
 
@@ -744,41 +770,29 @@ static void tree_dump_directive(const Directive *directive, Sint32 depth) {
 void tree_dump_node(const Node *node, Sint32 depth) {
 	switch (node->kind) {
 	case NODE_EXPRESSION:
-		tree_dump_expression(&node->expression, depth);
-		break;
+		return tree_dump_expression(&node->expression, depth);
 	case NODE_STATEMENT:
-		tree_dump_statement(&node->statement, depth);
-		break;
+		return tree_dump_statement(&node->statement, depth);
 	case NODE_IDENTIFIER:
-		tree_dump_identifier(&node->identifier, depth);
-		break;
+		return tree_dump_identifier(&node->identifier, depth);
 	case NODE_VALUE:
-		tree_dump_value(&node->value, depth);
-		break;
+		return tree_dump_value(&node->value, depth);
 	case NODE_LITERAL_VALUE:
-		tree_dump_literal_value(&node->literal_value, depth);
-		break;
+		return tree_dump_literal_value(&node->literal_value, depth);
 	case NODE_COMPOUND_LITERAL:
-		tree_dump_compound_literal(&node->compound_literal, depth);
-		break;
+		return tree_dump_compound_literal(&node->compound_literal, depth);
 	case NODE_FIELD:
-		tree_dump_field(&node->field, depth);
-		break;
+		return tree_dump_field(&node->field, depth);
 	case NODE_FIELD_LIST:
-		tree_dump_field_list(&node->field_list, depth);
-		break;
+		return tree_dump_field_list(&node->field_list, depth);
 	case NODE_PROCEDURE:
-		tree_dump_procedure(&node->procedure, depth);
-		break;
+		return tree_dump_procedure(&node->procedure, depth);
 	case NODE_PROCEDURE_TYPE:
-		tree_dump_procedure_type(&node->procedure_type, depth);
-		break;
+		return tree_dump_procedure_type(&node->procedure_type, depth);
 	case NODE_PROCEDURE_GROUP:
-		tree_dump_procedure_group(&node->procedure_group, depth);
-		break;
+		return tree_dump_procedure_group(&node->procedure_group, depth);
 	case NODE_DIRECTIVE:
-		tree_dump_directive(&node->directive, depth);
-		break;
+		return tree_dump_directive(&node->directive, depth);
 	}
 }
 
