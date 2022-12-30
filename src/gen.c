@@ -24,25 +24,46 @@ static Bool gen_identifier(Generator *generator, const Identifier *identifier, S
 	return strbuf_put_formatted(strbuf, "%.*s", SFMT(contents));
 }
 
-static Bool gen_type(Generator *generator, const Node *node, StrBuf *strbuf) {
-	if (node->kind == NODE_PROCEDURE_TYPE) {
-		const ProcedureType *procedure_type = &node->procedure_type;
-		if (procedure_type->results) {
-			return gen_type(generator, procedure_type->results, strbuf);
-		} else {
-			strbuf_put_string(strbuf, SCLIT("void"));
-			// TODO(dweiler): When there is no results we should generate "void",
-			return true;
+static Bool gen_type(Generator *generator, const Type *type, StrBuf *strbuf) {
+	switch (type->kind) {
+	case TYPE_PROCEDURE:
+		{
+			const ProcedureType *procedure_type = &type->procedure;
+			if (procedure_type->results) {
+				return gen_node(generator, procedure_type->results, strbuf, 0);
+			} else {
+				strbuf_put_string(strbuf, SCLIT("void"));
+			}
 		}
-	} else if (node->kind == NODE_FIELD_LIST) {
-		const FieldList *field_list = &node->field_list;
-		return gen_type(generator, field_list->fields[0], strbuf);
-	} else if (node->kind == NODE_IDENTIFIER) {
-		const Identifier *identifier = &node->identifier;
-		return gen_identifier(generator, identifier, strbuf);
+		break;
+	case TYPE_SLICE:
+		if (!gen_node(generator, type->slice.type, strbuf, 0)) {
+			return false;
+		}
+		strbuf_put_rune(strbuf, '*');
+		break;
+	case TYPE_ARRAY:
+		if (!gen_node(generator, type->array.type, strbuf, 0)) {
+			return false;
+		}
+		break;
+	case TYPE_POINTER:
+		if (!gen_node(generator, type->pointer.type, strbuf, 0)) {
+			return false;
+		}
+		strbuf_put_rune(strbuf, '*');
+		break;
+	case TYPE_MULTI_POINTER:
+		if (!gen_node(generator, type->multi_pointer.type, strbuf, 0)) {
+			return false;
+		}
+		strbuf_put_rune(strbuf, '*');
+		break;
+	default:
+		printf("Unimplemented type\n");
+		return false;
 	}
-	printf("Unimplemented type\n");
-	return false;
+	return true;
 }
 
 static Bool gen_name(Generator *generator, const Node *node, StrBuf *strbuf) {
@@ -380,11 +401,6 @@ static Bool gen_for_statement(Generator *generator, const ForStatement *statemen
 	gen_node(generator, statement->body, strbuf, depth + 1);
 	strbuf_put_rune(strbuf, '\n');
 
-	// TODO(dweiler): See above for how to reintroduce this later.
-	// if (statement->post) {
-	// 	gen_node(generator, statement->post, strbuf, depth + 1);
-	// }
-
 	gen_padding(depth, strbuf);
 	strbuf_put_rune(strbuf, '}');
 	strbuf_put_rune(strbuf, '\n');
@@ -427,7 +443,8 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 		}
 
 		if (type) {
-			if (!gen_type(generator, type, strbuf)) {
+			ASSERT(node_is_kind(type, NODE_TYPE));
+			if (!gen_type(generator, &type->type, strbuf)) {
 				return false;
 			}
 			strbuf_put_rune(strbuf, ' ');
@@ -441,7 +458,8 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 			if (procedure->flags & PROC_FLAG_FORCE_INLINE) {
 				strbuf_put_string(strbuf, SCLIT("FORCE_INLINE "));
 			}
-			if (!gen_type(generator, procedure->type, strbuf)) {
+			ASSERT(node_is_kind(procedure->type, NODE_TYPE));
+			if (!gen_node(generator, procedure->type, strbuf, 0)) {
 				return false;
 			}
 
@@ -457,15 +475,25 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 			strbuf_put_string(strbuf, rename);
 		} else {
 			gen_name(generator, name, strbuf);
+			// Special behavior needed for array types since C puts [N] after the identifier.
+			if (type && node_is_type(type, TYPE_ARRAY)) {
+				const Node *base = type;
+				while (node_is_type(base, TYPE_ARRAY)) {
+					strbuf_put_rune(strbuf, '[');
+					gen_node(generator, base->type.array.count, strbuf, 0);
+					strbuf_put_rune(strbuf, ']');
+					base = base->type.array.type;
+				}
+			}
 		}
 
 		if (value) {
 			// Generate procedure parameter list.
 			if (value->kind == NODE_PROCEDURE) {
 				strbuf_put_rune(strbuf, '(');
-				const Node *type = value->procedure.type;
-				ASSERT(type->kind == NODE_PROCEDURE_TYPE);
-				const Node *params = type->procedure_type.params;
+				Node *node = value->procedure.type;
+				ASSERT(node_is_type(node, TYPE_PROCEDURE));
+				const Node *params = node->type.procedure.params;
 				ASSERT(params->kind == NODE_FIELD_LIST);
 				const Uint64 n_params = array_size(params->field_list.fields);
 				if (n_params == 0) {
@@ -683,6 +711,18 @@ static Bool gen_node(Generator *generator, const Node *node, StrBuf *strbuf, Sin
 		return gen_literal_value(generator, 0, &node->literal_value, strbuf);
 	case NODE_DIRECTIVE:
 		return gen_directive(generator, &node->directive, strbuf);
+	case NODE_TYPE:
+		return gen_type(generator, &node->type, strbuf);
+	case NODE_FIELD_LIST:
+		{
+			const FieldList *field_list = &node->field_list;
+			const Uint64 n_fields = array_size(field_list->fields);
+			for (Uint64 i = 0; i < n_fields; i++) {
+				gen_node(generator, field_list->fields[i], strbuf, depth);
+			}
+			return true;
+		}
+		break;
 	default:
 		printf("Unimplemented node\n");
 		return false;
@@ -707,7 +747,6 @@ static Bool gen_c0_int(IntInstruction instr, StrBuf *strbuf) {
 	const InstructionInfo info = INFOS[instr];
 	if (info.bits == 128) {
 		// TODO(dweiler): Implement 128-bit integer emulation.
-		printf("128-bit integers not supported yet\n");
 		return true;
 	}
 
@@ -765,6 +804,10 @@ static Bool gen_c0_cmp(CmpInstruction instr, StrBuf *strbuf) {
 	};
 
 	const InstructionInfo info = INFOS[instr];
+	if (info.bits == 128) {
+		// TODO(dweiler): Implement 128-bit integer emulation.
+		return true;
+	}
 
 	strbuf_put_formatted(strbuf, "static FORCE_INLINE u%d %su%d(u%d lhs, u%d rhs) {\n",
 		info.bits, info.name, info.bits, info.bits, info.bits);
@@ -789,7 +832,13 @@ static Bool gen_c0_rel(RelInstruction instr, StrBuf *strbuf) {
 	};
 
 	const InstructionInfo info = INFOS[instr];
+	if (info.bits == 128) {
+		// TODO(dweiler): Implement 128-bit integer emulation.
+		return true;
+	}
 
+	// TODO(dweiler): Mark relational instructions as signed/unsigned to avoid
+	// this hack.
 	#define REL(enumerator, ...) #enumerator,
 	static const char *ENUMS[] = {
 		#include "instructions.h"
@@ -815,6 +864,10 @@ static Bool gen_c0_bit(BitInstruction instr, StrBuf *strbuf) {
 	};
 
 	const InstructionInfo info = INFOS[instr];
+	if (info.bits == 128) {
+		// TODO(dweiler): Implement 128-bit integer emulation.
+		return true;
+	}
 
 	strbuf_put_formatted(strbuf, "static FORCE_INLINE i%d %si%d(i%d lhs, i%d rhs) {\n",
 		info.bits, info.name, info.bits, info.bits, info.bits);
@@ -848,7 +901,7 @@ static Bool gen_c0_flt_prelude(Uint64 used, StrBuf *strbuf) {
 }
 
 static Bool gen_c0_cmp_prelude(Uint64 used, StrBuf *strbuf) {
-	for (Uint64 i = 0; i < INSTR_FLT_COUNT; i++) {
+	for (Uint64 i = 0; i < INSTR_CMP_COUNT; i++) {
 		if (used & (CAST(Uint64, 1) << i)) {
 			if (!gen_c0_cmp(CAST(CmpInstruction, i), strbuf)) {
 				return false;
@@ -1190,13 +1243,12 @@ static Bool gen_import_prelude(Generator *generator, StrBuf *strbuf) {
 
 Bool gen_init(Generator *generator, const Tree *tree) {
 	generator->tree = tree;
-	// HACK(dweiler): Use all instructions for now.
-	generator->used_int = (1 << INSTR_ADDI32) | (1 << INSTR_SUBI32) | (1 << INSTR_MULI32);
-	generator->used_flt = 0;
-	generator->used_cmp = (1 << INSTR_EQI32) | (1 << INSTR_NEI32);
-	generator->used_rel = 0xffffffff; 
-	generator->used_bit = (1 << INSTR_ANDI32);
-	generator->used_flt = 0;
+	// TODO(dweiler): Only mark the ones we actually use.
+	generator->used_int = (CAST(Uint64, 1) << INSTR_INT_COUNT) - 1;
+	generator->used_flt = (CAST(Uint64, 1) << INSTR_FLT_COUNT) - 1;
+	generator->used_cmp = (CAST(Uint64, 1) << INSTR_CMP_COUNT) - 1;
+	generator->used_rel = (CAST(Uint64, 1) << INSTR_REL_COUNT) - 1;
+	generator->used_bit = (CAST(Uint64, 1) << INSTR_BIT_COUNT) - 1;
 	generator->scopes = 0;
 	return true;
 }

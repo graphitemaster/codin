@@ -6,6 +6,7 @@
 typedef enum NodeKind NodeKind;
 typedef enum ExpressionKind ExpressionKind;
 typedef enum StatementKind StatementKind;
+typedef enum TypeKind TypeKind;
 
 typedef enum CallingConvention CallingConvention;
 typedef enum BlockFlag BlockFlag;
@@ -34,6 +35,13 @@ typedef struct ReturnStatement ReturnStatement;
 typedef struct ForStatement ForStatement;
 typedef struct DeferStatement DeferStatement;
 
+typedef struct Type Type;
+typedef struct SliceType SliceType;
+typedef struct ArrayType ArrayType;
+typedef struct DynamicArrayType DynamicArrayType;
+typedef struct PointerType PointerType;
+typedef struct MultiPointerType MultiPointerType;
+
 typedef struct Identifier Identifier;
 typedef struct Value Value;
 typedef struct LiteralValue LiteralValue;
@@ -55,9 +63,9 @@ enum NodeKind {
 	NODE_FIELD,
 	NODE_FIELD_LIST,
 	NODE_PROCEDURE,
-	NODE_PROCEDURE_TYPE,
 	NODE_PROCEDURE_GROUP,
 	NODE_DIRECTIVE,
+	NODE_TYPE,
 };
 
 enum ExpressionKind {
@@ -81,6 +89,15 @@ enum StatementKind {
 	STATEMENT_RETURN,
 	STATEMENT_FOR,
 	STATEMENT_DEFER,
+};
+
+enum TypeKind {
+	TYPE_PROCEDURE,      // proc
+	TYPE_SLICE,          // []T
+	TYPE_ARRAY,          // [N]T, or [?]T
+	TYPE_DYNAMIC_ARRAY,  // [dynamicT]
+	TYPE_POINTER,        // ^
+	TYPE_MULTI_POINTER,  // [^]
 };
 
 struct UnaryExpression {
@@ -262,6 +279,14 @@ enum CallingConvention {
 	CCONV_NONE,
 };
 
+struct ProcedureGroup {
+	Array(Node*) procedures;
+};
+
+struct Directive {
+	DirectiveKind kind;
+};
+
 struct ProcedureType {
 	Node *params;  // FieldList
 	Node *results; // FieldList
@@ -269,12 +294,37 @@ struct ProcedureType {
 	CallingConvention convention;
 };
 
-struct ProcedureGroup {
-	Array(Node*) procedures;
+struct SliceType {
+	Node *type;
 };
 
-struct Directive {
-	DirectiveKind kind;
+struct ArrayType {
+	Node *count;
+	Node *type;
+};
+
+struct DynamicArrayType {
+	Node *type;
+};
+
+struct PointerType {
+	Node *type;
+};
+
+struct MultiPointerType {
+	Node *type;
+};
+
+struct Type {
+	TypeKind kind;
+	union {
+		ProcedureType    procedure;
+		SliceType        slice;
+		ArrayType        array;
+		DynamicArrayType dynamic_array;
+		PointerType      pointer;
+		MultiPointerType multi_pointer;
+	};
 };
 
 struct Node {
@@ -289,9 +339,9 @@ struct Node {
 		Field           field;
 		FieldList       field_list;
 		Procedure       procedure;
-		ProcedureType   procedure_type;
 		ProcedureGroup  procedure_group;
 		Directive      	directive;
+		Type            type;
 	};
 };
 
@@ -307,6 +357,10 @@ FORCE_INLINE Bool node_is_statement(const Node *node, StatementKind kind) {
 
 FORCE_INLINE Bool node_is_expression(const Node *node, ExpressionKind kind) {
 	return node_is_kind(node, NODE_EXPRESSION) && node->expression.kind == kind;
+}
+
+FORCE_INLINE Bool node_is_type(const Node *node, TypeKind kind) {
+	return node_is_kind(node, NODE_TYPE) && node->type.kind == kind;
 }
 
 _Static_assert(sizeof(Node) <= 64, "Too big");
@@ -337,6 +391,13 @@ Node *tree_new_for_statement(Tree *tree, Node *init, Node *cond, Node *body, Nod
 Node *tree_new_return_statement(Tree *tree, Array(Node*) results);
 Node *tree_new_defer_statement(Tree *tree, Node *statement);
 
+Node *tree_new_procedure_type(Tree *tree, Node *params, Node* results, Uint64 flags, CallingConvention convention);
+Node *tree_new_slice_type(Tree *tree, Node *type);
+Node *tree_new_array_type(Tree *tree, Node *count, Node *type);
+Node *tree_new_dynamic_array_type(Tree *tree, Node *type);
+Node *tree_new_pointer_type(Tree *tree, Node *type);
+Node *tree_new_multi_pointer_type(Tree *tree, Node *type);
+
 Node *tree_new_identifier(Tree *tree, String contents);
 Node *tree_new_value(Tree *tree, Node *field, Node *val);
 Node *tree_new_literal_value(Tree *tree, LiteralKind literal, String value);
@@ -345,7 +406,6 @@ Node *tree_new_field(Tree *tree, Node* name, Node *type);
 Node *tree_new_field_list(Tree *tree, Array(Node*) list);
 
 Node *tree_new_procedure(Tree *tree, ProcedureFlag flags, Node *type, Node *body);
-Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags, CallingConvention convention);
 Node *tree_new_procedure_group(Tree *tree, Array(Node*) procedures);
 Node *tree_new_directive(Tree *tree, DirectiveKind directive);
 

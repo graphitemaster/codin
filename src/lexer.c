@@ -10,7 +10,7 @@
 #undef ERROR
 #endif
 
-const Token TOKEN_NIL = { KIND_INVALID };
+const Token TOKEN_NIL = { KIND_INVALID, { 0, 0 }, { 0, 0 }, { 0 } };
 
 #define ERROR(...) \
 	do { \
@@ -69,7 +69,7 @@ static Bool is_digit(Rune ch) {
 	return false;
 }
 
-static Uint8 peek(Lexer *lexer) {
+static Uint8 peekl(Lexer *lexer) {
 	const Input *input = &lexer->input;
 	if (input->cur < input->end) {
 		return *input->cur;
@@ -186,7 +186,7 @@ static Token scan_numeric(Lexer *lexer, Bool dot) {
 
 	if (lexer->rune == '.') {
 		// .. is an operator
-		if (peek(lexer) == '.') {
+		if (peekl(lexer) == '.') {
 			token.string.length = lexer->here - token.string.contents;
 			return token;
 		}

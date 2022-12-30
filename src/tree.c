@@ -26,6 +26,12 @@ static Node *new_statement(Tree *tree, StatementKind kind) {
 	return node;
 }
 
+static Node *new_type(Tree *tree, TypeKind kind) {
+	Node *node = new_node(tree, NODE_TYPE);
+	node->type.kind = kind;
+	return node;
+}
+
 Bool node_is_literal(const Node *node) {
 	switch (node->kind) {
 	case NODE_IDENTIFIER:
@@ -190,6 +196,52 @@ Node *tree_new_defer_statement(Tree *tree, Node *stmt) {
 	return node;
 }
 
+Node *tree_new_procedure_type(Tree *tree, Node *params, Node *results, Uint64 flags, CallingConvention convention) {
+	Node *node = new_type(tree, TYPE_PROCEDURE);
+	ProcedureType *procedure_type = &node->type.procedure;
+	procedure_type->params = params;
+	procedure_type->results = results;
+	procedure_type->flags = flags;
+	procedure_type->convention = convention;
+	return node;
+}
+
+Node *tree_new_slice_type(Tree *tree, Node *type) {
+	Node *node = new_type(tree, TYPE_SLICE);
+	SliceType *slice = &node->type.slice;
+	slice->type = type;
+	return node;
+}
+
+Node *tree_new_array_type(Tree *tree, Node *count, Node *type) {
+	Node *node = new_type(tree, TYPE_ARRAY);
+	ArrayType *array = &node->type.array;
+	array->count = count;
+	array->type = type;
+	return node;
+}
+
+Node *tree_new_dynamic_array_type(Tree *tree, Node *type) {
+	Node *node = new_type(tree, TYPE_DYNAMIC_ARRAY);
+	DynamicArrayType *dynamic_array = &node->type.dynamic_array;
+	dynamic_array->type = type;
+	return node;
+}
+
+Node *tree_new_pointer_type(Tree *tree, Node *type) {
+	Node *node = new_type(tree, TYPE_POINTER);
+	PointerType *pointer = &node->type.pointer;
+	pointer->type = type;
+	return node;
+}
+
+Node *tree_new_multi_pointer_type(Tree *tree, Node *type) {
+	Node *node = new_type(tree, TYPE_MULTI_POINTER);
+	MultiPointerType *multi_pointer = &node->type.multi_pointer;
+	multi_pointer->type = type;
+	return node;
+}
+
 Node *tree_new_value(Tree *tree, Node *field, Node *val) {
 	Node *node = new_node(tree, NODE_VALUE);
 	Value *value = &node->value;
@@ -235,16 +287,6 @@ Node *tree_new_procedure(Tree *tree, ProcedureFlag flags, Node *type, Node *body
 	procedure->flags = flags;
 	procedure->type = type;
 	procedure->body = body;
-	return node;
-}
-
-Node *tree_new_procedure_type(Tree *tree, Node* params, Node* results, Uint64 flags, CallingConvention convention) {
-	Node *node = new_node(tree, NODE_PROCEDURE_TYPE);
-	ProcedureType *procedure_type = &node->procedure_type;
-	procedure_type->params = params;
-	procedure_type->results = results;
-	procedure_type->flags = flags;
-	procedure_type->convention = convention;
 	return node;
 }
 
@@ -767,6 +809,45 @@ static void tree_dump_directive(const Directive *directive, Sint32 depth) {
 	printf("(directive '%.*s\')", SFMT(string));
 }
 
+static void tree_dump_type(const Type* type, Sint32 depth) {
+	switch (type->kind) {
+	case TYPE_PROCEDURE:
+		return tree_dump_procedure_type(&type->procedure, depth);
+	case TYPE_SLICE:
+		tree_dump_pad(depth);
+		printf("(slice\n");
+		tree_dump_node(type->slice.type, depth + 1);
+		putchar(')');
+		break;
+	case TYPE_ARRAY:
+		tree_dump_pad(depth);
+		printf("(array\n");
+		tree_dump_node(type->array.count, depth + 1);
+		putchar('\n');
+		tree_dump_node(type->array.type, depth + 1);
+		putchar(')');
+		break;
+	case TYPE_DYNAMIC_ARRAY:
+		tree_dump_pad(depth);
+		printf("(vector\n");
+		tree_dump_node(type->dynamic_array.type, depth + 1);
+		putchar(')');
+		break;
+	case TYPE_POINTER:
+		tree_dump_pad(depth);
+		printf("(pointer\n");
+		tree_dump_node(type->pointer.type, depth + 1);
+		putchar(')');
+		break;
+	case TYPE_MULTI_POINTER:
+		tree_dump_pad(depth);
+		printf("(multipointer\n");
+		tree_dump_node(type->multi_pointer.type, depth + 1);
+		putchar(')');
+		break;
+	}
+}
+
 void tree_dump_node(const Node *node, Sint32 depth) {
 	switch (node->kind) {
 	case NODE_EXPRESSION:
@@ -787,12 +868,12 @@ void tree_dump_node(const Node *node, Sint32 depth) {
 		return tree_dump_field_list(&node->field_list, depth);
 	case NODE_PROCEDURE:
 		return tree_dump_procedure(&node->procedure, depth);
-	case NODE_PROCEDURE_TYPE:
-		return tree_dump_procedure_type(&node->procedure_type, depth);
 	case NODE_PROCEDURE_GROUP:
 		return tree_dump_procedure_group(&node->procedure_group, depth);
 	case NODE_DIRECTIVE:
 		return tree_dump_directive(&node->directive, depth);
+	case NODE_TYPE:
+		return tree_dump_type(&node->type, depth);
 	}
 }
 

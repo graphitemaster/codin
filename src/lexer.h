@@ -69,6 +69,8 @@ struct Location {
 	int line;
 };
 
+#define LOCATION_NIL { 0, 0 }
+
 struct Token {
 	Kind kind;
 	Location location;

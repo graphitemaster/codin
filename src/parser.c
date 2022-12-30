@@ -160,10 +160,10 @@ static Bool ignore_newline(const Parser *parser) {
 	return parser->expression_depth >= 0;
 }
 
-static Token peek(Parser *parser) {
+static Token peekp(Parser *parser) {
 	const Token token = lexer_peek(&parser->lexer);
 	if (is_kind(token, KIND_COMMENT)) {
-		return peek(parser);
+		return peekp(parser);
 	}
 	return token;
 }
@@ -175,7 +175,7 @@ static Bool advance_possible_newline(Parser *parser, Bool literal) {
 
 	if (is_kind(token, KIND_SEMICOLON) && string_compare(token.string, SCLIT("\n"))) {
 		if (literal) {
-			const Token next = peek(parser);
+			const Token next = peekp(parser);
 			const Location this_location = token.location;
 			const Location next_location = next.location;
 			if (this_location.line + 1 >= next_location.line) {
@@ -334,10 +334,68 @@ static Node *parse_type(Parser *parser) {
 
 static Node *parse_literal_value(Parser *parser, Node *type);
 
-static Node *parse_result_list(Parser *parser) {
-	(void)parser;
+typedef enum FieldFlag FieldFlag;
+
+enum FieldFlag {
+	FIELD_FLAG_INVALID   = 0,
+	FIELD_FLAG_USING     = 1 << 0,
+	FIELD_FLAG_AUTO_CAST = 1 << 1,
+	FIELD_FLAG_NO_ALIAS  = 1 << 2,
+	FIELD_FLAG_C_VARARG  = 1 << 3,
+	FIELD_FLAG_CONST     = 1 << 4,
+	FIELD_FLAG_ANY_INT   = 1 << 5,
+	FIELD_FLAG_SUBTYPE   = 1 << 6,
+	FIELD_FLAG_BY_PTR    = 1 << 7,
+};
+
+static FieldFlag parse_field_flag(Parser *parser) {
+	const Token token = parser->this_token;
+	if (is_keyword(token, KEYWORD_USING)) {
+		return FIELD_FLAG_USING;
+	} else if (is_operator(token, OPERATOR_AUTO_CAST)) {
+		return FIELD_FLAG_AUTO_CAST;
+	} else if (is_kind(token, KIND_DIRECTIVE)) {
+		switch (token.as_directive) {
+		case DIRECTIVE_NO_ALIAS:
+			return FIELD_FLAG_NO_ALIAS;
+		case DIRECTIVE_C_VARARG:
+			return FIELD_FLAG_C_VARARG;
+		case DIRECTIVE_CONST:
+			return FIELD_FLAG_CONST;
+		case DIRECTIVE_ANY_INT:
+			return FIELD_FLAG_ANY_INT;
+		case DIRECTIVE_SUBTYPE:
+			return FIELD_FLAG_SUBTYPE;
+		case DIRECTIVE_BY_PTR:
+			return FIELD_FLAG_BY_PTR;
+		default:
+			ERROR("Unsupported directive in field");
+		}
+	}
+	return FIELD_FLAG_INVALID;
+}
+
+static FieldFlag parse_field_flags(Parser *parser) {
 	TRACE_ENTER();
-	UNIMPLEMENTED("parse_result_list not implemented");
+	FieldFlag flags = FIELD_FLAG_INVALID;
+	for (;;) {
+		const FieldFlag flag = parse_field_flag(parser);
+		if (flag == FIELD_FLAG_INVALID) {
+			break;
+		}
+		if (flags & flag) {
+			ERROR("Duplicate in field list");
+		}
+		flags |= flag;
+		advancep(parser);
+	}
+	TRACE_LEAVE();
+	return flags;
+}
+
+static Node *parse_result_list(Parser *parser) {
+	TRACE_ENTER();
+	UNIMPLEMENTED("parse_result_list");
 	TRACE_LEAVE();
 	return 0;
 }
@@ -385,11 +443,13 @@ static Node *parse_parameter_list(Parser *parser) {
 	while (!is_operator(parser->this_token, OPERATOR_CLOSEPAREN) &&
 	       !is_kind(parser->this_token, KIND_EOF))
 	{
-		Node *identifier = parse_identifier(parser);
+		Uint64 flags = parse_field_flags(parser);
+		(void)flags;
+		Node *identifier = parse_type_or_identifier(parser);
 		array_push(names, identifier);
 		if (is_operator(parser->this_token, OPERATOR_COLON)) {
 			expect_operator(parser, OPERATOR_COLON);
-			Node *type = parse_identifier(parser);
+			Node *type = parse_type_or_identifier(parser);
 			const Uint64 n_names = array_size(names);
 			for (Uint64 i = 0; i < n_names; i++) {
 				Node *field = tree_new_field(parser->tree, names[i], type);
@@ -728,7 +788,6 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 				if (is_operator(parser->last_token, OPERATOR_CLOSEPAREN)) {
 					ERROR("Empty parenthesized expression");
 				}
-
 				const Sint32 depth = parser->expression_depth;
 				parser->expression_depth = (depth > 0 ? depth : 0) + 1;
 				node = parse_expression(parser, false);
@@ -738,9 +797,48 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 				return node;
 			}
 		case OPERATOR_POINTER:
-			UNIMPLEMENTED("^");
+			{
+				expect_operator(parser, OPERATOR_POINTER);
+				Node *type = parse_type(parser);
+				node = tree_new_pointer_type(parser->tree, type);
+				TRACE_LEAVE();
+				return node;
+			}
 		case OPERATOR_OPENBRACKET:
-			UNIMPLEMENTED("[");
+			{
+				expect_operator(parser, OPERATOR_OPENBRACKET);
+				Node *count = 0;
+				if (is_operator(parser->this_token, OPERATOR_POINTER)) {
+					expect_operator(parser, OPERATOR_POINTER);
+					expect_operator(parser, OPERATOR_CLOSEBRACKET);
+					Node *type = parse_type(parser);
+					node = tree_new_multi_pointer_type(parser->tree, type);
+					TRACE_LEAVE();
+					return node;
+				} else if (is_operator(parser->this_token, OPERATOR_QUESTION)) {
+					expect_operator(parser, OPERATOR_QUESTION);
+					count = tree_new_unary_expression(parser->tree, OPERATOR_QUESTION, 0);
+				} else if (accepted_keyword(parser, KEYWORD_DYNAMIC)) {
+					expect_operator(parser, OPERATOR_CLOSEBRACKET);
+					Node *type = parse_type(parser);
+					node = tree_new_dynamic_array_type(parser->tree, type);
+					TRACE_LEAVE();
+					return node;
+				} else if (!is_operator(parser->this_token, OPERATOR_CLOSEBRACKET)) {
+					parser->expression_depth++;
+					count = parse_expression(parser, false);
+					parser->expression_depth--;
+				}
+				expect_operator(parser, OPERATOR_CLOSEBRACKET);
+				Node *type = parse_type(parser);
+				if (count) {
+					node = tree_new_array_type(parser->tree, count, type);
+				} else {
+					node = tree_new_slice_type(parser->tree, type);
+				}
+				TRACE_LEAVE();
+				return node;
+			}
 		default:
 			break;
 		}
@@ -1327,7 +1425,7 @@ static Node *parse_do_body(Parser *parser) {
 }
 
 static Bool accepted_control_statement_separator(Parser *parser) {
-	const Token token = peek(parser);
+	const Token token = peekp(parser);
 	if (!is_kind(token, KIND_LBRACE)) {
 		return accepted_kind(parser, KIND_SEMICOLON);
 	}
