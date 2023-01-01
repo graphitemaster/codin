@@ -2,6 +2,7 @@
 #include "src/array.c"
 #include "src/gen.c"
 #include "src/lexer.c"
+#include "src/lower.c"
 #include "src/main.c"
 #include "src/parser.c"
 #include "src/path.c"
