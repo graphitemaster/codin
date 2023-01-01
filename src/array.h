@@ -1,6 +1,7 @@
 #ifndef CODIN_ARRAY_H
 #define CODIN_ARRAY_H
 #include <stdalign.h>
+#include <string.h> // memmove
 #include "support.h"
 
 typedef struct Array Array;
@@ -36,6 +37,11 @@ _Static_assert(alignof(Array) == 16, "not aligned");
 
 #define array_free(array) \
 	(void)((array) ? (array_delete(array), (array) = 0) : 0)
+
+#define array_insert(array, index, value) \
+	(array_expand(array, 1) \
+		? (memmove(&(array)[index+1], &(array)[index], (array_size(array) - (index) - 1) * sizeof *(array)), (array)[index] = (value), true) \
+		: false)
 
 #define array_resize(array, size_) \
 	((array) \

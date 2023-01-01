@@ -316,6 +316,10 @@ void tree_init(Tree *tree) {
 }
 
 void tree_free(Tree *tree) {
+	if (!tree) {
+		return;
+	}
+
 	const Uint64 n_nodes = array_size(tree->nodes);
 	for (Uint64 i = 0; i < n_nodes; i++) {
 		Node *node = tree->nodes[i];
@@ -712,12 +716,14 @@ static void tree_dump_literal_value(const LiteralValue *literal_value, Sint32 de
 static void tree_dump_compound_literal(const CompoundLiteral *compound_literal, Sint32 depth) {
 	const Uint64 n_elements = array_size(compound_literal->elements);
 	tree_dump_pad(depth);
-	printf("(compound");
+	printf("(compound\n");
 	if (compound_literal->type) {
-		putchar(' ');
+		tree_dump_pad(depth + 1);
 		tree_dump_node(compound_literal->type, 0);
 	}
-	putchar('\n');
+	if (n_elements) {
+		putchar('\n');
+	}
 	for (Uint64 i = 0; i < n_elements; i++) {
 		const Node *const element = compound_literal->elements[i];
 		tree_dump_node(element, depth + 1);

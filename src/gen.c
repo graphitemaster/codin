@@ -159,16 +159,16 @@ static Bool gen_unary_expression(Generator *generator, const UnaryExpression *ex
 static Bool gen_binary_instruction(Generator *generator, const BinaryExpression *expression, StrBuf *strbuf) {
 	const char *what = "unknown";
 	switch (expression->operation) {
-	case OPERATOR_LT:    what = "lti32";  break;
-	case OPERATOR_GT:    what = "gti32";  break;
-	case OPERATOR_ADD:   what = "addi32"; break;
-	case OPERATOR_SUB:   what = "subi32"; break;
-	case OPERATOR_MUL:   what = "muli32"; break;
-	case OPERATOR_CMPEQ: what = "eqi32";  break;
-	case OPERATOR_NOTEQ: what = "nei32";  break;
-	case OPERATOR_GTEQ:  what = "gtei32"; break;
-	case OPERATOR_LTEQ:  what = "ltei32"; break;
-	case OPERATOR_AND:   what = "andi32"; break;
+	case OPERATOR_LT:    what = "lti64";  break;
+	case OPERATOR_GT:    what = "gti64";  break;
+	case OPERATOR_ADD:   what = "addi64"; break;
+	case OPERATOR_SUB:   what = "subi64"; break;
+	case OPERATOR_MUL:   what = "muli64"; break;
+	case OPERATOR_CMPEQ: what = "eqi64";  break;
+	case OPERATOR_NOTEQ: what = "nei64";  break;
+	case OPERATOR_GTEQ:  what = "gtei64"; break;
+	case OPERATOR_LTEQ:  what = "ltei64"; break;
+	case OPERATOR_AND:   what = "andi64"; break;
 	default:
 		printf("Unimplemented binary instructon\n");
 	}
@@ -225,7 +225,7 @@ static Bool gen_if_statement(Generator *generator, const IfStatement *statement,
 	if (!gen_node(generator, statement->condition, strbuf, 0)) {
 		return false;
 	}
-	strbuf_put_string(strbuf, SCLIT(") "));
+	strbuf_put_string(strbuf, SCLIT(")\n"));
 	if (!gen_node(generator, statement->body, strbuf, depth)) {
 		return false;
 	}
@@ -244,7 +244,6 @@ static Bool gen_if_statement(Generator *generator, const IfStatement *statement,
 			}
 		}
 	}
-	strbuf_put_rune(strbuf, '\n');
 	if (statement->init) {
 		depth--;
 		gen_padding(depth, strbuf);
@@ -256,50 +255,7 @@ static Bool gen_if_statement(Generator *generator, const IfStatement *statement,
 
 static Bool gen_statement(Generator *generator, const Statement *statement, StrBuf *strbuf, Sint32 depth);
 
-static Bool gen_defer_statement(Generator *generator, const Node *node, StrBuf *strbuf, Sint32 depth) {
-	ASSERT(node->kind == NODE_STATEMENT);
-	if (node->statement.kind == STATEMENT_BLOCK) {
-		gen_padding(depth, strbuf);
-	}
-	if (!gen_node(generator, node, strbuf, depth)) {
-		return false;
-	}
-	if (node->statement.kind == STATEMENT_BLOCK) {
-		strbuf_put_rune(strbuf, '\n');
-	}
-	return true;
-}
-
-static Bool gen_defer_statements(Generator *generator, const Scope *scope, StrBuf *strbuf, Sint32 depth) {
-	Array(const DeferStatement*) defers = scope->defers;
-	const Uint64 n_defers = array_size(defers);
-	if (n_defers == 0) {
-		return true;
-	}
-	// Emit in reverse order.
-	for (Uint64 i = n_defers - 1; i < n_defers; i--) {
-		if (!gen_defer_statement(generator, defers[i]->statement, strbuf, depth)) {
-			return false;
-		}
-	}
-	return true;
-}
-
-static Bool gen_defers(Generator *generator, StrBuf *strbuf, Sint32 depth) {
-	Array(Scope*) scopes = generator->scopes;
-	const Uint64 n_scopes = array_size(scopes);
-	// Emit in reverse order.
-	for (Uint64 i = n_scopes - 1; i < n_scopes; i--) {
-		if (!gen_defer_statements(generator, scopes[i], strbuf, depth)) {
-			return false;
-		}
-	}
-	return true;
-}
-
 static Bool gen_return_statement(Generator *generator, const ReturnStatement *statement, StrBuf *strbuf, Sint32 depth) {
-	// Emit all defers up to this return point.
-	gen_defers(generator, strbuf, depth);
 	gen_padding(depth, strbuf);
 	strbuf_put_string(strbuf, SCLIT("return"));
 	if (array_size(statement->results) != 0) {
@@ -338,74 +294,17 @@ static Bool gen_for_statement(Generator *generator, const ForStatement *statemen
 		gen_node(generator, statement->init, strbuf, depth + 1);
 	}
 
-	Bool has_in = statement->cond && node_is_expression(statement->cond, EXPRESSION_IN);
-	Bool has_range = false;
-	if (has_in) {
-		const InExpression *in = &statement->cond->expression.in;
-		if (node_is_expression(in->rhs, EXPRESSION_BINARY)) {
-			has_range = true;
-			const Node *b_lhs = in->rhs->expression.binary.lhs;
-			gen_padding(depth + 1, strbuf);
-			strbuf_put_string(strbuf, SCLIT("i64 "));
-			gen_node(generator, in->lhs[0], strbuf, 0);
-			strbuf_put_string(strbuf, SCLIT(" = "));
-			gen_node(generator, b_lhs, strbuf, 0);
-			strbuf_put_string(strbuf, SCLIT(";\n"));
-		} else {
-			return false;
-		}
-	}
-
 	gen_padding(depth + 1, strbuf);
 
 	strbuf_put_string(strbuf, SCLIT("while ("));
 	if (statement->cond) {
-		Node *cond = statement->cond;
-		if (has_range) {
-			const InExpression *in = &cond->expression.in;
-			const BinaryExpression *binary = &in->rhs->expression.binary;
-			switch (binary->operation) {
-			case OPERATOR_ELLIPSIS:  // <lhs> .. <rhs>
-				FALLTHROUGH();
-			case OPERATOR_RANGEFULL: // <lhs> ..= <rhs>
-				strbuf_put_string(strbuf, SCLIT("ltei64("));
-				break;
-			case OPERATOR_RANGEHALF: // <lhs> ..< <rhs>
-				strbuf_put_string(strbuf, SCLIT("lti64("));
-				break;
-			default:
-				// Unsupported
-				return false;
-			}
-			if (!gen_node(generator, in->lhs[0], strbuf, 0)) {
-				return false;
-			}
-			strbuf_put_rune(strbuf, ',');
-			strbuf_put_rune(strbuf, ' ');
-			if (!gen_node(generator, binary->rhs, strbuf, 0)) {
-				return false;
-			}
-			strbuf_put_rune(strbuf, ')');
-		} else if (!gen_node(generator, statement->cond, strbuf, 0)) {
+		if (!gen_node(generator, statement->cond, strbuf, 0)) {
 			return false;
 		}
 	} else {
 		strbuf_put_rune(strbuf, '1');
 	}
-	strbuf_put_string(strbuf, SCLIT(") "));
-
-	if (has_range) {
-		// Emit <lhs> += 1 by creating this assignment statement and putting it
-		// as the last statement on the block.
-		const InExpression *in = &statement->cond->expression.in;
-		Tree *tree = CAST(Tree *, generator->tree);
-		Array(Node*) lhs = 0;
-		Array(Node*) rhs = 0;
-		array_push(lhs, in->lhs[0]);
-		array_push(rhs, tree_new_literal_value(tree, LITERAL_INTEGER, SCLIT("1")));
-		Node *assignment = tree_new_assignment_statement(tree, ASSIGNMENT_ADDEQ, lhs, rhs);
-		array_push(statement->body->statement.block.statements, assignment);
-	}
+	strbuf_put_string(strbuf, SCLIT(")\n"));
 
 	// Inject the post statement as the last statement in the block.
 	if (statement->post) {
@@ -413,7 +312,6 @@ static Bool gen_for_statement(Generator *generator, const ForStatement *statemen
 	}
 
 	gen_node(generator, statement->body, strbuf, depth + 1);
-	strbuf_put_rune(strbuf, '\n');
 
 	gen_padding(depth, strbuf);
 	strbuf_put_rune(strbuf, '}');
@@ -445,7 +343,7 @@ static Bool gen_assignment_statement(Generator *generator, const AssignmentState
 		// The value be assigned might be a literal. Construct a compound literal
 		// on the C side to pass to memcpy.
 		if (node_is_kind(statement->rhs[0], NODE_LITERAL_VALUE)) {
-			strbuf_put_string(strbuf, SCLIT("&(i32){"));
+			strbuf_put_string(strbuf, SCLIT("&(i64){"));
 			gen_node(generator, statement->rhs[0], strbuf, 0);
 			strbuf_put_rune(strbuf, '}');
 		} else {
@@ -462,8 +360,8 @@ static Bool gen_assignment_statement(Generator *generator, const AssignmentState
 	// Compound assignment.
 	const char *what = "";
 	switch (statement->assignment) {
-	case ASSIGNMENT_ADDEQ: what = "addi32"; break;
-	case ASSIGNMENT_SUBEQ: what = "subi32"; break;
+	case ASSIGNMENT_ADDEQ: what = "addi64"; break;
+	case ASSIGNMENT_SUBEQ: what = "subi64"; break;
 	default:
 		printf("Unimplemented assignment\n");
 		return false;
@@ -592,45 +490,27 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 }
 
 static Bool gen_block_statement(Generator *generator, const BlockStatement *statement, StrBuf *strbuf, Sint32 depth) {
+	gen_padding(depth, strbuf);
 	strbuf_put_rune(strbuf, '{');
 	strbuf_put_rune(strbuf, '\n');
 	const Uint64 n_statements = array_size(statement->statements);
-
-	Scope *scope = malloc(sizeof *scope);
-	if (!scope) {
-		return false;
-	}
-
-	scope->defers = 0;
-	array_push(generator->scopes, scope);
-
 	for (Uint64 i = 0; i < n_statements; i++) {
 		const Node *node = statement->statements[i];
 		ASSERT(node->kind == NODE_STATEMENT);
-		if (node->statement.kind == STATEMENT_DEFER) {
-			array_push(scope->defers, &node->statement.defer);
-		} else {
-			if (!gen_statement(generator, &node->statement, strbuf, depth + 1)) {
-				return false;
-			}
+		if (!gen_statement(generator, &node->statement, strbuf, depth + 1)) {
+			return false;
 		}
 	}
-	// Don't bother generating defers if our last statement was a return since
-	// the return statement would've accounted for it already and one cannot
-	// execute any statements after a return.
-	if (n_statements && statement->statements[n_statements - 1]->statement.kind != STATEMENT_RETURN) {
-		gen_defer_statements(generator, scope, strbuf, depth + 1);
-	}
-	array_free(scope->defers);
-	free(scope);
-	array_meta(generator->scopes)->size--;
 	gen_padding(depth, strbuf);
 	strbuf_put_rune(strbuf, '}');
+	strbuf_put_rune(strbuf, '\n');
 	return true;
 }
 
 static Bool gen_statement(Generator *generator, const Statement *statement, StrBuf *strbuf, Sint32 depth) {
 	switch (statement->kind) {
+	case STATEMENT_EMPTY:
+		return true;
 	case STATEMENT_EXPRESSION:
 		return gen_expression_statement(generator, &statement->expression, strbuf, depth);
 	case STATEMENT_DECLARATION:
@@ -648,6 +528,9 @@ static Bool gen_statement(Generator *generator, const Statement *statement, StrB
 	case STATEMENT_IMPORT:
 		// Handled else-where.
 		return true;
+	case STATEMENT_DEFER:
+		fprintf(stderr, "Lowering pass failed to remove defer statement\n");
+		return false;
 	default:
 		printf("Unimplemented statement\n");
 		return false;
@@ -1301,13 +1184,7 @@ Bool gen_init(Generator *generator, const Tree *tree) {
 	generator->used_cmp = (CAST(Uint64, 1) << INSTR_CMP_COUNT) - 1;
 	generator->used_rel = (CAST(Uint64, 1) << INSTR_REL_COUNT) - 1;
 	generator->used_bit = (CAST(Uint64, 1) << INSTR_BIT_COUNT) - 1;
-	generator->scopes = 0;
 	return true;
-}
-
-void gen_free(Generator *generator) {
-	//ASSERT(array_size(generator->scopes) == 0);
-	array_free(generator->scopes);
 }
 
 Bool gen_run(Generator *generator, StrBuf *strbuf, Bool generate_main) {

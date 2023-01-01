@@ -7,6 +7,7 @@
 #include "path.h"
 #include "parser.h"
 #include "threadpool.h"
+#include "lower.h"
 
 typedef struct Command Command;
 
@@ -56,13 +57,18 @@ static Bool generate(const Tree *tree, StrBuf *strbuf) {
 	}
 	strbuf_init(strbuf);
 	const Bool result = gen_run(&gen, strbuf, true);
-	gen_free(&gen);
 	return result;
 }
 
 static Bool transpile(String path) {
 	Tree *tree = parse(path);
 	if (!tree) {
+		return false;
+	}
+
+	if (!lower(tree)) {
+		fprintf(stderr, "Failed to lower\n");
+		tree_free(tree);
 		return false;
 	}
 
@@ -197,7 +203,7 @@ static Bool run(String path) {
 
 static Bool dump_ast(String file) {
 	Tree *tree = parse(file);
-	if (tree) {
+	if (tree && lower(tree)) {
 		tree_dump(tree);
 		tree_free(tree);
 		return true;
@@ -207,7 +213,8 @@ static Bool dump_ast(String file) {
 
 static Bool dump_c(String file) {
 	Tree *tree = parse(file);
-	if (!tree) {
+	if (!tree || !lower(tree)) {
+		tree_free(tree);
 		return false;
 	}
 	StrBuf strbuf;
@@ -219,6 +226,7 @@ static Bool dump_c(String file) {
 		tree_free(tree);
 		return true;
 	}
+	strbuf_free(&strbuf);
 	tree_free(tree);
 	return false;
 }

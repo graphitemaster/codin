@@ -1514,14 +1514,7 @@ static Node *parse_for_statement(Parser *parser) {
 				body = parse_block_statement(parser, false);
 			}
 			parser->expression_depth = depth;
-			// Generate a compiler identifier for the counter.
-			// TODO(dweiler): This introduces a leak. Create a proper ident pool.
-			char name[4096];
-			snprintf(name, sizeof name, "CODIN_%d", CAST(Sint32, parser->unique_id++));
-			Node *ident = tree_new_identifier(parser->tree, string_copy_from_null(name));
-			Array(Node*) lhs = 0;
-			array_push(lhs, ident);
-			cond = tree_new_in_expression(parser->tree, lhs, rhs);
+			cond = tree_new_in_expression(parser->tree, 0, rhs);
 			Node *node = tree_new_for_statement(parser->tree, 0, cond, body, 0);
 			TRACE_LEAVE();
 			return node;

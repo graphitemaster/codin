@@ -355,7 +355,7 @@ struct Node {
 Bool node_is_literal(const Node *node);
 
 FORCE_INLINE Bool node_is_kind(const Node *node, NodeKind kind) {
-	return node->kind == kind;
+	return node && node->kind == kind;
 }
 
 FORCE_INLINE Bool node_is_statement(const Node *node, StatementKind kind) {
