@@ -84,7 +84,27 @@ static Node *infer(const Lower *lower, Node *node) {
 	case NODE_EXPRESSION:
 		switch (node->expression.kind) {
 		case EXPRESSION_UNARY:
-			return infer(lower, node->expression.unary.operand);
+			{
+				const UnaryExpression *unary = &node->expression.unary;
+				if (unary->operation == OPERATOR_AND) {
+					return tree_new_pointer_type(lower->tree, infer(lower, unary->operand));
+				} else {
+					return infer(lower, unary->operand);
+				}
+			}
+			break;
+		case EXPRESSION_DEREFERENCE:
+			{
+				const Node *operand = infer(lower, node->expression.dereference.operand);
+				if (node_is_type(operand, TYPE_POINTER)) {
+					return infer(lower, operand->type.pointer.type);
+				} else if (node_is_type(operand, TYPE_MULTI_POINTER)) {
+					return infer(lower, operand->type.multi_pointer.type);
+				} else {
+					return 0;
+				}
+			}
+			break;
 		case EXPRESSION_BINARY:
 			return infer(lower, node->expression.binary.lhs);
 		case EXPRESSION_CALL:
@@ -116,6 +136,10 @@ static Node *infer(const Lower *lower, Node *node) {
 		switch (node->type.kind) {
 		case TYPE_PROCEDURE:
 			return node->type.procedure.results ? infer(lower, node->type.procedure.results) : 0;
+		case TYPE_POINTER:
+			return infer(lower, node->type.pointer.type);
+		case TYPE_MULTI_POINTER:
+			return infer(lower, node->type.multi_pointer.type);
 		default:
 			break;
 		}
