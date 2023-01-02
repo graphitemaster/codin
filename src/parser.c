@@ -763,7 +763,10 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 			TRACE_LEAVE();
 			return node;
 		case KEYWORD_TYPEID:
-			UNIMPLEMENTED("typeid");
+			expect_keyword(parser, KEYWORD_TYPEID);
+			node = tree_new_typeid_type(parser->tree);
+			TRACE_LEAVE();
+			return node;
 		case KEYWORD_MAP:
 			UNIMPLEMENTED("map");
 		case KEYWORD_MATRIX:

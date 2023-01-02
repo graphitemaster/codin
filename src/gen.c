@@ -59,6 +59,9 @@ static Bool gen_type(Generator *generator, const Type *type, StrBuf *strbuf) {
 		}
 		strbuf_put_rune(strbuf, '*');
 		break;
+	case TYPE_TYPEID:
+		strbuf_put_string(strbuf, SCLIT("typeid"));
+		break;
 	default:
 		printf("Unimplemented type\n");
 		return false;

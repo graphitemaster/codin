@@ -42,6 +42,7 @@ typedef struct ArrayType ArrayType;
 typedef struct DynamicArrayType DynamicArrayType;
 typedef struct PointerType PointerType;
 typedef struct MultiPointerType MultiPointerType;
+typedef struct TypeIdType TypeIdType;
 
 typedef struct Identifier Identifier;
 typedef struct Value Value;
@@ -100,6 +101,7 @@ enum TypeKind {
 	TYPE_DYNAMIC_ARRAY,  // [dynamicT]
 	TYPE_POINTER,        // ^
 	TYPE_MULTI_POINTER,  // [^]
+	TYPE_TYPEID,         // typeid
 };
 
 struct UnaryExpression {
@@ -322,6 +324,10 @@ struct MultiPointerType {
 	Node *type;
 };
 
+struct TypeIdType {
+	Sint32 : 32;
+};
+
 struct Type {
 	TypeKind kind;
 	union {
@@ -331,6 +337,7 @@ struct Type {
 		DynamicArrayType dynamic_array;
 		PointerType      pointer;
 		MultiPointerType multi_pointer;
+		TypeIdType       typeid;
 	};
 };
 
@@ -405,6 +412,7 @@ Node *tree_new_array_type(Tree *tree, Node *count, Node *type);
 Node *tree_new_dynamic_array_type(Tree *tree, Node *type);
 Node *tree_new_pointer_type(Tree *tree, Node *type);
 Node *tree_new_multi_pointer_type(Tree *tree, Node *type);
+Node *tree_new_typeid_type(Tree *node);
 
 Node *tree_new_identifier(Tree *tree, String contents);
 Node *tree_new_value(Tree *tree, Node *field, Node *val);

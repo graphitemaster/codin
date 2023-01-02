@@ -248,6 +248,10 @@ Node *tree_new_pointer_type(Tree *tree, Node *type) {
 	return node;
 }
 
+Node *tree_new_typeid_type(Tree *tree) {
+	return new_type(tree, TYPE_TYPEID);
+}
+
 Node *tree_new_multi_pointer_type(Tree *tree, Node *type) {
 	Node *node = new_type(tree, TYPE_MULTI_POINTER);
 	MultiPointerType *multi_pointer = &node->type.multi_pointer;
@@ -844,6 +848,10 @@ static void tree_dump_type(const Type* type, Sint32 depth) {
 	switch (type->kind) {
 	case TYPE_PROCEDURE:
 		return tree_dump_procedure_type(&type->procedure, depth);
+	case TYPE_TYPEID:
+		tree_dump_pad(depth);
+		printf("(typeid)");
+		break;
 	case TYPE_SLICE:
 		tree_dump_pad(depth);
 		printf("(slice\n");
@@ -1325,6 +1333,8 @@ static Node *tree_clone_type(Tree *tree, const Type *type) {
 		return tree_clone_pointer_type(tree, &type->pointer);
 	case TYPE_MULTI_POINTER:
 		return tree_clone_multi_pointer_type(tree, &type->multi_pointer);
+	case TYPE_TYPEID:
+		return tree_new_typeid_type(tree);
 	}
 	UNREACHABLE();
 }
