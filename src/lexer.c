@@ -11,6 +11,7 @@
 #endif
 
 const Token TOKEN_NIL = { KIND_INVALID, { 0, 0 }, { 0, 0 }, { 0 } };
+const Source SOURCE_NIL = { { 0, 0 }, { 0, 0 } };
 
 #define ERROR(...) \
 	do { \

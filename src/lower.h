@@ -4,6 +4,6 @@
 
 typedef struct Tree Tree;
 
-Bool lower(Tree *tree);
+Tree *lower(const Tree *tree);
 
 #endif // CODIN_LOWER_H

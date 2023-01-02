@@ -86,6 +86,10 @@ static void parser_trace_leave(Parser *parser) {
 #define TRACE_ENTER() parser_trace_enter(parser, __FUNCTION__)
 #define TRACE_LEAVE() parser_trace_leave(parser)
 
+static void parser_free(Parser *parser) {
+	source_free(&parser->source);
+}
+
 static Bool parser_init(Parser *parser, String filename) {
 	if (source_read(&parser->source, filename)) {
 		if (lexer_init(&parser->lexer, &parser->source)) {
@@ -97,7 +101,7 @@ static Bool parser_init(Parser *parser, String filename) {
 			return true;
 		}
 	}
-	source_free(&parser->source);
+	parser_free(parser);
 	return false;
 }
 
@@ -1767,13 +1771,12 @@ Tree *parse(String filename) {
 	Tree *tree = malloc(sizeof *tree);
 	tree_init(tree);
 
-	tree->source = parser->source;
-
 	parser->tree = tree;	
 	advancep(parser);
 
 	if (setjmp(parser->jmp) != 0) {
 		TRACE_LEAVE();
+		parser_free(parser);
 		tree_free(tree);
 		return 0;
 	}
@@ -1815,6 +1818,9 @@ Tree *parse(String filename) {
 		}
 	}
 
+	parser_free(parser);
+
 	TRACE_LEAVE();
+
 	return tree;
 }

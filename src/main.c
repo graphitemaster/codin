@@ -56,8 +56,11 @@ static Bool generate(const Tree *tree, StrBuf *strbuf) {
 		return false;
 	}
 	strbuf_init(strbuf);
-	const Bool result = gen_run(&gen, strbuf, true);
-	return result;
+	if (gen_run(&gen, strbuf, true)) {
+		return true;
+	}
+	strbuf_free(strbuf);
+	return false;
 }
 
 static Bool transpile(String path) {
@@ -66,16 +69,19 @@ static Bool transpile(String path) {
 		return false;
 	}
 
-	if (!lower(tree)) {
+	Tree *lowered = lower(tree);
+	if (!lowered) {
 		fprintf(stderr, "Failed to lower\n");
 		tree_free(tree);
 		return false;
 	}
 
+	tree_free(tree);
+	tree = lowered;
+
 	StrBuf strbuf;
 	if (!generate(tree, &strbuf)) {
 		fprintf(stderr, "Failed to generate C0\n");
-		strbuf_free(&strbuf);
 		tree_free(tree);
 		return false;
 	}
@@ -203,30 +209,49 @@ static Bool run(String path) {
 
 static Bool dump_ast(String file) {
 	Tree *tree = parse(file);
-	if (tree && lower(tree)) {
-		tree_dump(tree);
-		tree_free(tree);
-		return true;
+	if (!tree) {
+		return false;
 	}
-	return false;
+
+	Tree *lowered = lower(tree);
+	if (!lowered) {
+		tree_free(tree);
+		return false;
+	}
+
+	tree_free(tree);
+	tree_dump(lowered);
+	tree_free(lowered);
+	return true;
 }
 
 static Bool dump_c(String file) {
 	Tree *tree = parse(file);
-	if (!tree || !lower(tree)) {
-		tree_free(tree);
-		return false;
+	if (!tree) {
+		goto L_error;
 	}
+
+	Tree *lowered = lower(tree);
+	if (!lowered) {
+		goto L_error;
+	}
+
+	tree_free(tree);
+	tree = lowered;
+
 	StrBuf strbuf;
-	if (generate(tree, &strbuf)) {
-		const Uint64 size = array_size(strbuf.contents);
-		fwrite(strbuf.contents, size, 1, stdout);
-		fflush(stdout);
-		strbuf_free(&strbuf);
-		tree_free(tree);
-		return true;
+	if (!generate(tree, &strbuf)) {
+		goto L_error;
 	}
+
+	const Uint64 size = array_size(strbuf.contents);
+	fwrite(strbuf.contents, size, 1, stdout);
+	fflush(stdout);
 	strbuf_free(&strbuf);
+	tree_free(tree);
+	return true;
+
+L_error:
 	tree_free(tree);
 	return false;
 }

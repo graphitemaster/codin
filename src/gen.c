@@ -222,7 +222,7 @@ static Bool gen_if_statement(Generator *generator, const IfStatement *statement,
 		gen_padding(depth, strbuf);
 	}
 	strbuf_put_string(strbuf, SCLIT("if ("));
-	if (!gen_node(generator, statement->condition, strbuf, 0)) {
+	if (!gen_node(generator, statement->cond, strbuf, 0)) {
 		return false;
 	}
 	strbuf_put_string(strbuf, SCLIT(")\n"));
@@ -382,7 +382,6 @@ static Bool gen_assignment_statement(Generator *generator, const AssignmentState
 static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf, Bool prototype, Sint32 depth) {
 	gen_padding(depth, strbuf);
 	const Uint64 n_decls = array_size(statement->names);
-	const Uint64 n_values = array_size(statement->values);
 	const Node *type = statement->type;
 
 	for (Uint64 i = 0; i < n_decls; i++) {
@@ -390,30 +389,24 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 		if (prototype) {
 			strbuf_put_string(strbuf, SCLIT("extern "));
 		}
-
 		if (type) {
 			ASSERT(node_is_kind(type, NODE_TYPE) || node_is_kind(type, NODE_IDENTIFIER));
 			if (!gen_node(generator, type, strbuf, 0)) {
 				return false;
 			}
 			strbuf_put_rune(strbuf, ' ');
+		} else {
+			// When no type, emit "void".
+			strbuf_put_string(strbuf, SCLIT("void "));
 		}
-
 		// Generate return type for procedure.
-		const Node *value = i < n_values ? statement->values[i] : 0;
+		const Node *value = statement->values[i];
 		String rename = STRING_NIL;
 		if (value && value->kind == NODE_PROCEDURE) {
 			const Procedure *procedure = &value->procedure;
 			if (procedure->flags & PROC_FLAG_FORCE_INLINE) {
 				strbuf_put_string(strbuf, SCLIT("FORCE_INLINE "));
 			}
-			ASSERT(node_is_kind(procedure->type, NODE_TYPE));
-			if (!gen_node(generator, procedure->type, strbuf, 0)) {
-				return false;
-			}
-
-			strbuf_put_rune(strbuf, ' ');
-
 			// When encountering "main" rename it to "CODIN_main".
 			if (string_compare(name->identifier.contents, SCLIT("main"))) {
 				rename = SCLIT("CODIN_main");

@@ -64,6 +64,8 @@ struct Source {
 	String contents;
 };
 
+extern const Source SOURCE_NIL;
+
 struct Location {
 	int column;
 	int line;

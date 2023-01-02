@@ -7,6 +7,12 @@
 // parser.c
 void source_free(Source *source);
 
+static String new_string(Tree *tree, String string) {
+	String copy = string_copy(string);
+	array_push(tree->strings, copy);
+	return copy;
+}
+
 static Node *new_node(Tree *tree, NodeKind kind) {
 	Node *node = calloc(sizeof *node, 1);
 	node->kind = kind;
@@ -124,8 +130,8 @@ Node *tree_new_empty_statement(Tree *tree) {
 Node *tree_new_import_statement(Tree *tree, String name, String package) {
 	Node *node = new_statement(tree, STATEMENT_IMPORT);
 	ImportStatement *statement = &node->statement.import;
-	statement->name = name;
-	statement->package = package;
+	statement->name = new_string(tree, name);
+	statement->package = new_string(tree, package);
 	return node;
 }
 
@@ -156,7 +162,7 @@ Node *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, Array
 Node *tree_new_identifier(Tree *tree, String contents) {
 	Node *node = new_node(tree, NODE_IDENTIFIER);
 	Identifier *identifier = &node->identifier;
-	identifier->contents = contents;
+	identifier->contents = new_string(tree, contents);
 	return node;
 }
 
@@ -169,10 +175,10 @@ Node *tree_new_declaration_statement(Tree *tree, Node *type, Array(Node*) names,
 	return node;
 }
 
-Node *tree_new_if_statement(Tree *tree, Node *init, Node *condition, Node *body, Node *elif) {
+Node *tree_new_if_statement(Tree *tree, Node *init, Node *cond, Node *body, Node *elif) {
 	Node *node = new_statement(tree, STATEMENT_IF);
 	IfStatement *statement = &node->statement.if_;
-	statement->condition = condition;
+	statement->cond = cond;
 	statement->init = init;
 	statement->body = body;
 	statement->elif = elif;
@@ -261,7 +267,7 @@ Node *tree_new_literal_value(Tree *tree, LiteralKind literal, String value) {
 	Node *node = new_node(tree, NODE_LITERAL_VALUE);
 	LiteralValue *literal_value = &node->literal_value;
 	literal_value->literal = literal;
-	literal_value->value = value;
+	literal_value->value = new_string(tree, value);
 	return node;
 }
 
@@ -311,14 +317,22 @@ Node *tree_new_directive(Tree *tree, DirectiveKind kind) {
 }
 
 void tree_init(Tree *tree) {
+	tree->package = STRING_NIL;
 	tree->nodes = 0;
 	tree->statements = 0;
+	tree->strings = 0;
 }
 
 void tree_free(Tree *tree) {
 	if (!tree) {
 		return;
 	}
+
+	const Uint64 n_strings = array_size(tree->strings);
+	for (Uint64 i = 0; i < n_strings; i++) {
+		string_free(tree->strings[i]);
+	}
+	array_free(tree->strings);
 
 	const Uint64 n_nodes = array_size(tree->nodes);
 	for (Uint64 i = 0; i < n_nodes; i++) {
@@ -364,10 +378,10 @@ void tree_free(Tree *tree) {
 				Expression *expression = &node->expression;
 				switch (expression->kind) {
 				case EXPRESSION_CALL:
-					{
-						CallExpression *call_expression = &expression->call;
-						array_free(call_expression->arguments);
-					}
+					array_free(expression->call.arguments);
+					break;
+				case EXPRESSION_IN:
+					array_free(expression->in.lhs);
 					break;
 				default:
 					break;
@@ -381,8 +395,6 @@ void tree_free(Tree *tree) {
 	}
 	array_free(tree->nodes);
 	array_free(tree->statements);
-
-	source_free(&tree->source);
 
 	free(tree);
 }
@@ -609,7 +621,7 @@ static void tree_dump_if_statement(const IfStatement *statement, Sint32 depth) {
 		tree_dump_node(statement->init, depth + 2);
 		printf(")\n");
 	}
-	tree_dump_node(statement->condition, depth + 1);
+	tree_dump_node(statement->cond, depth + 1);
 	putchar('\n');
 	tree_dump_node(statement->body, depth + 1);
 	if (statement->elif) {
@@ -787,25 +799,23 @@ static const char *calling_convention_to_string(CallingConvention convention) {
 
 static void tree_dump_procedure_type(const ProcedureType *procedure, Sint32 depth) {
 	tree_dump_pad(depth);
-	const Uint64 n_parameters = array_size(procedure->params);
-	const Uint64 n_results = array_size(procedure->results);
 	printf("(cconv \"%s\")\n", calling_convention_to_string(procedure->convention));
 	tree_dump_pad(depth);
-	printf("(parameters ");
-	if (n_parameters == 0) {
-		printf("<empty>");
-	} else {
-		putchar('\n');
+	printf("(parameters\n");
+	if (procedure->params) {
 		tree_dump_node(procedure->params, depth + 1);
+	} else {
+		tree_dump_pad(depth + 1);
+		printf("<empty>");
 	}
 	printf(")\n");
 	tree_dump_pad(depth);
-	printf("(results ");
-	if (n_results == 0) {
-		printf("<empty>");
+	printf("(results\n");
+	if (procedure->results) {
+		tree_dump_node(procedure->results, depth + 1);
 	} else {
-		putchar('\n');
-		tree_dump_field_list(&procedure->results->field_list, depth + 1);
+		tree_dump_pad(depth + 1);
+		printf("<empty>");
 	}
 	putchar(')');
 }
@@ -896,6 +906,7 @@ void tree_dump_node(const Node *node, Sint32 depth) {
 	case NODE_TYPE:
 		return tree_dump_type(&node->type, depth);
 	}
+	UNREACHABLE();
 }
 
 void tree_dump(Tree *tree) {
@@ -908,4 +919,442 @@ void tree_dump(Tree *tree) {
 		}
 	}
 	printf(")\n");
+}
+
+// Clone
+static Node *tree_clone_unary_expression(Tree *tree, const UnaryExpression *expression) {
+	Node *operand = tree_clone_node(tree, expression->operand);
+	return operand ? tree_new_unary_expression(tree, expression->operation, operand) : 0;
+}
+
+static Node *tree_clone_binary_expression(Tree *tree, const BinaryExpression *expression) {
+	Node *lhs = tree_clone_node(tree, expression->lhs);
+	Node *rhs = tree_clone_node(tree, expression->rhs);
+	return lhs && rhs ? tree_new_binary_expression(tree, expression->operation, lhs, rhs) : 0;
+}
+
+static Node *tree_clone_cast_expression(Tree *tree, const CastExpression *expression) {
+	Node *type = 0;
+	if (expression->type && !(type = tree_clone_node(tree, expression->type))) {
+		return 0;
+	}
+	Node *operand = tree_clone_node(tree, expression->expression);
+	return operand ? tree_new_cast_expression(tree, type, operand) : 0;
+}
+
+static Node *tree_clone_selector_expression(Tree *tree, const SelectorExpression *expression) {
+	Node *operand = tree_clone_node(tree, expression->operand);
+	Node *identifier = tree_clone_node(tree, expression->identifier);
+	return operand && identifier ? tree_new_selector_expression(tree, operand, identifier) : 0;
+}
+
+static Node *tree_clone_call_expression(Tree *tree, const CallExpression *expression) {
+	Node *operand = tree_clone_node(tree, expression->operand);
+	if (!operand) {
+		return 0;
+	}
+	Array(Node*) arguments = 0;
+	const Uint64 n_arguments = array_size(expression->arguments);
+	for (Uint64 i = 0; i < n_arguments; i++) {
+		Node *argument = tree_clone_node(tree, expression->arguments[i]);
+		if (!argument || !array_push(arguments, argument)) {
+			goto L_error;
+		}
+	}
+	Node *result = tree_new_call_expression(tree, operand, arguments);
+	if (result) {
+		return result;
+	}
+L_error:
+	array_free(arguments);
+	return 0;
+}
+
+static Node *tree_clone_assertion_expression(Tree *tree, const AssertionExpression *expression) {
+	Node *type = 0;
+	if (expression->type && !(type = tree_clone_node(tree, expression->type))) {
+		return 0;
+	}
+	Node *operand = tree_clone_node(tree, expression->operand);
+	return operand ? tree_new_assertion_expression(tree, operand, type) : 0;
+}
+
+static Node *tree_clone_in_expression(Tree *tree, const InExpression *expression) {
+	Node *rhs = tree_clone_node(tree, expression->rhs);
+	if (!rhs) {
+		return 0;
+	}
+	Array(Node*) lhs = 0;
+	const Uint64 n_lhs = array_size(expression->lhs);
+	for (Uint64 i = 0; i < n_lhs; i++) {
+		Node *node = tree_clone_node(tree, expression->lhs[i]);
+		if (!node || !array_push(lhs, node)) {
+			goto L_error;
+		}
+	}
+	Node *result = tree_new_in_expression(tree, lhs, rhs);
+	if (result) {
+		return result;
+	}
+L_error:
+	array_free(lhs);
+	return 0;
+}
+
+static Node *tree_clone_dereference_expression(Tree *tree, const DereferenceExpression *expression) {
+	Node *operand = tree_clone_node(tree, expression->operand);
+	return operand ? tree_new_dereference_expression(tree, operand) : 0;
+}
+
+Node *tree_clone_expression(Tree *tree, const Expression *expression) {
+	switch (expression->kind) {
+	case EXPRESSION_UNARY:
+		return tree_clone_unary_expression(tree, &expression->unary);
+	case EXPRESSION_BINARY:
+		return tree_clone_binary_expression(tree, &expression->binary);
+	case EXPRESSION_CAST:
+		return tree_clone_cast_expression(tree, &expression->cast);
+	case EXPRESSION_SELECTOR:
+		return tree_clone_selector_expression(tree, &expression->selector);
+	case EXPRESSION_CALL:
+		return tree_clone_call_expression(tree, &expression->call);
+	case EXPRESSION_ASSERTION:
+		return tree_clone_assertion_expression(tree, &expression->assertion);
+	case EXPRESSION_IN:
+		return tree_clone_in_expression(tree, &expression->in);
+	case EXPRESSION_DEREFERENCE:
+		return tree_clone_dereference_expression(tree, &expression->dereference);
+	}
+	UNREACHABLE();
+}
+
+static Node *tree_clone_block_statement(Tree *tree, const BlockStatement *statement) {
+	Array(Node*) statements = 0;
+	const Uint64 n_statements = array_size(statement->statements);
+	for (Uint64 i = 0; i < n_statements; i++) {
+		Node *node = tree_clone_node(tree, statement->statements[i]);
+		if (!node || !array_push(statements, node)) {
+			goto L_error;
+		}
+	}
+	Node *result = tree_new_block_statement(tree, statement->flags, statements);
+	if (result) {
+		return result;
+	}
+L_error:
+	array_free(statements);
+	return 0;
+}
+
+static Node *tree_clone_import_statement(Tree *tree, const ImportStatement *statement) {
+	return tree_new_import_statement(tree, statement->name, statement->package);
+}
+
+static Node *tree_clone_expression_statement(Tree *tree, const ExpressionStatement *statement) {
+	Node *expression = tree_clone_node(tree, statement->expression);
+	return expression ? tree_new_expression_statement(tree, expression) : 0;
+}
+
+static Node *tree_clone_assignment_statement(Tree *tree, const AssignmentStatement *statement) {
+	Array(Node*) lhs = 0;
+	Array(Node*) rhs = 0;
+	const Uint64 n_lhs = array_size(statement->lhs);
+	const Uint64 n_rhs = array_size(statement->rhs);
+	for (Uint64 i = 0; i < n_lhs; i++) {
+		Node *node = tree_clone_node(tree, statement->lhs[i]);
+		if (!node || !array_push(lhs, node)) {
+			goto L_error;
+		}
+	}
+	for (Uint64 i = 0; i < n_rhs; i++) {
+		Node *node = tree_clone_node(tree, statement->rhs[i]);
+		if (!node || !array_push(rhs, node)) {
+			goto L_error;
+		}
+	}
+	Node *result = tree_new_assignment_statement(tree, statement->assignment, lhs, rhs);
+	if (result) {
+		return result;
+	}
+L_error:
+	array_free(rhs);
+	array_free(lhs);
+	return 0;
+}
+
+static Node *tree_clone_declaration_statement(Tree *tree, const DeclarationStatement *statement) {
+	Node *type = 0;
+	if (statement->type && !(type = tree_clone_node(tree, statement->type))) {
+		return 0;
+	}
+	Array(Node*) names = 0;
+	Array(Node*) values = 0;
+	const Uint64 n_names = array_size(statement->names);
+	const Uint64 n_values = array_size(statement->values);
+	for (Uint64 i = 0; i < n_names; i++) {
+		Node *node = tree_clone_node(tree, statement->names[i]);
+		if (!node || !array_push(names, node)) {
+			goto L_error;
+		}
+	}
+	for (Uint64 i = 0; i < n_values; i++) {
+		Node *node = tree_clone_node(tree, statement->values[i]);
+		if (!node || !array_push(values, node)) {
+			goto L_error;
+		}
+	}
+	Node *result = tree_new_declaration_statement(tree, type, names, values);
+	if (result) {
+		return result;
+	}
+L_error:
+	array_free(values);
+	array_free(names);
+	return 0;
+}
+
+static Node *tree_clone_if_statement(Tree *tree, const IfStatement *statement) {
+	Node *init = 0;
+	Node *elif = 0;
+	if ((statement->init && !(init = tree_clone_node(tree, statement->init))) ||
+	    (statement->elif && !(elif = tree_clone_node(tree, statement->elif))))
+	{
+		return 0;
+	}
+	Node *cond = tree_clone_node(tree, statement->cond);
+	Node *body = tree_clone_node(tree, statement->body);
+	return cond && body ? tree_new_if_statement(tree, init, cond, body, elif) : 0;
+}
+
+Node *tree_clone_return_statement(Tree *tree, const ReturnStatement *statement) {
+	Array(Node*) results = 0;
+	const Uint64 n_results = array_size(statement->results);
+	for (Uint64 i = 0; i < n_results; i++) {
+		Node *result = tree_clone_node(tree, statement->results[i]);
+		if (!result || !array_push(results, result)) {
+			goto L_error;
+		}
+	}
+	Node *result = tree_new_return_statement(tree, results);
+	if (result) {
+		return result;
+	}
+L_error:
+	array_free(results);
+	return 0;
+}
+
+static Node *tree_clone_for_statement(Tree *tree, const ForStatement *statement) {
+	Node *init = 0;
+	Node *post = 0;
+	if ((statement->init && !(init = tree_clone_node(tree, statement->init))) ||
+	    (statement->post && !(post = tree_clone_node(tree, statement->post))))
+	{
+		return 0;
+	}
+	Node *cond = tree_clone_node(tree, statement->cond);
+	Node *body = tree_clone_node(tree, statement->body);
+	return cond && body ? tree_new_for_statement(tree, init, cond, body, post) : 0;
+}
+
+static Node *tree_clone_defer_statement(Tree *tree, const DeferStatement *statement) {
+	Node *node = tree_clone_node(tree, statement->statement);
+	return node ? tree_new_defer_statement(tree, node) : 0;
+}
+
+Node *tree_clone_statement(Tree *tree, const Statement *statement) {
+	switch (statement->kind) {
+	case STATEMENT_EMPTY:
+		return tree_new_empty_statement(tree);
+	case STATEMENT_BLOCK:
+		return tree_clone_block_statement(tree, &statement->block);
+	case STATEMENT_IMPORT:
+		return tree_clone_import_statement(tree, &statement->import);
+	case STATEMENT_EXPRESSION:
+		return tree_clone_expression_statement(tree, &statement->expression);
+	case STATEMENT_ASSIGNMENT:
+		return tree_clone_assignment_statement(tree, &statement->assignment);
+	case STATEMENT_DECLARATION:
+		return tree_clone_declaration_statement(tree, &statement->declaration);
+	case STATEMENT_IF:
+		return tree_clone_if_statement(tree, &statement->if_);
+	case STATEMENT_RETURN:
+		return tree_clone_return_statement(tree, &statement->return_);
+	case STATEMENT_FOR:
+		return tree_clone_for_statement(tree, &statement->for_);
+	case STATEMENT_DEFER:
+		return tree_clone_defer_statement(tree, &statement->defer);
+	}
+	UNREACHABLE();
+}
+
+static Node *tree_clone_identifier(Tree *tree, const Identifier *identifier) {
+	return tree_new_identifier(tree, identifier->contents);
+}
+
+static Node *tree_clone_value(Tree *tree, const Value *value_) {
+	Node *field = tree_clone_node(tree, value_->field);
+	Node *value = tree_clone_node(tree, value_->value);
+	return field && value ? tree_new_value(tree, field, value) : 0;
+}
+
+static Node *tree_clone_literal_value(Tree *tree, const LiteralValue *literal_value) {
+	return tree_new_literal_value(tree, literal_value->literal, literal_value->value);
+}
+
+static Node *tree_clone_compound_literal(Tree *tree, const CompoundLiteral *compound_literal) {
+	Node *type = tree_clone_node(tree, compound_literal->type);
+	if (!type) {
+		return 0;
+	}
+	Array(Node*) elements = 0;
+	const Uint64 n_elements = array_size(compound_literal->elements);
+	for (Uint64 i = 0; i < n_elements; i++) {
+		Node *element = tree_clone_node(tree, compound_literal->elements[i]);
+		if (!element || !array_push(elements, element)) {
+			goto L_error;
+		}
+	}
+	Node *result = tree_new_compound_literal(tree, type, elements);
+	if (result) {
+		return result;
+	}
+L_error:
+	array_free(elements);
+	return 0;
+}
+
+static Node *tree_clone_field(Tree *tree, const Field *field) {
+	Node *name = tree_clone_node(tree, field->name);
+	Node *type = tree_clone_node(tree, field->type);
+	return name && type ? tree_new_field(tree, name, type) : 0;
+}
+
+static Node *tree_clone_field_list(Tree *tree, const FieldList *field_list) {
+	Array(Node*) fields = 0;
+	const Uint64 n_fields = array_size(field_list->fields);
+	for (Uint64 i = 0; i < n_fields; i++) {
+		Node *field = tree_clone_node(tree, field_list->fields[i]);
+		if (!field || !array_push(fields, field)) {
+			goto L_error;
+		}
+	}
+	Node *result = tree_new_field_list(tree, fields);
+	if (result) {
+		return result;
+	}
+L_error:
+	array_free(fields);
+	return 0;
+}
+
+static Node *tree_clone_procedure(Tree *tree, const Procedure *procedure) {
+	Node *type = tree_clone_node(tree, procedure->type);
+	Node *body = tree_clone_node(tree, procedure->body);
+	return type && body ? tree_new_procedure(tree, procedure->flags, type, body) : 0;
+}
+
+static Node *tree_clone_procedure_group(Tree *tree, const ProcedureGroup *procedure_group) {
+	Array(Node*) procedures = 0;
+	const Uint64 n_procedures = array_size(procedure_group->procedures);
+	for (Uint64 i = 0; i < n_procedures; i++) {
+		Node *procedure = tree_clone_node(tree, procedure_group->procedures[i]);
+		if (!procedure || !array_push(procedures, procedure)) {
+			goto L_error;
+		}
+	}
+	Node *result = tree_new_procedure_group(tree, procedures);
+	if (result) {
+		return result;
+	}
+L_error:
+	array_free(procedures);
+	return 0;
+}
+
+static Node *tree_clone_directive(Tree *tree, const Directive *directive) {
+	return tree_new_directive(tree, directive->kind);
+}
+
+static Node *tree_clone_procedure_type(Tree *tree, const ProcedureType *type) {
+	Node *results = 0;
+	if (type->results && !(results = tree_clone_node(tree, type->results))) {
+		return 0;
+	}
+	Node *params = tree_clone_node(tree, type->params);
+	return params ? tree_new_procedure_type(tree, params, results, type->flags, type->convention) : 0;
+}
+
+static Node *tree_clone_slice_type(Tree *tree, const SliceType *slice_type) {
+	Node *type = tree_clone_node(tree, slice_type->type);
+	return type ? tree_new_slice_type(tree, type) : 0;
+}
+
+static Node *tree_clone_array_type(Tree *tree, const ArrayType *array_type) {
+	Node *count = tree_clone_node(tree, array_type->count);
+	Node *type = tree_clone_node(tree, array_type->type);
+	return type && count ? tree_new_array_type(tree, count, type) : 0;
+}
+
+static Node *tree_clone_dynamic_array_type(Tree *tree, const DynamicArrayType *dynamic_array_type) {
+	Node *type = tree_clone_node(tree, dynamic_array_type->type);
+	return type ? tree_new_dynamic_array_type(tree, type) : 0;
+}
+
+static Node *tree_clone_pointer_type(Tree *tree, const PointerType *pointer_type) {
+	Node *type = tree_clone_node(tree, pointer_type->type);
+	return type ? tree_new_pointer_type(tree, type) : 0;
+}
+
+static Node *tree_clone_multi_pointer_type(Tree *tree, const MultiPointerType *multi_pointer_type) {
+	Node *type = tree_clone_node(tree, multi_pointer_type->type);
+	return type ? tree_new_multi_pointer_type(tree, type) : 0;
+}
+
+static Node *tree_clone_type(Tree *tree, const Type *type) {
+	switch (type->kind) {
+	case TYPE_PROCEDURE:
+		return tree_clone_procedure_type(tree, &type->procedure);
+	case TYPE_SLICE:
+		return tree_clone_slice_type(tree, &type->slice);
+	case TYPE_ARRAY:
+		return tree_clone_array_type(tree, &type->array);
+	case TYPE_DYNAMIC_ARRAY:
+		return tree_clone_dynamic_array_type(tree, &type->dynamic_array);
+	case TYPE_POINTER:
+		return tree_clone_pointer_type(tree, &type->pointer);
+	case TYPE_MULTI_POINTER:
+		return tree_clone_multi_pointer_type(tree, &type->multi_pointer);
+	}
+	UNREACHABLE();
+}
+
+Node *tree_clone_node(Tree *tree, const Node *node) {
+	switch (node->kind) {
+	case NODE_EXPRESSION:
+		return tree_clone_expression(tree, &node->expression);
+	case NODE_STATEMENT:
+		return tree_clone_statement(tree, &node->statement);
+	case NODE_IDENTIFIER:
+		return tree_clone_identifier(tree, &node->identifier);
+	case NODE_VALUE:
+		return tree_clone_value(tree, &node->value);
+	case NODE_LITERAL_VALUE:
+		return tree_clone_literal_value(tree, &node->literal_value);
+	case NODE_COMPOUND_LITERAL:
+		return tree_clone_compound_literal(tree, &node->compound_literal);
+	case NODE_FIELD:
+		return tree_clone_field(tree, &node->field);
+	case NODE_FIELD_LIST:
+		return tree_clone_field_list(tree, &node->field_list);
+	case NODE_PROCEDURE:
+		return tree_clone_procedure(tree, &node->procedure);
+	case NODE_PROCEDURE_GROUP:
+		return tree_clone_procedure_group(tree, &node->procedure_group);
+	case NODE_DIRECTIVE:
+		return tree_clone_directive(tree, &node->directive);
+	case NODE_TYPE:
+		return tree_clone_type(tree, &node->type);
+	}
+	UNREACHABLE();
 }

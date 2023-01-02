@@ -52,6 +52,9 @@ _Static_assert(alignof(Array) == 16, "not aligned");
 			? (array_meta(array)->size = (size_), true) \
 			: false))
 
+#define array_last(array) \
+	((array)[array_size(array) - 1])
+
 #define array_clear(array) \
 	(void)((array) ? array_meta(array)->size = 0 : 0)
 

@@ -193,7 +193,7 @@ struct DeclarationStatement {
 
 struct IfStatement {
 	Node *init;
-	Node *condition;
+	Node *cond;
 	Node *body;
 	Node *elif;
 };
@@ -374,9 +374,9 @@ _Static_assert(sizeof(Node) <= 64, "Too big");
 
 struct Tree {
 	String package;
-	Source source;
 	Array(Node*) nodes;
 	Array(Node*) statements;
+	Array(String) strings;
 };
 
 Node *tree_new_unary_expression(Tree *tree, OperatorKind operation, Node *operand);
@@ -416,6 +416,11 @@ Node *tree_new_field_list(Tree *tree, Array(Node*) list);
 Node *tree_new_procedure(Tree *tree, ProcedureFlag flags, Node *type, Node *body);
 Node *tree_new_procedure_group(Tree *tree, Array(Node*) procedures);
 Node *tree_new_directive(Tree *tree, DirectiveKind directive);
+
+Node *tree_clone_node(Tree *tree, const Node *node);
+Node *tree_clone_statement(Tree *tree, const Statement *statement);
+Node *tree_clone_return_statement(Tree *tree, const ReturnStatement *statement);
+Node *tree_clone_expression(Tree *tree, const Expression *expression);
 
 void tree_init(Tree *tree);
 void tree_free(Tree *tree);
