@@ -16,30 +16,69 @@
 //
 // * Generates zero initializers for all variables.
 //
-// * Hoists nested porcedure calls out and stores their results to unique
+// * Hoists nested procedure calls out and stores their results to unique
 //   variables. This is necessary to ensure left-to-right evaluation and to
 //   allow for massaging procedure calls.
-
 typedef struct Lower Lower;
 typedef struct Block Block;
+typedef struct Symbol Symbol;
+
+struct Symbol {
+	String name;
+	Node *type;
+};
 
 struct Block {
 	Block *prev;
 	Array(const Node*) defers;
 	Array(Node*) statements;
+	Array(Symbol) symbols;
 };
 
 struct Lower {
 	Tree *tree;
 	Block *block;
 	Sint32 unique_id;
+	Array(Symbol) symbols;
 };
 
+static Bool define(Lower *lower, String name, Node *type) {
+	Block *block = lower->block;
+	Array(Symbol) *symbols = block ? &block->symbols : &lower->symbols;
+	return array_push(*symbols, ((Symbol) { name, type }));
+}
+
+static const Symbol *symbol(const Lower *lower, String name) {
+	for (Block *block = lower->block; block; block = block->prev) {
+		const Array(Symbol) symbols = block->symbols;
+		const Uint64 n_symbols = array_size(symbols);
+		for (Uint64 i = 0; i < n_symbols; i++) {
+			const Symbol *sym = &symbols[i];
+			if (string_compare(sym->name, name)) {
+				return sym;
+			}
+		}
+	}
+
+	const Array(Symbol) symbols = lower->symbols;
+	const Uint64 n_symbols = array_size(symbols);
+	for (Uint64 i = 0; i < n_symbols; i++) {
+		const Symbol *sym = &symbols[i];
+		if (string_compare(sym->name, name)) {
+			return sym;
+		}
+	}
+
+	return 0;
+}
+
 static Node *infer(const Lower *lower, Node *node) {
-	// if (!node) return 0;
 	switch (node->kind) {
 	case NODE_IDENTIFIER:
-		return tree_clone_node(lower->tree, node);
+		{
+			const Symbol *sym = symbol(lower, node->identifier.contents);
+			return sym ? sym->type : 0;
+		}
 	case NODE_PROCEDURE:
 		return infer(lower, node->procedure.type);
 	case NODE_EXPRESSION:
@@ -123,6 +162,7 @@ static Node *lower_block_statement(Lower *lower, const BlockStatement *block_sta
 	block->prev = lower->block;
 	block->defers = 0;
 	block->statements = 0;
+	block->symbols = 0;
 
 	lower->block = block;
 
@@ -156,6 +196,7 @@ static Node *lower_block_statement(Lower *lower, const BlockStatement *block_sta
 	Node *result = tree_new_block_statement(lower->tree, block_statement->flags, block->statements);
 	if (result) {
 		lower->block = block->prev;
+		array_free(block->symbols);
 		array_free(block->defers);
 		free(block);
 		return result;
@@ -163,6 +204,7 @@ static Node *lower_block_statement(Lower *lower, const BlockStatement *block_sta
 
 L_error:
 	lower->block = block->prev;
+	array_free(block->symbols);
 	array_free(block->statements);
 	array_free(block->defers);
 	free(block);
@@ -207,6 +249,10 @@ static Node *lower_declaration_statement(Lower *lower, const DeclarationStatemen
 		}
 	}
 
+	for (Uint64 i = 0; i < n_names; i++) {
+		define(lower, names[i]->identifier.contents, type);
+	}
+
 	Node *result = tree_new_declaration_statement(tree, type, names, values);
 	if (result) {
 		return result;
@@ -230,15 +276,27 @@ static Node *lower_return_statement(Lower *lower, const ReturnStatement *stateme
 			}
 		}
 	}
-	Node *ret = tree_clone_return_statement(lower->tree, statement);
-	if (!ret || !array_push(statements, ret)) {
+
+	Node *return_ = tree_clone_return_statement(lower->tree, statement);
+	if (!return_) {
 		goto L_error;
 	}
+
+	if (!statements) {
+		return return_;
+	}
+
+	// We have more than one statement generated at the return.
+	if (!array_push(statements, return_)) {
+		goto L_error;
+	}
+
 	// TODO(dweiler): Inherit the block flags here!
 	Node *result = tree_new_block_statement(lower->tree, 0, statements);
 	if (result) {
 		return result;
 	}
+
 L_error:
 	array_free(statements);
 	return 0;
@@ -271,11 +329,6 @@ static Node *lower_if_statement(Lower *lower, const IfStatement *statement) {
 
 static Node *lower_for_statement(Lower *lower, const ForStatement *statement) {
 	Tree *tree = lower->tree;
-
-	Node *body = lower_block_statement(lower, &statement->body->statement.block);
-	if (!body) {
-		return 0;
-	}
 
 	Array(Node*) names = 0;
 	Array(Node*) values = 0;
@@ -313,16 +366,19 @@ static Node *lower_for_statement(Lower *lower, const ForStatement *statement) {
 			goto L_error;
 		}
 
+		Node *type = infer(lower, lhs);
+
 		if (n_names == 2) {
 			// Generate = {}.
-			Node *value = tree_new_compound_literal(tree, 0, 0);
+			Node *value = tree_new_compound_literal(tree, type, 0);
 			if (!value || !array_push(values, value)) {
 				goto L_error;
 			}
 		}
 
 		Node *pred = array_last(names);
-		init = tree_new_declaration_statement(tree, infer(lower, lhs), names, values);
+		define(lower, pred->identifier.contents, type);
+		init = tree_new_declaration_statement(tree, type, names, values);
 		switch (bin->operation) {
 		case OPERATOR_ELLIPSIS:
 			FALLTHROUGH();
@@ -361,6 +417,11 @@ static Node *lower_for_statement(Lower *lower, const ForStatement *statement) {
 		goto L_error;
 	}
 
+	Node *body = lower_block_statement(lower, &statement->body->statement.block);
+	if (!body) {
+		return 0;
+	}
+
 	Node *result = tree_new_for_statement(tree, init, cond, body, post);
 	if (result) {
 		return result;
@@ -396,7 +457,7 @@ static Node *lower_statement(Lower *lower, const Statement *statement) {
 	case STATEMENT_EXPRESSION:
 		return lower_expression_statement(lower, &statement->expression);
 	case STATEMENT_DEFER:
-		// Should've been removed
+			// Should've been removed
 		return false;
 	default:
 		return tree_clone_statement(lower->tree, statement);
@@ -493,7 +554,20 @@ Tree *lower(const Tree *tree) {
 
 	lower.block = 0;
 	lower.unique_id = 0;
+	lower.symbols = 0;
 	tree_init(lower.tree);
+
+	static const String BUILTIN_TYPES[] = {
+		SLIT("i8"),  SLIT("i16"), SLIT("i32"), SLIT("i64"), SLIT("i128"),
+		SLIT("u8"),  SLIT("u16"), SLIT("u32"), SLIT("u64"), SLIT("u128"),
+		SLIT("b8"),  SLIT("b16"), SLIT("b32"), SLIT("b64"),
+		SLIT("f16"), SLIT("f32"), SLIT("f64"),
+	};
+
+	for (Uint64 i = 0; i < sizeof(BUILTIN_TYPES) / sizeof(BUILTIN_TYPES[0]); i++) {
+		Node *type = tree_new_identifier(lower.tree, BUILTIN_TYPES[i]);
+		define(&lower, BUILTIN_TYPES[i], type);
+	}
 
 	const Uint64 n_statements = array_size(tree->statements);
 	for (Uint64 i = 0; i < n_statements; i++) {
@@ -505,9 +579,11 @@ Tree *lower(const Tree *tree) {
 
 	ASSERT(!lower.block);
 
+	array_free(lower.symbols);
 	return lower.tree;
 
 L_error:
+	array_free(lower.symbols);
 	tree_free(lower.tree);
 	return 0;
 }

@@ -561,7 +561,7 @@ static void tree_dump_import_statement(const ImportStatement *statement, Sint32 
 	printf("(import '%.*s')", SFMT(package));
 }
 
-static void tree_dump_expression_statement(const ExpressionStatement *statement, Sint32 depth) {
+void tree_dump_expression_statement(const ExpressionStatement *statement, Sint32 depth) {
 	(void)depth;
 	printf("(expression\n");
 	tree_dump_node(statement->expression, depth + 1);
