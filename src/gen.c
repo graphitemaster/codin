@@ -274,31 +274,6 @@ static Bool gen_return_statement(Generator *generator, const ReturnStatement *st
 
 static Bool gen_for_statement(Generator *generator, const ForStatement *statement, StrBuf *strbuf, Sint32 depth) {
 	gen_padding(depth, strbuf);
-
-	// We convert the following Odin
-	//
-	//	for init; cond; post {
-	//		body
-	//	}
-	//
-	// Into the following C
-	//
-	//	{
-	//		init;
-	//		while cond {
-	//			body
-	//			post
-	//		}
-	//	}
-	strbuf_put_rune(strbuf, '{');
-	strbuf_put_rune(strbuf, '\n');
-
-	if (statement->init) {
-		gen_node(generator, statement->init, strbuf, depth + 1);
-	}
-
-	gen_padding(depth + 1, strbuf);
-
 	strbuf_put_string(strbuf, SCLIT("while ("));
 	if (statement->cond) {
 		if (!gen_node(generator, statement->cond, strbuf, 0)) {
@@ -309,15 +284,9 @@ static Bool gen_for_statement(Generator *generator, const ForStatement *statemen
 	}
 	strbuf_put_string(strbuf, SCLIT(")\n"));
 
-	// Inject the post statement as the last statement in the block.
-	if (statement->post) {
-		array_push(statement->body->statement.block.statements, statement->post);
-	}
-
-	gen_node(generator, statement->body, strbuf, depth + 1);
+	gen_node(generator, statement->body, strbuf, depth);
 
 	gen_padding(depth, strbuf);
-	strbuf_put_rune(strbuf, '}');
 	strbuf_put_rune(strbuf, '\n');
 
 	return true;
@@ -523,6 +492,10 @@ static Bool gen_statement(Generator *generator, const Statement *statement, StrB
 		return gen_assignment_statement(generator, &statement->assignment, strbuf, depth);
 	case STATEMENT_IMPORT:
 		// Handled else-where.
+		return true;
+	case STATEMENT_BREAK:
+		gen_padding(depth, strbuf);
+		strbuf_put_string(strbuf, SCLIT("break;\n"));
 		return true;
 	case STATEMENT_DEFER:
 		fprintf(stderr, "Lowering pass failed to remove defer statement\n");
@@ -1051,6 +1024,8 @@ static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 	gen_c0_cmp_prelude(generator->used_cmp, strbuf);
 	gen_c0_rel_prelude(generator->used_rel, strbuf);
 	gen_c0_bit_prelude(generator->used_bit, strbuf);
+
+	strbuf_put_string(strbuf, SCLIT("static FORCE_INLINE noti32(i32 x) { return !x;}\n"));
 
 	return true;
 }

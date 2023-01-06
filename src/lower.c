@@ -106,7 +106,7 @@ static Node *infer(const Lower *lower, Node *node) {
 			}
 			break;
 		case EXPRESSION_BINARY:
-			return infer(lower, node->expression.binary.lhs);
+			return infer(lower, node->expression.binary.rhs);
 		case EXPRESSION_CALL:
 			return infer(lower, node->expression.call.operand);
 		case EXPRESSION_CAST:
@@ -164,23 +164,13 @@ static Node *unique_identifier(Lower *lower) {
 }
 
 static Node *lower_statement(Lower *lower, const Statement *statement);
-static Node *lower_block_statement(Lower *lower, const BlockStatement *block_statement);
+static Node *lower_block_statement(Lower *lower, const BlockStatement *block_statement, Bool new_block);
 static Node *lower_node(Lower *lower, const Node *node);
 
-static Node *lower_procedure(Lower *lower, const Procedure *procedure) {
-	Tree *tree = lower->tree;
-	Node *type = 0;
-	if (procedure->type && !(type = tree_clone_node(tree, procedure->type))) {
-		return 0;
-	}
-	Node *body = lower_block_statement(lower, &procedure->body->statement.block);
-	return body ? tree_new_procedure(tree, procedure->flags, type, body) : 0;
-}
-
-static Node *lower_block_statement(Lower *lower, const BlockStatement *block_statement) {
+static Bool push_block(Lower *lower) {
 	Block *block = malloc(sizeof *block);
 	if (!block) {
-		return 0;
+		return false;
 	}
 
 	block->prev = lower->block;
@@ -189,6 +179,51 @@ static Node *lower_block_statement(Lower *lower, const BlockStatement *block_sta
 	block->symbols = 0;
 
 	lower->block = block;
+
+	return true;
+}
+
+static void pop_block(Lower *lower) {
+	Block *block = lower->block;
+	lower->block = block->prev;
+	array_free(block->symbols);
+	array_free(block->defers);
+	free(block);
+}
+
+static Node *lower_procedure(Lower *lower, const Procedure *procedure) {
+	Tree *tree = lower->tree;
+	Node *type = 0;
+	if (procedure->type && !(type = lower_node(lower, procedure->type))) {
+		return 0;
+	}
+
+	if (!push_block(lower)) {
+		return 0;
+	}
+
+	// Define the local variables of the procedure after we lower block to enter
+	// that block scope.
+	const FieldList *arguments = &type->type.procedure.params->field_list;
+	const Uint64 n_arguments = array_size(arguments->fields);
+	for (Uint64 i = 0; i < n_arguments; i++) {
+		const Field *field = &arguments->fields[i]->field;
+		define(lower, field->name->identifier.contents, infer(lower, field->type));
+	}
+
+	Node *body = lower_block_statement(lower, &procedure->body->statement.block, false);
+
+	pop_block(lower);
+
+	return body ? tree_new_procedure(tree, procedure->flags, type, body) : 0;
+}
+
+static Node *lower_block_statement(Lower *lower, const BlockStatement *block_statement, Bool new_block) {
+	if (new_block && !push_block(lower)) {
+		return 0;
+	}
+
+	Block *block = lower->block;
 
 	const Uint64 n_statements = array_size(block_statement->statements);
 	for (Uint64 i = 0; i < n_statements; i++) {
@@ -219,19 +254,18 @@ static Node *lower_block_statement(Lower *lower, const BlockStatement *block_sta
 
 	Node *result = tree_new_block_statement(lower->tree, block_statement->flags, block->statements);
 	if (result) {
-		lower->block = block->prev;
-		array_free(block->symbols);
-		array_free(block->defers);
-		free(block);
+		if (new_block) {
+			pop_block(lower);
+		}
 		return result;
 	}
 
 L_error:
-	lower->block = block->prev;
-	array_free(block->symbols);
-	array_free(block->statements);
-	array_free(block->defers);
-	free(block);
+	if (new_block) {
+		array_free(block->statements);
+		pop_block(lower);
+	}
+
 	return result;
 }
 
@@ -239,7 +273,7 @@ static Node *lower_declaration_statement(Lower *lower, const DeclarationStatemen
 	Tree *tree = lower->tree;
 
 	Node *type = 0;
-	if (statement->type && !(type = tree_clone_node(tree, statement->type))) {
+	if (statement->type && !(type = lower_node(lower, statement->type))) {
 		return 0;
 	}
 
@@ -250,6 +284,11 @@ static Node *lower_declaration_statement(Lower *lower, const DeclarationStatemen
 
 	if (!type && n_values == 1) {
 		type = infer(lower, statement->values[0]);
+	}
+
+	// Define early as possible.
+	for (Uint64 i = 0; i < n_names; i++) {
+		define(lower, statement->names[i]->identifier.contents, type);
 	}
 
 	for (Uint64 i = 0; i < n_names; i++) {
@@ -271,10 +310,6 @@ static Node *lower_declaration_statement(Lower *lower, const DeclarationStatemen
 		if (!value || !array_push(values, value)) {
 			goto L_error;
 		}
-	}
-
-	for (Uint64 i = 0; i < n_names; i++) {
-		define(lower, names[i]->identifier.contents, type);
 	}
 
 	Node *result = tree_new_declaration_statement(tree, type, names, values);
@@ -301,8 +336,19 @@ static Node *lower_return_statement(Lower *lower, const ReturnStatement *stateme
 		}
 	}
 
-	Node *return_ = tree_clone_return_statement(lower->tree, statement);
+	Array(Node*) results = 0;
+	const Uint64 n_results = array_size(statement->results);
+	for (Uint64 i = 0; i < n_results; i++) {
+		Node *result = lower_node(lower, statement->results[i]);
+		if (!result || !array_push(results, result)) {
+			array_free(results);
+			goto L_error;
+		}
+	}
+
+	Node *return_ = tree_new_return_statement(lower->tree, results);
 	if (!return_) {
+		array_free(results);
 		goto L_error;
 	}
 
@@ -322,7 +368,9 @@ static Node *lower_return_statement(Lower *lower, const ReturnStatement *stateme
 	}
 
 L_error:
+	array_free(results);
 	array_free(statements);
+
 	return 0;
 }
 
@@ -331,8 +379,8 @@ static Node *lower_if_statement(Lower *lower, const IfStatement *statement) {
 
 	Node *init = 0;
 	Node *cond = 0;
-	if ((statement->init && !(init = tree_clone_node(tree, statement->init))) ||
-			(statement->cond && !(cond = tree_clone_node(tree, statement->cond))))
+	if ((statement->init && !(init = lower_node(lower, statement->init))) ||
+			(statement->cond && !(cond = lower_node(lower, statement->cond))))
 	{
 		return 0;
 	}
@@ -340,13 +388,13 @@ static Node *lower_if_statement(Lower *lower, const IfStatement *statement) {
 	// Optional else block.
 	Node *elif = 0;
 	if (statement->elif) {
-		elif = lower_block_statement(lower, &statement->elif->statement.block);
+		elif = lower_block_statement(lower, &statement->elif->statement.block, true);
 		if (!elif) {
 			return 0;
 		}
 	}
 
-	Node *body = lower_block_statement(lower, &statement->body->statement.block);
+	Node *body = lower_block_statement(lower, &statement->body->statement.block, true);
 
 	return body ? tree_new_if_statement(lower->tree, init, cond, body, elif) : 0;
 }
@@ -364,7 +412,15 @@ static Node *lower_for_statement(Lower *lower, const ForStatement *statement) {
 	Node *cond = 0;
 	Node *post = 0;
 
-	// Lower "for in" into regular for init; cond; post.
+	// Lowers
+	//
+	//	for in <expression>
+	//	for <ident:a> in <expression>
+	//	for <ident:a>, <ident:a> in <expression>
+	//
+	// Into
+	//
+	//	<statement:init>; <expression:cond>; <statement:post>
 	if (node_is_expression(statement->cond, EXPRESSION_IN)) {
 		const InExpression *in = &statement->cond->expression.in;
 		if (!node_is_expression(in->rhs, EXPRESSION_BINARY)) {
@@ -434,22 +490,56 @@ static Node *lower_for_statement(Lower *lower, const ForStatement *statement) {
 		}
 
 		post = tree_new_assignment_statement(tree, ASSIGNMENT_ADDEQ, assign_lhs, assign_rhs);
-	} else if ((statement->init && !(init = lower_node(lower, statement->init))) ||
-		         (statement->cond && !(cond = lower_node(lower, statement->cond))) ||
-		         (statement->post && !(post = lower_node(lower, statement->post))))
-	{
+	}
+
+	// Lowers
+	//
+	//	for <statetement:init>; <expression:cond>; <statement:post>
+	//	{
+	//		<statement:block>
+	//	}
+	//
+	// Into
+	//	{
+	//		<statement:init>
+	//		for
+	//		{
+	//			if !<expression:cond> do break;
+	//			<statement:block>;
+	//			<statement:post>;
+	//		}
+	//	}
+	push_block(lower);
+	if (statement->init && !(init = lower_node(lower, statement->init))) {
 		goto L_error;
 	}
 
-	Node *body = lower_block_statement(lower, &statement->body->statement.block);
-	if (!body) {
-		return 0;
+	push_block(lower);
+	if (statement->cond && !(cond = lower_node(lower, statement->cond))) {
+		goto L_error;
 	}
 
-	Node *result = tree_new_for_statement(tree, init, cond, body, post);
-	if (result) {
-		return result;
-	}
+	// TODO(dweiler): Clean this up.
+	Uint64 n = array_size(lower->block->statements);
+	Node *body = lower_block_statement(lower, &statement->body->statement.block, false);
+	Node *not_cond = tree_new_unary_expression(tree, OPERATOR_NOT, cond);
+	Array(Node*) break_ = 0;
+	array_push(break_, tree_new_break_statement(tree));
+	Node *do_break = tree_new_block_statement(tree, 0, break_);
+	Node *cond_if = tree_new_if_statement(tree, 0, not_cond, do_break, 0);
+	array_insert(body->statement.block.statements, n, cond_if);
+	if (statement->post) post = lower_node(lower, statement->post);
+	array_push(body->statement.block.statements, post);
+	pop_block(lower);
+	Node *for_ = tree_new_for_statement(tree, 0, 0, body, 0);
+	pop_block(lower);
+
+	Array(Node*) statements = 0;
+	array_push(statements, init);
+	array_push(statements, for_);
+	Node *result = tree_new_block_statement(tree, 0, statements);
+
+	return result;
 
 L_error:
 	array_free(assign_rhs);
@@ -469,7 +559,7 @@ static Node *lower_expression_statement(Lower *lower, const ExpressionStatement 
 static Node *lower_statement(Lower *lower, const Statement *statement) {
 	switch (statement->kind) {
 	case STATEMENT_BLOCK:
-		return lower_block_statement(lower, &statement->block);
+		return lower_block_statement(lower, &statement->block, true);
 	case STATEMENT_DECLARATION:
 		return lower_declaration_statement(lower, &statement->declaration);
 	case STATEMENT_RETURN:
@@ -519,7 +609,10 @@ static Node *lower_call_expression(Lower *lower, const CallExpression *expressio
 			goto L_inner_error;
 		}
 
-		Node *statement = tree_new_declaration_statement(tree, infer(lower, value), names, values);
+		Node *type = infer(lower, value);
+		define(lower, name->identifier.contents, type);
+
+		Node *statement = tree_new_declaration_statement(tree, type, names, values);
 		if (!statement) {
 			goto L_inner_error;
 		}
@@ -546,10 +639,50 @@ L_error:
 	return 0;
 }
 
+static Node *lower_unary_expression(Lower *lower, const UnaryExpression *expression) {
+	Node *operand = lower_node(lower, expression->operand);
+	return operand ? tree_new_unary_expression(lower->tree, expression->operation, operand) : 0;
+}
+
+static Node *lower_binary_expression(Lower *lower, const BinaryExpression *expression) {
+	Node *lhs = lower_node(lower, expression->lhs);
+	Node *rhs = lower_node(lower, expression->rhs);
+
+	Array(Node*) *statements = &lower->block->statements;
+
+	Node *lhs_name = unique_identifier(lower);
+	Node *rhs_name = unique_identifier(lower);
+	Node *lhs_type = infer(lower, lhs);
+	Node *rhs_type = infer(lower, rhs);
+	define(lower, lhs_name->identifier.contents, lhs_type);
+	define(lower, rhs_name->identifier.contents, rhs_type);
+
+	Array(Node*) lhs_names = 0;
+	Array(Node*) rhs_names = 0;
+	array_push(lhs_names, lhs_name);
+	array_push(rhs_names, rhs_name);
+	Array(Node*) lhs_values = 0;
+	Array(Node*) rhs_values = 0;
+	array_push(lhs_values, lhs);
+	array_push(rhs_values, rhs);
+
+	Node *lhs_decl = tree_new_declaration_statement(lower->tree, lhs_type, lhs_names, lhs_values);
+	Node *rhs_decl = tree_new_declaration_statement(lower->tree, rhs_type, rhs_names, rhs_values);
+
+	array_push(*statements, lhs_decl);
+	array_push(*statements, rhs_decl);
+
+	return lhs && rhs ? tree_new_binary_expression(lower->tree, expression->operation, lhs_name, rhs_name) : 0;
+}
+
 static Node *lower_expression(Lower *lower, const Expression *expression) {
 	switch (expression->kind) {
 	case EXPRESSION_CALL:
 		return lower_call_expression(lower, &expression->call);
+	case EXPRESSION_UNARY:
+		return lower_unary_expression(lower, &expression->unary);
+	case EXPRESSION_BINARY:
+		return lower_binary_expression(lower, &expression->binary);
 	default:
 		return tree_clone_expression(lower->tree, expression);
 	}

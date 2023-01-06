@@ -35,6 +35,7 @@ typedef struct IfStatement IfStatement;
 typedef struct ReturnStatement ReturnStatement;
 typedef struct ForStatement ForStatement;
 typedef struct DeferStatement DeferStatement;
+typedef struct BreakStatement BreakStatement;
 
 typedef struct Type Type;
 typedef struct SliceType SliceType;
@@ -92,6 +93,7 @@ enum StatementKind {
 	STATEMENT_RETURN,
 	STATEMENT_FOR,
 	STATEMENT_DEFER,
+	STATEMENT_BREAK,
 };
 
 enum TypeKind {
@@ -215,6 +217,10 @@ struct DeferStatement {
 	Node *statement;
 };
 
+struct BreakStatement {
+	Uint32 : 32;
+};
+
 struct Statement {
 	StatementKind kind;
 	union {
@@ -228,6 +234,7 @@ struct Statement {
 		ReturnStatement      return_;
 		ForStatement         for_;
 		DeferStatement       defer;
+		BreakStatement       break_;
 	};
 };
 
@@ -405,6 +412,7 @@ Node *tree_new_if_statement(Tree *tree, Node *init, Node *condition, Node *body,
 Node *tree_new_for_statement(Tree *tree, Node *init, Node *cond, Node *body, Node *post);
 Node *tree_new_return_statement(Tree *tree, Array(Node*) results);
 Node *tree_new_defer_statement(Tree *tree, Node *statement);
+Node *tree_new_break_statement(Tree *tree);
 
 Node *tree_new_procedure_type(Tree *tree, Node *params, Node* results, Uint64 flags, CallingConvention convention);
 Node *tree_new_slice_type(Tree *tree, Node *type);

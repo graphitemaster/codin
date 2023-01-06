@@ -202,6 +202,10 @@ Node *tree_new_return_statement(Tree *tree, Array(Node*) results) {
 	return node;
 }
 
+Node *tree_new_break_statement(Tree *tree) {
+	return new_statement(tree, STATEMENT_BREAK);
+}
+
 Node *tree_new_defer_statement(Tree *tree, Node *stmt) {
 	Node *node = new_statement(tree, STATEMENT_DEFER);
 	DeferStatement *statement = &node->statement.defer;
