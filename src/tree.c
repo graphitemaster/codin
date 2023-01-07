@@ -5,13 +5,6 @@
 #include "tree.h"
 #include "context.h"
 
-static String new_string(Tree *tree, String string) {
-	Context *context = tree->context;
-	String copy = string_copy(string);
-	array_push(tree->strings, copy);
-	return copy;
-}
-
 static Node *new_node(Tree *tree, NodeKind kind) {
 	Context *context = tree->context;
 	Allocator *allocator = context->allocator;
@@ -129,10 +122,11 @@ Node *tree_new_empty_statement(Tree *tree) {
 }
 
 Node *tree_new_import_statement(Tree *tree, String name, String package) {
+	Context *context = tree->context;
 	Node *node = new_statement(tree, STATEMENT_IMPORT);
 	ImportStatement *statement = &node->statement.import;
-	statement->name = new_string(tree, name);
-	statement->package = new_string(tree, package);
+	statement->name = string_copy(name);
+	statement->package = string_copy(package);
 	return node;
 }
 
@@ -161,9 +155,10 @@ Node *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, Array
 }
 
 Node *tree_new_identifier(Tree *tree, String contents) {
+	Context *context = tree->context;
 	Node *node = new_node(tree, NODE_IDENTIFIER);
 	Identifier *identifier = &node->identifier;
-	identifier->contents = new_string(tree, contents);
+	identifier->contents = string_copy(contents);
 	return node;
 }
 
@@ -273,10 +268,11 @@ Node *tree_new_value(Tree *tree, Node *field, Node *val) {
 }
 
 Node *tree_new_literal_value(Tree *tree, LiteralKind literal, String value) {
+	Context *context = tree->context;
 	Node *node = new_node(tree, NODE_LITERAL_VALUE);
 	LiteralValue *literal_value = &node->literal_value;
 	literal_value->literal = literal;
-	literal_value->value = new_string(tree, value);
+	literal_value->value = string_copy(value);
 	return node;
 }
 
@@ -330,7 +326,6 @@ void tree_init(Tree *tree, Context *context) {
 	tree->package = STRING_NIL;
 	tree->nodes = 0;
 	tree->statements = 0;
-	tree->strings = 0;
 }
 
 void tree_dump_node(const Node *node, Sint32 depth);

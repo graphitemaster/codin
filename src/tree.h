@@ -393,7 +393,6 @@ struct Tree {
 	String package;
 	Array(Node*) nodes;
 	Array(Node*) statements;
-	Array(String) strings;
 };
 
 Node *tree_new_unary_expression(Tree *tree, OperatorKind operation, Node *operand);
