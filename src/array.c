@@ -1,21 +1,23 @@
 #include <stdlib.h>
 
 #include "array.h"
+#include "context.h"
 
-Bool array_grow(void **const array, Uint64 elements, Uint64 type_size) {
-	Uint64 count = 0;
+Bool array_grow(Context *context, void **const array, Size elements, Size type_size) {
+	Allocator *allocator = context->allocator;
+	Size count = 0;
 	void *data = 0;
 	if (*array) {
 		Array *const meta = array_meta(*array);
 		count = 2 * meta->capacity + elements;
-		data = realloc(meta, type_size * count + sizeof *meta);
+		data = allocator->reallocate(allocator, meta, type_size * count + sizeof *meta);
 		if (!data) {
-			free(meta);
+			allocator->deallocate(allocator, meta);
 			return false;
 		}
 	} else {
 		count = elements + 1;
-		data = malloc(type_size * count + sizeof(Array));
+		data = allocator->allocate(allocator, type_size * count + sizeof(Array));
 		if (!data) {
 			return false;
 		}
@@ -27,6 +29,7 @@ Bool array_grow(void **const array, Uint64 elements, Uint64 type_size) {
 	return true;
 }
 
-void array_delete(void *const array) {
-	free(array_meta(array));
+void array_delete(Context *context, void *const array) {
+	Allocator *allocator = context->allocator;
+	allocator->deallocate(allocator, array_meta(array));
 }

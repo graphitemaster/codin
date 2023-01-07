@@ -39,7 +39,12 @@ typedef uint32_t Uint32;
 typedef int64_t Sint64;
 typedef uint64_t Uint64;
 
+typedef Uint16 Float16;
+typedef float Float32;
+typedef double Float64;
+
 typedef bool Bool;
+typedef size_t Size;
 
 typedef int32_t Rune; // Unicode codepoint.
 

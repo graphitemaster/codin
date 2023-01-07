@@ -8,6 +8,7 @@
 #include "parser.h"
 #include "threadpool.h"
 #include "lower.h"
+#include "context.h"
 
 typedef struct Command Command;
 
@@ -50,21 +51,20 @@ static int usage(const char *app) {
 	return 1;
 }
 
-static Bool generate(const Tree *tree, StrBuf *strbuf) {
+static Bool generate(Context *context, const Tree *tree, StrBuf *strbuf) {
 	Generator gen;
-	if (!gen_init(&gen, tree)) {
+	if (!gen_init(&gen, context, tree)) {
 		return false;
 	}
-	strbuf_init(strbuf);
+	strbuf_init(strbuf, context);
 	if (gen_run(&gen, strbuf, true)) {
 		return true;
 	}
-	strbuf_free(strbuf);
 	return false;
 }
 
-static Bool transpile(String path) {
-	Tree *tree = parse(path);
+static Bool transpile(String path, Context *context) {
+	Tree *tree = parse(path, context);
 	if (!tree) {
 		return false;
 	}
@@ -72,21 +72,14 @@ static Bool transpile(String path) {
 	Tree *lowered = lower(tree);
 	if (!lowered) {
 		fprintf(stderr, "Failed to lower\n");
-		tree_free(tree);
 		return false;
 	}
-
-	tree_free(tree);
-	tree = lowered;
 
 	StrBuf strbuf;
-	if (!generate(tree, &strbuf)) {
+	if (!generate(context, lowered, &strbuf)) {
 		fprintf(stderr, "Failed to generate C0\n");
-		tree_free(tree);
 		return false;
 	}
-
-	tree_free(tree);
 
 	Uint64 slash = 0;
 	if (!string_find_last_byte(path, '/', &slash)) {
@@ -101,7 +94,7 @@ static Bool transpile(String path) {
 	
 	const String name = string_slice(path, slash + 1, dot);
 	StrBuf file;
-	strbuf_init(&file);
+	strbuf_init(&file, context);
 	strbuf_put_formatted(&file, ".build/%.*s.c", SFMT(name));
 	strbuf_put_rune(&file, '\0');
 
@@ -112,39 +105,42 @@ static Bool transpile(String path) {
 	FILE *fp = fopen(CAST(const char *, filename.contents), "wb");
 	if (!fp) {
 		fprintf(stderr, "Failed to write C0\n");
-		strbuf_free(&file);
-		strbuf_free(&strbuf);
 		return false;
 	}
-	strbuf_free(&file);
 
 	const String source = strbuf_result(&strbuf);
 	fwrite(source.contents, source.length, 1, fp);
 	fclose(fp);
-	strbuf_free(&strbuf);
 
 	return true;
 }
 
+typedef struct Worker Worker;
+
+struct Worker {
+	String path;
+	Context *context;
+};
+
 static void transpile_worker(void *user) {
-	const String *path = CAST(const String *, user);
-	transpile(*path);
-	string_free(*path);
+	Worker *worker = CAST(Worker*, user);
+	Context *context = worker->context;
+	transpile(worker->path, context);
 }
 
-static Bool build(const char *app, String path, Uint64 n_threads, Bool is_file) {
+static Bool build(const char *app, Context *context, String path, Size n_threads, Bool is_file) {
 	StrBuf strbuf;
-	strbuf_init(&strbuf);
+	strbuf_init(&strbuf, context);
 
 	if (is_file) {
 		// Transpile a single file.
-		if (!transpile(path)) {
+		if (!transpile(path, context)) {
 			return false;
 		}
 	} else {
 		// Transpile many files.
 		Array(String) files = path_list(path);
-		const Uint64 n_files = array_size(files);
+		const Size n_files = array_size(files);
 		if (n_files == 0) {
 			fprintf(stderr, "ERROR: `%s build` takes a package as its first argument.\n", app);
 			fprintf(stderr, "Did you mean `%s build %.*s -file`?\n", app, SFMT(path));
@@ -152,23 +148,18 @@ static Bool build(const char *app, String path, Uint64 n_threads, Bool is_file) 
 			return false;
 		}
 		ThreadPool pool;
-		threadpool_init(&pool, n_threads);
-		for (Uint64 i = 0; i < n_files; i++) {
+		threadpool_init(&pool, n_threads, context);
+		for (Size i = 0; i < n_files; i++) {
 			const String name = files[i];
 			if (string_ends_with(name, SCLIT(".odin"))) {
 				strbuf_put_formatted(&strbuf, "%.*s/%.*s", SFMT(path), SFMT(name));
-				String *result = malloc(sizeof *result);
-				*result = string_copy(strbuf_result(&strbuf));
+				Worker *worker = malloc(sizeof *worker);
+				worker->path = string_copy(strbuf_result(&strbuf));
+				worker->context = context;
 				strbuf_clear(&strbuf);
-				threadpool_queue(&pool, transpile_worker, result, free);
+				threadpool_queue(&pool, transpile_worker, worker, free);
 			}
 		}
-		threadpool_free(&pool);
-
-		for (Uint64 i = 0; i < n_files; i++) {
-			string_free(files[i]);
-		}
-		array_free(files);
 	}
 
 	// Generate one of the following commands to build the C0.
@@ -187,15 +178,14 @@ static Bool build(const char *app, String path, Uint64 n_threads, Bool is_file) 
 	// Compile it.
 	const String compile = strbuf_result(&strbuf);
 	const Bool status = system(CAST(const char *, compile.contents)) == 0;
-	strbuf_free(&strbuf);
 
 	return status;
 }
 
-static Bool run(String path) {
+static Bool run(String path, Context *context) {
 	String project = project_name(path);
 	StrBuf strbuf;
-	strbuf_init(&strbuf);
+	strbuf_init(&strbuf, context);
 #if defined(OS_WINDOWS)
 	strbuf_put_formatted(&strbuf, ",\\%.*s.exe", SFMT(project));
 #elif defined(OS_LINUX)
@@ -203,57 +193,46 @@ static Bool run(String path) {
 #endif
 	strbuf_put_rune(&strbuf, '\0');
 	const Bool result = system(CAST(const char *, strbuf.contents)) == 0;
-	strbuf_free(&strbuf);
 	return result;
 }
 
-static Bool dump_ast(String file) {
-	Tree *tree = parse(file);
+static Bool dump_ast(Context *context, String file) {
+	Tree *tree = parse(file, context);
 	if (!tree) {
 		return false;
 	}
 
 	Tree *lowered = lower(tree);
 	if (!lowered) {
-		tree_free(tree);
 		return false;
 	}
 
-	tree_free(tree);
 	tree_dump(lowered);
-	tree_free(lowered);
+
 	return true;
 }
 
-static Bool dump_c(String file) {
-	Tree *tree = parse(file);
+static Bool dump_c(Context *context, String file) {
+	Tree *tree = parse(file, context);
 	if (!tree) {
-		goto L_error;
+		return 0;
 	}
 
 	Tree *lowered = lower(tree);
 	if (!lowered) {
-		goto L_error;
+		return 0;
 	}
 
-	tree_free(tree);
-	tree = lowered;
-
 	StrBuf strbuf;
-	if (!generate(tree, &strbuf)) {
-		goto L_error;
+	if (!generate(context, lowered, &strbuf)) {
+		return 0;
 	}
 
 	const Uint64 size = array_size(strbuf.contents);
 	fwrite(strbuf.contents, size, 1, stdout);
 	fflush(stdout);
-	strbuf_free(&strbuf);
-	tree_free(tree);
-	return true;
 
-L_error:
-	tree_free(tree);
-	return false;
+	return true;
 }
 
 int main(int argc, char **argv) {
@@ -266,17 +245,32 @@ int main(int argc, char **argv) {
 		return usage(app);
 	}
 
-	const Bool file = argc >= 3 && !strcmp(argv[2], "-file");
+	Allocator *allocator = &DEFAULT_ALLOCATOR;
 
-	if (!strcmp(argv[0], "build")) {
-		return build(app, string_from_null(argv[1]), 8, file) ? 0 : 1;
-	} else if (!strcmp(argv[0], "run")) {
-		return (build(app, string_from_null(argv[1]), 8, file) && run(string_from_null(argv[1]))) ? 0 : 1;
-	} else if (!strcmp(argv[0], "dump-ast")) {
-		return dump_ast(string_from_null(argv[1])) ? 0 : 1;
-	} else if (!strcmp(argv[0], "dump-c")) {
-		return dump_c(string_from_null(argv[1])) ? 0 : 1;
+	Context context;
+	context.allocator = allocator;
+
+	if (setjmp(context.jmp) != 0) {
+		allocator->finalize(allocator);
+		return 1;
 	}
 
-	return usage(app);
+	const Bool file = argc >= 3 && !strcmp(argv[2], "-file");
+
+	Bool result = false;
+	if (!strcmp(argv[0], "build")) {
+		result = build(app, &context, string_from_null(argv[1]), 8, file);
+	} else if (!strcmp(argv[0], "run")) {
+		result = (build(app, &context, string_from_null(argv[1]), 8, file) && run(string_from_null(argv[1]), &context));
+	} else if (!strcmp(argv[0], "dump-ast")) {
+		result = dump_ast(&context, string_from_null(argv[1]));
+	} else if (!strcmp(argv[0], "dump-c")) {
+		result = dump_c(&context, string_from_null(argv[1]));
+	} else {
+		return usage(app);
+	}
+
+	allocator->finalize(allocator);
+
+	return result ? 1 : 0;
 }

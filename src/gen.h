@@ -3,6 +3,7 @@
 #include "strbuf.h"
 #include "tree.h"
 
+typedef struct Context Context;
 typedef struct Generator Generator;
 
 typedef enum IntInstruction IntInstruction;
@@ -49,6 +50,8 @@ _Static_assert(INSTR_BIT_COUNT <= 64, "Too many instructions");
 
 struct Generator {
 	const Tree *tree;
+	Context *context;
+
 	Uint64 load_directive_id;
 
 	// Bits indicating which instructions are used.
@@ -59,7 +62,7 @@ struct Generator {
 	Uint64 used_bit;
 };
 
-Bool gen_init(Generator *generator, const Tree *tree);
+Bool gen_init(Generator *generator, Context *context, const Tree *tree);
 Bool gen_run(Generator *generator, StrBuf *strbuf, Bool generate_main);
 
 #endif // CODIN_GEN_H

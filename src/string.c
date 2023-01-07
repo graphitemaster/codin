@@ -2,6 +2,7 @@
 #include <stdlib.h> // malloc, free
 
 #include "string.h"
+#include "context.h"
 
 static void *our_memrrchr(const void *m, int c, size_t n) {
 	const unsigned char *s = m;
@@ -12,11 +13,12 @@ static void *our_memrrchr(const void *m, int c, size_t n) {
 
 const String STRING_NIL = { 0, 0 };
 
-String string_copy_from_data(const Uint8 *data, Uint64 length) {
+String _string_copy_from_data(const Uint8 *data, Uint64 length, Context *context) {
 	if (length == 0) {
 		return STRING_NIL;
 	}
-	Uint8 *storage = malloc(length);
+	Allocator *allocator = context->allocator;
+	Uint8 *storage = allocator->allocate(allocator, length);
 	if (!storage) {
 		return STRING_NIL;
 	}
@@ -24,20 +26,20 @@ String string_copy_from_data(const Uint8 *data, Uint64 length) {
 	return (String) { storage, length };
 }
 
-String string_copy_from_null(const char *string) {
+String _string_copy_from_null(const char *string, Context *context) {
 	if (string == 0) {
 		return STRING_NIL;
 	}
 	const Uint64 length = strlen(string);
-	return string_copy_from_data(CAST(const Uint8 *, string), length);
+	return _string_copy_from_data(CAST(const Uint8 *, string), length, context);
 }
 
 String string_from_null(const char *string) {
 	return (String) { CAST(Uint8*, string), strlen(string) };
 }
 
-String string_copy(String string) {
-	return string_copy_from_data(string.contents, string.length);
+String _string_copy(String string, Context *context) {
+	return _string_copy_from_data(string.contents, string.length, context);
 }
 
 Bool string_compare(String lhs, String rhs) {
@@ -56,19 +58,21 @@ String string_unquote(String string, const char *quote_set) {
 	return string;
 }
 
-void string_free(String string) {
-	free(string.contents);
+void _string_free(String string, Context *context) {
+	Allocator *allocator = context->allocator;
+	allocator->deallocate(allocator, string.contents);
 }
 
-char* string_to_null(String string) {
+char* _string_to_null(String string, Context *context) {
+	Allocator *allocator = context->allocator;
 	const Uint64 length = string.length;
-	char *result = malloc(length + 1);
-	if (result) {
-		memcpy(result, string.contents, length);
-		result[length] = '\0';
-		return result;
+	char *result = allocator->allocate(allocator, length + 1);
+	if (!result) {
+		return 0;
 	}
-	return 0;
+	memcpy(result, string.contents, length);
+	result[length] = '\0';
+	return result;
 }
 
 Bool string_starts_with(String string, String prefix) {
@@ -139,11 +143,12 @@ static void utf8_to_utf16_core(const char *const source, Uint16 *destination, Ui
 	}
 }
 
-Bool utf8_to_utf16(const char *source, Uint16 **const destination) {
+Bool _utf8_to_utf16(const char *source, Uint16 **const destination, Context *context) {
 	Uint64 length = 0;
 	utf8_to_utf16_core(source, 0, &length);
 
-	Uint16 *dest = malloc((length + 1) * sizeof(Uint16));
+	Allocator *allocator = context->allocator;
+	Uint16 *dest = allocator->allocate(allocator, (length + 1) * sizeof(Uint16));
 	if (!dest) {
 		return false;
 	}

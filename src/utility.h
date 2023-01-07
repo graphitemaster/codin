@@ -3,11 +3,12 @@
 #include "array.h"
 #include "string.h"
 
-typedef Uint16 Float16;
-typedef float Float32;
-typedef double Float64;
+typedef struct Context Context;
 
-Array(Uint8) readfile(String filename);
+Array(Uint8) _readfile(String filename, Context *context);
+
+#define readfile(filename) \
+	_readfile((filename), context)
 
 Float16 f32_to_f16(Float32 x);
 

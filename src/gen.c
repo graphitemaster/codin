@@ -7,6 +7,7 @@
 #include "tree.h"
 #include "utility.h"
 #include "string.h"
+#include "context.h"
 
 static Bool gen_value(Generator *generator, const Node *type, const Node *node, StrBuf *strbuf);
 static Bool gen_node(Generator *generator, const Node *node, StrBuf *strbuf, Sint32 depth);
@@ -118,8 +119,8 @@ static Bool gen_call_expression(Generator *generator, const CallExpression *expr
 	}
 
 	strbuf_put_rune(strbuf, '(');
-	const Uint64 n_arguments = array_size(expression->arguments);
-	for (Uint64 i = 0; i < n_arguments; i++) {
+	const Size n_arguments = array_size(expression->arguments);
+	for (Size i = 0; i < n_arguments; i++) {
 		const Node *node = expression->arguments[i];
 		if (!gen_node(generator, node, strbuf, 0)) {
 			return false;
@@ -353,10 +354,10 @@ static Bool gen_assignment_statement(Generator *generator, const AssignmentState
 
 static Bool gen_declaration_statement(Generator *generator, const DeclarationStatement *statement, StrBuf *strbuf, Bool prototype, Sint32 depth) {
 	gen_padding(depth, strbuf);
-	const Uint64 n_decls = array_size(statement->names);
+	const Size n_decls = array_size(statement->names);
 	const Node *type = statement->type;
 
-	for (Uint64 i = 0; i < n_decls; i++) {
+	for (Size i = 0; i < n_decls; i++) {
 		const Node *name = statement->names[i];
 		if (prototype) {
 			strbuf_put_string(strbuf, SCLIT("extern "));
@@ -409,11 +410,11 @@ static Bool gen_declaration_statement(Generator *generator, const DeclarationSta
 				ASSERT(node_is_type(node, TYPE_PROCEDURE));
 				const Node *params = node->type.procedure.params;
 				ASSERT(params->kind == NODE_FIELD_LIST);
-				const Uint64 n_params = array_size(params->field_list.fields);
+				const Size n_params = array_size(params->field_list.fields);
 				if (n_params == 0) {
 					strbuf_put_string(strbuf, SCLIT("void"));
 				}
-				for (Uint64 i = 0; i < n_params; i++) {
+				for (Size i = 0; i < n_params; i++) {
 					const Node *node = params->field_list.fields[i];
 					ASSERT(node);
 					const Field *field = &node->field;
@@ -458,8 +459,8 @@ static Bool gen_block_statement(Generator *generator, const BlockStatement *stat
 	gen_padding(depth, strbuf);
 	strbuf_put_rune(strbuf, '{');
 	strbuf_put_rune(strbuf, '\n');
-	const Uint64 n_statements = array_size(statement->statements);
-	for (Uint64 i = 0; i < n_statements; i++) {
+	const Size n_statements = array_size(statement->statements);
+	for (Size i = 0; i < n_statements; i++) {
 		const Node *node = statement->statements[i];
 		ASSERT(node->kind == NODE_STATEMENT);
 		if (!gen_statement(generator, &node->statement, strbuf, depth + 1)) {
@@ -508,6 +509,7 @@ static Bool gen_statement(Generator *generator, const Statement *statement, StrB
 }
 
 static Bool gen_literal_value(Generator *generator, const Node *type, const LiteralValue *literal, StrBuf *strbuf) {
+	Context *context = generator->context;
 	(void)generator;
 	switch (literal->literal) {
 	case LITERAL_INTEGER:
@@ -519,7 +521,7 @@ static Bool gen_literal_value(Generator *generator, const Node *type, const Lite
 				char *copy = string_to_null(literal->value);
 				char *end;
 				const Float32 value = strtof(copy, &end);
-				free(copy);
+				context->allocator->deallocate(context->allocator, copy);
 				const Uint16 pattern = f32_to_f16(value);
 				return strbuf_put_formatted(strbuf, "0x%04x /* %f */", pattern, value);
 			}
@@ -545,8 +547,8 @@ static Bool gen_directive(Generator *generator, const Directive *directive, StrB
 		{
 			// Find the call expression matching the load directive
 			const Tree *tree = generator->tree;
-			const Uint64 n_nodes = array_size(tree->nodes);
-			for (Uint64 j = 0; j < n_nodes; j++) {
+			const Size n_nodes = array_size(tree->nodes);
+			for (Size j = 0; j < n_nodes; j++) {
 				const Node *find = tree->nodes[j];
 				if (find->kind != NODE_EXPRESSION) {
 					continue;
@@ -619,8 +621,8 @@ static Bool gen_node(Generator *generator, const Node *node, StrBuf *strbuf, Sin
 	case NODE_FIELD_LIST:
 		{
 			const FieldList *field_list = &node->field_list;
-			const Uint64 n_fields = array_size(field_list->fields);
-			for (Uint64 i = 0; i < n_fields; i++) {
+			const Size n_fields = array_size(field_list->fields);
+			for (Size i = 0; i < n_fields; i++) {
 				gen_node(generator, field_list->fields[i], strbuf, depth);
 			}
 			return true;
@@ -782,7 +784,7 @@ static Bool gen_c0_bit(BitInstruction instr, StrBuf *strbuf) {
 }
 
 static Bool gen_c0_int_prelude(Uint64 used, StrBuf *strbuf) {
-	for (Uint64 i = 0; i < INSTR_INT_COUNT; i++) {
+	for (Size i = 0; i < INSTR_INT_COUNT; i++) {
 		if (used & (CAST(Uint64, 1) << i)) {
 			if (!gen_c0_int(CAST(IntInstruction, i), strbuf)) {
 				return false;
@@ -793,7 +795,7 @@ static Bool gen_c0_int_prelude(Uint64 used, StrBuf *strbuf) {
 }
 
 static Bool gen_c0_flt_prelude(Uint64 used, StrBuf *strbuf) {
-	for (Uint64 i = 0; i < INSTR_FLT_COUNT; i++) {
+	for (Size i = 0; i < INSTR_FLT_COUNT; i++) {
 		if (used & (CAST(Uint64, 1) << i)) {
 			if (!gen_c0_flt(CAST(FltInstruction, i), strbuf)) {
 				return false;
@@ -804,7 +806,7 @@ static Bool gen_c0_flt_prelude(Uint64 used, StrBuf *strbuf) {
 }
 
 static Bool gen_c0_cmp_prelude(Uint64 used, StrBuf *strbuf) {
-	for (Uint64 i = 0; i < INSTR_CMP_COUNT; i++) {
+	for (Size i = 0; i < INSTR_CMP_COUNT; i++) {
 		if (used & (CAST(Uint64, 1) << i)) {
 			if (!gen_c0_cmp(CAST(CmpInstruction, i), strbuf)) {
 				return false;
@@ -815,7 +817,7 @@ static Bool gen_c0_cmp_prelude(Uint64 used, StrBuf *strbuf) {
 }
 
 static Bool gen_c0_rel_prelude(Uint64 used, StrBuf *strbuf) {
-	for (Uint64 i = 0; i < INSTR_REL_COUNT; i++) {
+	for (Size i = 0; i < INSTR_REL_COUNT; i++) {
 		if (used & (CAST(Uint64, 1) << i)) {
 			if (!gen_c0_rel(CAST(RelInstruction, i), strbuf)) {
 				return false;
@@ -826,7 +828,7 @@ static Bool gen_c0_rel_prelude(Uint64 used, StrBuf *strbuf) {
 }
 
 static Bool gen_c0_bit_prelude(Uint64 used, StrBuf *strbuf) {
-	for (Uint64 i = 0; i < INSTR_BIT_COUNT; i++) {
+	for (Size i = 0; i < INSTR_BIT_COUNT; i++) {
 		if (used & (CAST(Uint64, 1) << i)) {
 			if (!gen_c0_bit(CAST(BitInstruction, i), strbuf)) {
 				return false;
@@ -842,7 +844,7 @@ static Bool uses_f16_instructions(Generator *generator) {
 	static const Uint8 FLT_INSTR_SIZES[] = {
 		#include "instructions.h"
 	};
-	for (Uint64 i = 0; i < INSTR_FLT_COUNT; i++) {
+	for (Size i = 0; i < INSTR_FLT_COUNT; i++) {
 		if (generator->used_flt & (CAST(Uint64, 1) << i)) {
 			if (FLT_INSTR_SIZES[i] == 16) {
 				return true;
@@ -894,8 +896,8 @@ static Bool gen_c0_f16_prelude(StrBuf *strbuf) {
 	// Write out the base table.
 	strbuf_put_string(strbuf, SCLIT("static const u32 CODIN_f16_base[] = {\n"));
 	gen_padding(1, strbuf);
-	for (Uint64 i = 0;; i++) {
-		const Uint64 word = base[i];
+	for (Size i = 0;; i++) {
+		const Uint32 word = base[i];
 		strbuf_put_formatted(strbuf, "0x%08x", word);
 		const Bool nl = (i + 1) % MAX_BASE_COLUMNS == 0;
 		const Bool lb = i == 512 - 1;
@@ -916,7 +918,7 @@ static Bool gen_c0_f16_prelude(StrBuf *strbuf) {
 	// Write out the shift table.
 	strbuf_put_string(strbuf, SCLIT("static const u8 CODIN_f16_shift[] = {\n"));
 	gen_padding(1, strbuf);
-	for (Uint64 i = 0;; i++) {
+	for (Size i = 0;; i++) {
 		const Uint8 byte = shift[i];
 		strbuf_put_formatted(strbuf, "0x%02x", byte);
 		const Bool nl = (i + 1) % MAX_SHIFT_COLUMNS == 0;
@@ -1000,7 +1002,7 @@ static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 	};
 
 	// Emit the typedefs for mapping Odin types to C ones.
-	for (Uint64 i = 0; i < sizeof(TYPES)/sizeof(*TYPES); i++) {
+	for (Size i = 0; i < sizeof(TYPES)/sizeof(*TYPES); i++) {
 		strbuf_put_formatted(strbuf, "typedef %s %s;\n",
 			TYPES[i].c, TYPES[i].odin);
 	}
@@ -1031,6 +1033,8 @@ static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 }
 
 static Bool gen_load_directive_prelude(Generator *generator, const CallExpression *call, StrBuf *strbuf) {
+	Context *context = generator->context;
+
 	// Should have at least one argument.
 	Array(Node*) args = call->arguments;
 	ASSERT(array_size(args) >= 1);
@@ -1076,8 +1080,8 @@ static Bool gen_load_directive_prelude(Generator *generator, const CallExpressio
 	// columns to 13 max.
 	enum { MAX_COLUMNS = 13 };
 	gen_padding(1, strbuf);
-	const Uint64 n_bytes = array_size(contents);
-	for (Uint64 i = 0;; i++) {
+	const Size n_bytes = array_size(contents);
+	for (Size i = 0;; i++) {
 		const Uint8 byte = contents[i];
 		strbuf_put_formatted(strbuf, "0x%02x", byte);
 		const Bool nl = (i + 1) % MAX_COLUMNS == 0;
@@ -1103,15 +1107,17 @@ static Bool gen_load_directive_prelude(Generator *generator, const CallExpressio
 }
 
 static Bool gen_load_directives_prelude(Generator *generator, StrBuf *strbuf) {
+	// Context *context = generator->context;
+
 	const Tree *tree = generator->tree;
-	const Uint64 n_nodes = array_size(tree->nodes);
-	for (Uint64 i = 0; i < n_nodes; i++) {
+	const Size n_nodes = array_size(tree->nodes);
+	for (Size i = 0; i < n_nodes; i++) {
 		const Node *node = tree->nodes[i];
 		if (node->kind != NODE_DIRECTIVE || node->directive.kind != DIRECTIVE_LOAD) {
 			continue;
 		}
 		// Search all nodes to find the call expression which references this load directive.
-		for (Uint64 j = 0; j < n_nodes; j++) {
+		for (Size j = 0; j < n_nodes; j++) {
 			const Node *find = tree->nodes[j];
 			if (find->kind != NODE_EXPRESSION) {
 				continue;
@@ -1130,9 +1136,11 @@ static Bool gen_load_directives_prelude(Generator *generator, StrBuf *strbuf) {
 }
 
 static Bool gen_import_prelude(Generator *generator, StrBuf *strbuf) {
+	// Context *context = generator->context;
+
 	const Tree *tree = generator->tree;
-	const Uint64 n_nodes = array_size(tree->nodes);
-	for (Uint64 i = 0; i < n_nodes; i++) {
+	const Size n_nodes = array_size(tree->nodes);
+	for (Size i = 0; i < n_nodes; i++) {
 		const Node *node = tree->nodes[i];
 		if (node->kind != NODE_STATEMENT || node->statement.kind != STATEMENT_IMPORT) {
 			continue;
@@ -1147,8 +1155,10 @@ static Bool gen_import_prelude(Generator *generator, StrBuf *strbuf) {
 	return true;
 }
 
-Bool gen_init(Generator *generator, const Tree *tree) {
+Bool gen_init(Generator *generator, Context *context, const Tree *tree) {
 	generator->tree = tree;
+	generator->context = context;
+
 	// TODO(dweiler): Only mark the ones we actually use.
 	generator->used_int = (CAST(Uint64, 1) << INSTR_INT_COUNT) - 1;
 	generator->used_flt = (CAST(Uint64, 1) << INSTR_FLT_COUNT) - 1;
@@ -1168,11 +1178,11 @@ Bool gen_run(Generator *generator, StrBuf *strbuf, Bool generate_main) {
 	}
 
 	const Tree *tree = generator->tree;
-	const Uint64 n_statements = array_size(tree->statements);
+	const Size n_statements = array_size(tree->statements);
 
 	// Odin allows use before declaration, C does not. Emit declarations before
 	// everything else.
-	for (Uint64 i = 0; i < n_statements; i++) {
+	for (Size i = 0; i < n_statements; i++) {
 		const Node *node = tree->statements[i];
 		const Statement *statement = &node->statement;
 		if (statement->kind != STATEMENT_DECLARATION) {
@@ -1186,16 +1196,16 @@ Bool gen_run(Generator *generator, StrBuf *strbuf, Bool generate_main) {
 
 	// Check for a main procedure.
 	const Procedure *main = 0;
-	for (Uint64 i = 0; i < n_statements; i++) {
+	for (Size i = 0; i < n_statements; i++) {
 		const Node *node = tree->statements[i];
 		const Statement *statement = &node->statement;
 		if (statement->kind != STATEMENT_DECLARATION) {
 			continue;
 		}
 		const DeclarationStatement *declaration = &statement->declaration;
-		const Uint64 n_names = array_size(declaration->names);
-		const Uint64 n_values = array_size(declaration->values);
-		for (Uint64 i = 0; i < n_names; i++) {
+		const Size n_names = array_size(declaration->names);
+		const Size n_values = array_size(declaration->values);
+		for (Size i = 0; i < n_names; i++) {
 			const Node *name = declaration->names[i];
 			const Node *value = i < n_values ? declaration->values[i] : 0;
 			if (value && value->kind == NODE_PROCEDURE && string_compare(name->identifier.contents, SCLIT("main"))) {
@@ -1205,7 +1215,7 @@ Bool gen_run(Generator *generator, StrBuf *strbuf, Bool generate_main) {
 		}
 	}
 
-	for (Uint64 i = 0; i < n_statements; i++) {
+	for (Size i = 0; i < n_statements; i++) {
 		const Node *statement = tree->statements[i];
 		ASSERT(statement->kind == NODE_STATEMENT);
 		if (!gen_node(generator, tree->statements[i], strbuf, 0)) {

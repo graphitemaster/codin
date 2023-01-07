@@ -11,6 +11,7 @@
 
 #include <stdio.h> //
 #include "path.h"
+#include "context.h"
 
 Bool path_mkdir(const char *pathname) {
 #if defined(OS_WINDOWS)
@@ -29,14 +30,14 @@ Bool path_mkdir(const char *pathname) {
 #endif
 }
 
-Array(String) path_list(String path) {
+Array(String) _path_list(String path, Context *context) {
 	Array(String) results = 0;
 #if defined(OS_WINDOWS)
 	// TODO(dweiler): Implement.
 #elif defined(OS_LINUX)
 	char *name = string_to_null(path);
 	DIR *dp = opendir(name);
-	free(name);
+	context->allocator->deallocate(context->allocator, name);
 	if (!dp) {
 		return 0;
 	}

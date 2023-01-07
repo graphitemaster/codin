@@ -4,6 +4,7 @@
 #include "lower.h"
 #include "tree.h"
 #include "strbuf.h"
+#include "context.h"
 
 // Lowers the AST into a simpler AST.
 //
@@ -37,12 +38,14 @@ struct Block {
 
 struct Lower {
 	Tree *tree;
+	Context *context;
 	Block *block;
 	Sint32 unique_id;
 	Array(Symbol) symbols;
 };
 
 static Bool define(Lower *lower, String name, Node *type) {
+	Context *context = lower->context;
 	Block *block = lower->block;
 	Array(Symbol) *symbols = block ? &block->symbols : &lower->symbols;
 	return array_push(*symbols, ((Symbol) { name, type }));
@@ -51,8 +54,8 @@ static Bool define(Lower *lower, String name, Node *type) {
 static const Symbol *symbol(const Lower *lower, String name) {
 	for (Block *block = lower->block; block; block = block->prev) {
 		const Array(Symbol) symbols = block->symbols;
-		const Uint64 n_symbols = array_size(symbols);
-		for (Uint64 i = 0; i < n_symbols; i++) {
+		const Size n_symbols = array_size(symbols);
+		for (Size i = 0; i < n_symbols; i++) {
 			const Symbol *sym = &symbols[i];
 			if (string_compare(sym->name, name)) {
 				return sym;
@@ -61,8 +64,8 @@ static const Symbol *symbol(const Lower *lower, String name) {
 	}
 
 	const Array(Symbol) symbols = lower->symbols;
-	const Uint64 n_symbols = array_size(symbols);
-	for (Uint64 i = 0; i < n_symbols; i++) {
+	const Size n_symbols = array_size(symbols);
+	for (Size i = 0; i < n_symbols; i++) {
 		const Symbol *sym = &symbols[i];
 		if (string_compare(sym->name, name)) {
 			return sym;
@@ -152,13 +155,11 @@ static Node *infer(const Lower *lower, Node *node) {
 
 static Node *unique_identifier(Lower *lower) {
 	StrBuf strbuf;
-	strbuf_init(&strbuf);
+	strbuf_init(&strbuf, lower->context);
 	if (!strbuf_put_formatted(&strbuf, "_CODIN_%d", lower->unique_id)) {
-		strbuf_free(&strbuf);
 		return 0;
 	}
 	Node *node = tree_new_identifier(lower->tree, strbuf_result(&strbuf));
-	strbuf_free(&strbuf);
 	lower->unique_id++;
 	return node;
 }
@@ -168,7 +169,9 @@ static Node *lower_block_statement(Lower *lower, const BlockStatement *block_sta
 static Node *lower_node(Lower *lower, const Node *node);
 
 static Bool push_block(Lower *lower) {
-	Block *block = malloc(sizeof *block);
+	Context *context = lower->context;
+	Allocator *allocator = context->allocator;
+	Block *block = allocator->allocate(allocator, sizeof *block);
 	if (!block) {
 		return false;
 	}
@@ -184,11 +187,13 @@ static Bool push_block(Lower *lower) {
 }
 
 static void pop_block(Lower *lower) {
+	Context *context = lower->context;
+	Allocator *allocator = context->allocator;
 	Block *block = lower->block;
 	lower->block = block->prev;
 	array_free(block->symbols);
 	array_free(block->defers);
-	free(block);
+	allocator->deallocate(allocator, block);
 }
 
 static Node *lower_procedure(Lower *lower, const Procedure *procedure) {
@@ -205,8 +210,8 @@ static Node *lower_procedure(Lower *lower, const Procedure *procedure) {
 	// Define the local variables of the procedure after we lower block to enter
 	// that block scope.
 	const FieldList *arguments = &type->type.procedure.params->field_list;
-	const Uint64 n_arguments = array_size(arguments->fields);
-	for (Uint64 i = 0; i < n_arguments; i++) {
+	const Size n_arguments = array_size(arguments->fields);
+	for (Size i = 0; i < n_arguments; i++) {
 		const Field *field = &arguments->fields[i]->field;
 		define(lower, field->name->identifier.contents, infer(lower, field->type));
 	}
@@ -219,23 +224,25 @@ static Node *lower_procedure(Lower *lower, const Procedure *procedure) {
 }
 
 static Node *lower_block_statement(Lower *lower, const BlockStatement *block_statement, Bool new_block) {
+	Context *context = lower->context;
+
 	if (new_block && !push_block(lower)) {
 		return 0;
 	}
 
 	Block *block = lower->block;
 
-	const Uint64 n_statements = array_size(block_statement->statements);
-	for (Uint64 i = 0; i < n_statements; i++) {
+	const Size n_statements = array_size(block_statement->statements);
+	for (Size i = 0; i < n_statements; i++) {
 		const Node *statement = block_statement->statements[i];
 		if (node_is_statement(statement, STATEMENT_DEFER)) {
 			if (!array_push(block->defers, statement)) {
-				goto L_error;
+				return 0;
 			}
 		} else {
 			Node *node = lower_statement(lower, &statement->statement);
 			if (!node || !array_push(block->statements, node)) {
-				goto L_error;
+				return 0;
 			}
 		}
 	}
@@ -243,26 +250,21 @@ static Node *lower_block_statement(Lower *lower, const BlockStatement *block_sta
 	// Expand defers in reverse order at the end of the block.
 	if (n_statements && !node_is_statement(array_last(block_statement->statements), STATEMENT_RETURN)) {
 		Array(const Node*) defers = block->defers;
-		const Uint64 n_defers = array_size(defers);
-		for (Uint64 i = n_defers - 1; i < n_defers; i--) {
+		const Size n_defers = array_size(defers);
+		for (Size i = n_defers - 1; i < n_defers; i--) {
 			Node *node = lower_node(lower, defers[i]->statement.defer.statement);
 			if (!node || !array_push(block->statements, node)) {
-				goto L_error;
+				return 0;
 			}
 		}
 	}
 
 	Node *result = tree_new_block_statement(lower->tree, block_statement->flags, block->statements);
-	if (result) {
-		if (new_block) {
-			pop_block(lower);
-		}
-		return result;
+	if (!result) {
+		return 0;
 	}
 
-L_error:
 	if (new_block) {
-		array_free(block->statements);
 		pop_block(lower);
 	}
 
@@ -270,6 +272,8 @@ L_error:
 }
 
 static Node *lower_declaration_statement(Lower *lower, const DeclarationStatement *statement) {
+	Context *context = lower->context;
+
 	Tree *tree = lower->tree;
 
 	Node *type = 0;
@@ -279,77 +283,68 @@ static Node *lower_declaration_statement(Lower *lower, const DeclarationStatemen
 
 	Array(Node*) names = 0;
 	Array(Node*) values = 0;
-	const Uint64 n_names = array_size(statement->names);
-	const Uint64 n_values = array_size(statement->values);
+	const Size n_names = array_size(statement->names);
+	const Size n_values = array_size(statement->values);
 
 	if (!type && n_values == 1) {
 		type = infer(lower, statement->values[0]);
 	}
 
 	// Define early as possible.
-	for (Uint64 i = 0; i < n_names; i++) {
+	for (Size i = 0; i < n_names; i++) {
 		define(lower, statement->names[i]->identifier.contents, type);
 	}
 
-	for (Uint64 i = 0; i < n_names; i++) {
+	for (Size i = 0; i < n_names; i++) {
 		Node *name = tree_clone_node(tree, statement->names[i]);
 		if (!name || !array_push(names, name)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	for (Uint64 i = 0; i < n_values; i++) {
+	for (Size i = 0; i < n_values; i++) {
 		Node *value = lower_node(lower, statement->values[i]);
 		if (!value || !array_push(values, value)) {
-			goto L_error;
+			return 0;
 		}
 	}
 
 	// Ensure n_values == n_names by explicitly initializing with = {}.
-	for (Uint64 i = n_values; i < n_names; i++) {
+	for (Size i = n_values; i < n_names; i++) {
 		Node *value = tree_new_compound_literal(tree, 0, 0);
 		if (!value || !array_push(values, value)) {
-			goto L_error;
+			return 0;
 		}
 	}
 
-	Node *result = tree_new_declaration_statement(tree, type, names, values);
-	if (result) {
-		return result;
-	}
-
-L_error:
-	array_free(values);
-	array_free(names);
-
-	return 0;
+	return tree_new_declaration_statement(tree, type, names, values);
 }
 
 static Node *lower_return_statement(Lower *lower, const ReturnStatement *statement) {
+	Context *context = lower->context;
+
 	Array(Node*) statements = 0;
 	for (Block *block = lower->block; block; block = block->prev) {
-		const Uint64 n_defers = array_size(block->defers);
-		for (Uint64 i = n_defers - 1; i < n_defers; i--) {
+		const Size n_defers = array_size(block->defers);
+		for (Size i = n_defers - 1; i < n_defers; i--) {
 			Node *node = lower_node(lower, block->defers[i]->statement.defer.statement);
 			if (!node || !array_push(statements, node)) {
-				goto L_error;
+				return 0;
 			}
 		}
 	}
 
 	Array(Node*) results = 0;
-	const Uint64 n_results = array_size(statement->results);
-	for (Uint64 i = 0; i < n_results; i++) {
+	const Size n_results = array_size(statement->results);
+	for (Size i = 0; i < n_results; i++) {
 		Node *result = lower_node(lower, statement->results[i]);
 		if (!result || !array_push(results, result)) {
-			array_free(results);
-			goto L_error;
+			return 0;
 		}
 	}
 
 	Node *return_ = tree_new_return_statement(lower->tree, results);
 	if (!return_) {
-		array_free(results);
-		goto L_error;
+		return 0;
 	}
 
 	if (!statements) {
@@ -358,24 +353,15 @@ static Node *lower_return_statement(Lower *lower, const ReturnStatement *stateme
 
 	// We have more than one statement generated at the return.
 	if (!array_push(statements, return_)) {
-		goto L_error;
+		return 0;
 	}
 
 	// TODO(dweiler): Inherit the block flags here!
-	Node *result = tree_new_block_statement(lower->tree, 0, statements);
-	if (result) {
-		return result;
-	}
-
-L_error:
-	array_free(results);
-	array_free(statements);
-
-	return 0;
+	return tree_new_block_statement(lower->tree, 0, statements);
 }
 
 static Node *lower_if_statement(Lower *lower, const IfStatement *statement) {
-	Tree *tree = lower->tree;
+	// Tree *tree = lower->tree;
 
 	Node *init = 0;
 	Node *cond = 0;
@@ -400,6 +386,8 @@ static Node *lower_if_statement(Lower *lower, const IfStatement *statement) {
 }
 
 static Node *lower_for_statement(Lower *lower, const ForStatement *statement) {
+	Context *context = lower->context;
+
 	Tree *tree = lower->tree;
 
 	Array(Node*) names = 0;
@@ -427,23 +415,23 @@ static Node *lower_for_statement(Lower *lower, const ForStatement *statement) {
 			return 0;
 		}
 		const BinaryExpression *bin = &in->rhs->expression.binary;
-		const Uint64 n_names = array_size(in->lhs);
+		const Size n_names = array_size(in->lhs);
 		if (n_names == 0) {
 			Node *ident = unique_identifier(lower);
 			if (!ident || !array_push(names, ident)) {
-				goto L_error;
+				return 0;
 			}
-		} else for (Uint64 i = 0; i < n_names; i++) {
+		} else for (Size i = 0; i < n_names; i++) {
 			Node *name = lower_node(lower, in->lhs[i]);
 			if (!name || !array_push(names, name)) {
-				goto L_error;
+				return 0;
 			}
 		}
 
 		Node *lhs = lower_node(lower, bin->lhs);
 		Node *rhs = lower_node(lower, bin->rhs);
 		if (!lhs || !rhs || !array_push(values, lhs)) {
-			goto L_error;
+			return 0;
 		}
 
 		Node *type = infer(lower, lhs);
@@ -452,7 +440,7 @@ static Node *lower_for_statement(Lower *lower, const ForStatement *statement) {
 			// Generate = {}.
 			Node *value = tree_new_compound_literal(tree, type, 0);
 			if (!value || !array_push(values, value)) {
-				goto L_error;
+				return 0;
 			}
 		}
 
@@ -469,24 +457,24 @@ static Node *lower_for_statement(Lower *lower, const ForStatement *statement) {
 			cond = tree_new_binary_expression(tree, OPERATOR_LT, pred, rhs);
 			break;
 		default:
-			goto L_error;
+			return 0;
 		}
 
 		if (!cond) {
-			goto L_error;
+			return 0;
 		}
 
 		// Generate the += 1 for the post statement.
 		Node *literal_1 = tree_new_literal_value(tree, LITERAL_INTEGER, SCLIT("1"));
 		if (!literal_1) {
-			goto L_error;
+			return 0;
 		}
 	
 		if (!array_push(assign_lhs, pred)) {
-			goto L_error;
+			return 0;
 		}
 		if (!array_push(assign_rhs, literal_1)) {
-			goto L_error;
+			return 0;
 		}
 
 		post = tree_new_assignment_statement(tree, ASSIGNMENT_ADDEQ, assign_lhs, assign_rhs);
@@ -511,12 +499,12 @@ static Node *lower_for_statement(Lower *lower, const ForStatement *statement) {
 	//	}
 	push_block(lower);
 	if (statement->init && !(init = lower_node(lower, statement->init))) {
-		goto L_error;
+		return 0;
 	}
 
 	push_block(lower);
 	if (statement->cond && !(cond = lower_node(lower, statement->cond))) {
-		goto L_error;
+		return 0;
 	}
 
 	// TODO(dweiler): Clean this up.
@@ -537,18 +525,7 @@ static Node *lower_for_statement(Lower *lower, const ForStatement *statement) {
 	Array(Node*) statements = 0;
 	array_push(statements, init);
 	array_push(statements, for_);
-	Node *result = tree_new_block_statement(tree, 0, statements);
-
-	return result;
-
-L_error:
-	array_free(assign_rhs);
-	array_free(assign_lhs);
-
-	array_free(values);
-	array_free(names);
-
-	return 0;
+	return tree_new_block_statement(tree, 0, statements);
 }
 
 static Node *lower_expression_statement(Lower *lower, const ExpressionStatement *statement) {
@@ -580,6 +557,8 @@ static Node *lower_statement(Lower *lower, const Statement *statement) {
 }
 
 static Node *lower_call_expression(Lower *lower, const CallExpression *expression) {
+	Context *context = lower->context;
+
 	Tree *tree = lower->tree;
 
 	Node *operand = lower_node(lower, expression->operand);
@@ -590,23 +569,23 @@ static Node *lower_call_expression(Lower *lower, const CallExpression *expressio
 	// We're going to generate a bunch of <ident> = <argument> in the block just
 	// before the call so that the arguments are evaluated left to right.
 	Array(Node*) arguments = 0;
-	const Uint64 n_arguments = array_size(expression->arguments);
-	for (Uint64 i = 0; i < n_arguments; i++) {
+	const Size n_arguments = array_size(expression->arguments);
+	for (Size i = 0; i < n_arguments; i++) {
 		Array(Node*) names = 0;
 		Array(Node*) values = 0;
 
 		Node *name = unique_identifier(lower);
 		if (!name || !array_push(names, name)) {
-			goto L_inner_error;
+			return 0;
 		}
 
 		if (!array_push(arguments, name)) {
-			goto L_inner_error;
+			return 0;
 		}
 
 		Node *value = lower_node(lower, expression->arguments[i]);
 		if (!value || !array_push(values, value)) {
-			goto L_inner_error;
+			return 0;
 		}
 
 		Node *type = infer(lower, value);
@@ -614,29 +593,15 @@ static Node *lower_call_expression(Lower *lower, const CallExpression *expressio
 
 		Node *statement = tree_new_declaration_statement(tree, type, names, values);
 		if (!statement) {
-			goto L_inner_error;
+			return 0;
 		}
 
 		if (!array_push(lower->block->statements, statement)) {
-			goto L_inner_error;
+			return 0;
 		}
-
-		continue;
-
-L_inner_error:
-		array_free(values);
-		array_free(names);
-		goto L_error;
 	}
 
-	Node *result = tree_new_call_expression(tree, operand, arguments);
-	if (result) {
-		return result;
-	}
-
-L_error:
-	array_free(arguments);
-	return 0;
+	return tree_new_call_expression(tree, operand, arguments);
 }
 
 static Node *lower_unary_expression(Lower *lower, const UnaryExpression *expression) {
@@ -645,6 +610,8 @@ static Node *lower_unary_expression(Lower *lower, const UnaryExpression *express
 }
 
 static Node *lower_binary_expression(Lower *lower, const BinaryExpression *expression) {
+	Context *context = lower->context;
+
 	Node *lhs = lower_node(lower, expression->lhs);
 	Node *rhs = lower_node(lower, expression->rhs);
 
@@ -704,15 +671,21 @@ static Node *lower_node(Lower *lower, const Node *node) {
 }
 
 Tree *lower(const Tree *tree) {
+	Context *context = tree->context;
+	Allocator *allocator = context->allocator;
+
 	Lower lower;
-	if (!(lower.tree = malloc(sizeof *tree))) {
+	lower.context = context;
+	lower.tree = allocator->allocate(allocator, sizeof *tree);
+	if (!lower.tree) {
 		return 0;
 	}
 
 	lower.block = 0;
 	lower.unique_id = 0;
 	lower.symbols = 0;
-	tree_init(lower.tree);
+	lower.context = context;
+	tree_init(lower.tree, context);
 
 	static const String BUILTIN_TYPES[] = {
 		SLIT("i8"),  SLIT("i16"), SLIT("i32"), SLIT("i64"), SLIT("i128"),
@@ -721,16 +694,16 @@ Tree *lower(const Tree *tree) {
 		SLIT("f16"), SLIT("f32"), SLIT("f64"),
 	};
 
-	for (Uint64 i = 0; i < sizeof(BUILTIN_TYPES) / sizeof(BUILTIN_TYPES[0]); i++) {
+	for (Size i = 0; i < sizeof(BUILTIN_TYPES) / sizeof(BUILTIN_TYPES[0]); i++) {
 		Node *type = tree_new_identifier(lower.tree, BUILTIN_TYPES[i]);
 		define(&lower, BUILTIN_TYPES[i], type);
 	}
 
-	const Uint64 n_statements = array_size(tree->statements);
-	for (Uint64 i = 0; i < n_statements; i++) {
+	const Size n_statements = array_size(tree->statements);
+	for (Size i = 0; i < n_statements; i++) {
 		Node *statement = lower_statement(&lower, &tree->statements[i]->statement);
 		if (!statement || !array_push(lower.tree->statements, statement)) {
-			goto L_error;
+			return 0;
 		}
 	}
 
@@ -738,9 +711,4 @@ Tree *lower(const Tree *tree) {
 
 	array_free(lower.symbols);
 	return lower.tree;
-
-L_error:
-	array_free(lower.symbols);
-	tree_free(lower.tree);
-	return 0;
 }

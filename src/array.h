@@ -4,11 +4,12 @@
 #include <string.h> // memmove
 #include "support.h"
 
+typedef struct Context Context;
 typedef struct Array Array;
 
 struct Array {
-	alignas(16) Uint64 capacity;
-	Uint64 size;
+	alignas(16) Size capacity;
+	Size size;
 };
 _Static_assert(alignof(Array) == 16, "not aligned");
 
@@ -20,7 +21,7 @@ _Static_assert(alignof(Array) == 16, "not aligned");
 #define array_try_grow(array, size_) \
 	(((array) && array_meta(array)->size + (size_) < array_meta(array)->capacity) \
 		? true \
-		: array_grow((void **)&(array), (size_), sizeof *(array)))
+		: array_grow(context, (void **)&(array), (size_), sizeof *(array)))
 
 #define array_size(array) \
 	((array) ? array_meta(array)->size : 0)
@@ -36,7 +37,7 @@ _Static_assert(alignof(Array) == 16, "not aligned");
 		: false)
 
 #define array_free(array) \
-	(void)((array) ? (array_delete(array), (array) = 0) : 0)
+	(void)((array) ? (array_delete(context, array), (array) = 0) : 0)
 
 #define array_insert(array, index, value) \
 	(array_expand(array, 1) \
@@ -48,7 +49,7 @@ _Static_assert(alignof(Array) == 16, "not aligned");
 		? (array_meta(array)->size >= (size_) \
 			? (array_meta(array)->size = (size_), true) \
 			: array_expand((array), (size_) - array_meta(array)->size)) \
-		: (array_grow((void **)&(array), (size_), sizeof *(array)) \
+		: (array_grow(context, (void **)&(array), (size_), sizeof *(array)) \
 			? (array_meta(array)->size = (size_), true) \
 			: false))
 
@@ -58,7 +59,7 @@ _Static_assert(alignof(Array) == 16, "not aligned");
 #define array_clear(array) \
 	(void)((array) ? array_meta(array)->size = 0 : 0)
 
-Bool array_grow(void **const array, Uint64 elements, Uint64 type_size);
-void array_delete(void *const array);
+Bool array_grow(Context *context, void **const array, Size elements, Size type_size);
+void array_delete(Context *context, void *const array);
 
 #endif // CODIN_ARRAY_H

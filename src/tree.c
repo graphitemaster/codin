@@ -3,21 +3,22 @@
 #include <stdio.h>
 
 #include "tree.h"
-
-// parser.c
-void source_free(Source *source);
+#include "context.h"
 
 static String new_string(Tree *tree, String string) {
+	Context *context = tree->context;
 	String copy = string_copy(string);
 	array_push(tree->strings, copy);
 	return copy;
 }
 
 static Node *new_node(Tree *tree, NodeKind kind) {
-	Node *node = calloc(sizeof *node, 1);
+	Context *context = tree->context;
+	Allocator *allocator = context->allocator;
+	Node *node = allocator->allocate(allocator, sizeof *node);
+	memset(node, 0, sizeof *node);
 	node->kind = kind;
-	array_push(tree->nodes, node);
-	return node;
+	return array_push(tree->nodes, node) ? node : 0;
 }
 
 static Node *new_expression(Tree *tree, ExpressionKind kind) {
@@ -324,87 +325,12 @@ Node *tree_new_directive(Tree *tree, DirectiveKind kind) {
 	return node;
 }
 
-void tree_init(Tree *tree) {
+void tree_init(Tree *tree, Context *context) {
+	tree->context = context;
 	tree->package = STRING_NIL;
 	tree->nodes = 0;
 	tree->statements = 0;
 	tree->strings = 0;
-}
-
-void tree_free(Tree *tree) {
-	if (!tree) {
-		return;
-	}
-
-	const Uint64 n_strings = array_size(tree->strings);
-	for (Uint64 i = 0; i < n_strings; i++) {
-		string_free(tree->strings[i]);
-	}
-	array_free(tree->strings);
-
-	const Uint64 n_nodes = array_size(tree->nodes);
-	for (Uint64 i = 0; i < n_nodes; i++) {
-		Node *node = tree->nodes[i];
-		switch (node->kind) {
-		case NODE_STATEMENT:
-			{
-				Statement *statement = &node->statement;
-				switch (statement->kind) {
-				case STATEMENT_BLOCK:
-					array_free(statement->block.statements);
-					break;
-				case STATEMENT_ASSIGNMENT:
-					array_free(statement->assignment.lhs);
-					array_free(statement->assignment.rhs);
-					break;
-				case STATEMENT_DECLARATION:
-					array_free(statement->declaration.names);
-					array_free(statement->declaration.values);
-					break;
-				case STATEMENT_RETURN:
-					array_free(statement->return_.results);
-					break;
-				default:
-					break;
-				}
-			}
-			break;
-		case NODE_COMPOUND_LITERAL:
-			{
-				CompoundLiteral *compound_literal = &node->compound_literal;
-				array_free(compound_literal->elements);
-			}
-			break;
-		case NODE_FIELD_LIST:
-			{
-				FieldList *field_list = &node->field_list;
-				array_free(field_list->fields);
-			}
-			break;
-		case NODE_EXPRESSION:
-			{
-				Expression *expression = &node->expression;
-				switch (expression->kind) {
-				case EXPRESSION_CALL:
-					array_free(expression->call.arguments);
-					break;
-				case EXPRESSION_IN:
-					array_free(expression->in.lhs);
-					break;
-				default:
-					break;
-				}
-			}
-			break;
-		default:
-			break;
-		}
-		free(tree->nodes[i]);
-	}
-	array_free(tree->nodes);
-	array_free(tree->statements);
-
-	free(tree);
 }
 
 void tree_dump_node(const Node *node, Sint32 depth);
@@ -472,8 +398,8 @@ static void tree_dump_call_expression(const CallExpression *expression, Sint32 d
 		printf("<builtin>");
 	}
 	putchar('\n');
-	const Uint64 n_arguments = array_size(expression->arguments);
-	for (Uint64 i = 0; i < n_arguments; i++) {
+	const Size n_arguments = array_size(expression->arguments);
+	for (Size i = 0; i < n_arguments; i++) {
 		tree_dump_node(expression->arguments[i], depth + 1);
 		if (i != n_arguments - 1) {
 			putchar('\n');
@@ -499,8 +425,8 @@ static void tree_dump_in_expression(const InExpression *expression, Sint32 depth
 	printf("(in\n");
 	tree_dump_pad(depth + 1);
 	printf("(lhs\n");
-	const Uint64 n_lhs = array_size(expression->lhs);
-	for (Uint64 i = 0; i < n_lhs; i++) {
+	const Size n_lhs = array_size(expression->lhs);
+	for (Size i = 0; i < n_lhs; i++) {
 		const Node *node = expression->lhs[i];
 		tree_dump_node(node, depth + 2);
 		putchar('\n');
@@ -548,9 +474,9 @@ static void tree_dump_empty_statement(const EmptyStatement *statement, Sint32 de
 }
 
 static void tree_dump_block_statement(const BlockStatement *statement, Sint32 depth) {
-	const Uint64 n_statements = array_size(statement->statements);
+	const Size n_statements = array_size(statement->statements);
 	printf("(block\n");
-	for (Uint64 i = 0; i < n_statements; i++) {
+	for (Size i = 0; i < n_statements; i++) {
 		tree_dump_node(statement->statements[i], depth + 1);
 		if (i != n_statements - 1) {
 			putchar('\n');
@@ -582,8 +508,8 @@ static void tree_dump_assignment_statement(const AssignmentStatement *statement,
 	printf("(assignment\n");
 	tree_dump_pad(depth + 1);
 	printf("'%.*s'\n", SFMT(assignment));
-	const Uint64 n_assignments = array_size(statement->lhs);
-	for (Uint64 i = 0; i < n_assignments; i++) {
+	const Size n_assignments = array_size(statement->lhs);
+	for (Size i = 0; i < n_assignments; i++) {
 		const Node *const lhs = statement->lhs[i];
 		const Node *const rhs = statement->rhs[i];
 		tree_dump_node(lhs, depth + 1);
@@ -604,9 +530,9 @@ static void tree_dump_declaration_statement(const DeclarationStatement *statemen
 		tree_dump_node(statement->type, depth + 2);
 		printf(")\n");
 	}
-	const Uint64 n_decls = array_size(statement->names);
-	const Uint64 n_values = array_size(statement->values);
-	for (Uint64 i = 0; i < n_decls; i++) {
+	const Size n_decls = array_size(statement->names);
+	const Size n_values = array_size(statement->values);
+	for (Size i = 0; i < n_decls; i++) {
 		const Node *name = statement->names[i];
 		tree_dump_node(name, depth + 1);
 		if (i < n_values) {
@@ -641,12 +567,12 @@ static void tree_dump_if_statement(const IfStatement *statement, Sint32 depth) {
 
 static void tree_dump_return_statement(const ReturnStatement *statement, Sint32 depth) {
 	printf("(return\n");
-	const Uint64 n_results = array_size(statement->results);
+	const Size n_results = array_size(statement->results);
 	if (n_results == 0) {
 		tree_dump_pad(depth + 1);
 		printf("<empty>");
 	}
-	for (Uint64 i = 0; i < n_results; i++) {
+	for (Size i = 0; i < n_results; i++) {
 		tree_dump_node(statement->results[i], depth + 1);
 		if (i != n_results - 1) {
 			putchar(',');
@@ -734,7 +660,7 @@ static void tree_dump_literal_value(const LiteralValue *literal_value, Sint32 de
 }
 
 static void tree_dump_compound_literal(const CompoundLiteral *compound_literal, Sint32 depth) {
-	const Uint64 n_elements = array_size(compound_literal->elements);
+	const Size n_elements = array_size(compound_literal->elements);
 	tree_dump_pad(depth);
 	printf("(compound\n");
 	if (compound_literal->type) {
@@ -744,7 +670,7 @@ static void tree_dump_compound_literal(const CompoundLiteral *compound_literal, 
 	if (n_elements) {
 		putchar('\n');
 	}
-	for (Uint64 i = 0; i < n_elements; i++) {
+	for (Size i = 0; i < n_elements; i++) {
 		const Node *const element = compound_literal->elements[i];
 		tree_dump_node(element, depth + 1);
 		if (i != n_elements - 1) {
@@ -764,14 +690,14 @@ static void tree_dump_field(const Field *field, Sint32 depth) {
 }
 
 static void tree_dump_field_list(const FieldList* field_list, Sint32 depth) {
-	const Uint64 n_fields = array_size(field_list->fields);
+	const Size n_fields = array_size(field_list->fields);
 	tree_dump_pad(depth);
 	printf("(fields\n");
 	if (n_fields == 0) {
 		tree_dump_pad(depth + 1);
 		printf("<empty>");
 	}
-	for (Uint64 i = 0; i < n_fields; i++) {
+	for (Size i = 0; i < n_fields; i++) {
 		const Node *field = field_list->fields[i];
 		tree_dump_node(field, depth + 1);
 		if (i != n_fields - 1) {
@@ -830,9 +756,9 @@ static void tree_dump_procedure_type(const ProcedureType *procedure, Sint32 dept
 
 static void tree_dump_procedure_group(const ProcedureGroup *group, Sint32 depth) {
 	tree_dump_pad(depth);
-	const Uint64 n_procedures = array_size(group->procedures);
+	const Size n_procedures = array_size(group->procedures);
 	printf("(procgroup\n");
-	for (Uint64 i = 0; i < n_procedures; i++) {
+	for (Size i = 0; i < n_procedures; i++) {
 		const Node *procedure = group->procedures[i];
 		tree_dump_node(procedure, depth + 1);
 		if (i != n_procedures - 1) {
@@ -923,8 +849,8 @@ void tree_dump_node(const Node *node, Sint32 depth) {
 
 void tree_dump(Tree *tree) {
 	printf("(tree\n");
-	const Uint64 n_statements = array_size(tree->statements);
-	for (Uint64 i = 0; i < n_statements; i++) {
+	const Size n_statements = array_size(tree->statements);
+	for (Size i = 0; i < n_statements; i++) {
 		tree_dump_node(tree->statements[i], 1);
 		if (i != n_statements - 1) {
 			putchar('\n');
@@ -961,25 +887,21 @@ static Node *tree_clone_selector_expression(Tree *tree, const SelectorExpression
 }
 
 static Node *tree_clone_call_expression(Tree *tree, const CallExpression *expression) {
+	Context *context = tree->context;
+
 	Node *operand = tree_clone_node(tree, expression->operand);
 	if (!operand) {
 		return 0;
 	}
 	Array(Node*) arguments = 0;
-	const Uint64 n_arguments = array_size(expression->arguments);
-	for (Uint64 i = 0; i < n_arguments; i++) {
+	const Size n_arguments = array_size(expression->arguments);
+	for (Size i = 0; i < n_arguments; i++) {
 		Node *argument = tree_clone_node(tree, expression->arguments[i]);
 		if (!argument || !array_push(arguments, argument)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	Node *result = tree_new_call_expression(tree, operand, arguments);
-	if (result) {
-		return result;
-	}
-L_error:
-	array_free(arguments);
-	return 0;
+	return tree_new_call_expression(tree, operand, arguments);
 }
 
 static Node *tree_clone_assertion_expression(Tree *tree, const AssertionExpression *expression) {
@@ -992,25 +914,21 @@ static Node *tree_clone_assertion_expression(Tree *tree, const AssertionExpressi
 }
 
 static Node *tree_clone_in_expression(Tree *tree, const InExpression *expression) {
+	Context *context = tree->context;
+
 	Node *rhs = tree_clone_node(tree, expression->rhs);
 	if (!rhs) {
 		return 0;
 	}
 	Array(Node*) lhs = 0;
-	const Uint64 n_lhs = array_size(expression->lhs);
-	for (Uint64 i = 0; i < n_lhs; i++) {
+	const Size n_lhs = array_size(expression->lhs);
+	for (Size i = 0; i < n_lhs; i++) {
 		Node *node = tree_clone_node(tree, expression->lhs[i]);
 		if (!node || !array_push(lhs, node)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	Node *result = tree_new_in_expression(tree, lhs, rhs);
-	if (result) {
-		return result;
-	}
-L_error:
-	array_free(lhs);
-	return 0;
+	return tree_new_in_expression(tree, lhs, rhs);
 }
 
 static Node *tree_clone_dereference_expression(Tree *tree, const DereferenceExpression *expression) {
@@ -1041,21 +959,17 @@ Node *tree_clone_expression(Tree *tree, const Expression *expression) {
 }
 
 static Node *tree_clone_block_statement(Tree *tree, const BlockStatement *statement) {
+	Context *context = tree->context;
+
 	Array(Node*) statements = 0;
-	const Uint64 n_statements = array_size(statement->statements);
-	for (Uint64 i = 0; i < n_statements; i++) {
+	const Size n_statements = array_size(statement->statements);
+	for (Size i = 0; i < n_statements; i++) {
 		Node *node = tree_clone_node(tree, statement->statements[i]);
 		if (!node || !array_push(statements, node)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	Node *result = tree_new_block_statement(tree, statement->flags, statements);
-	if (result) {
-		return result;
-	}
-L_error:
-	array_free(statements);
-	return 0;
+	return tree_new_block_statement(tree, statement->flags, statements);
 }
 
 static Node *tree_clone_import_statement(Tree *tree, const ImportStatement *statement) {
@@ -1068,61 +982,51 @@ static Node *tree_clone_expression_statement(Tree *tree, const ExpressionStateme
 }
 
 static Node *tree_clone_assignment_statement(Tree *tree, const AssignmentStatement *statement) {
+	Context *context = tree->context;
+
 	Array(Node*) lhs = 0;
 	Array(Node*) rhs = 0;
-	const Uint64 n_lhs = array_size(statement->lhs);
-	const Uint64 n_rhs = array_size(statement->rhs);
-	for (Uint64 i = 0; i < n_lhs; i++) {
+	const Size n_lhs = array_size(statement->lhs);
+	const Size n_rhs = array_size(statement->rhs);
+	for (Size i = 0; i < n_lhs; i++) {
 		Node *node = tree_clone_node(tree, statement->lhs[i]);
 		if (!node || !array_push(lhs, node)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	for (Uint64 i = 0; i < n_rhs; i++) {
+	for (Size i = 0; i < n_rhs; i++) {
 		Node *node = tree_clone_node(tree, statement->rhs[i]);
 		if (!node || !array_push(rhs, node)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	Node *result = tree_new_assignment_statement(tree, statement->assignment, lhs, rhs);
-	if (result) {
-		return result;
-	}
-L_error:
-	array_free(rhs);
-	array_free(lhs);
-	return 0;
+	return tree_new_assignment_statement(tree, statement->assignment, lhs, rhs);
 }
 
 static Node *tree_clone_declaration_statement(Tree *tree, const DeclarationStatement *statement) {
+	Context *context = tree->context;
+
 	Node *type = 0;
 	if (statement->type && !(type = tree_clone_node(tree, statement->type))) {
 		return 0;
 	}
 	Array(Node*) names = 0;
 	Array(Node*) values = 0;
-	const Uint64 n_names = array_size(statement->names);
-	const Uint64 n_values = array_size(statement->values);
-	for (Uint64 i = 0; i < n_names; i++) {
+	const Size n_names = array_size(statement->names);
+	const Size n_values = array_size(statement->values);
+	for (Size i = 0; i < n_names; i++) {
 		Node *node = tree_clone_node(tree, statement->names[i]);
 		if (!node || !array_push(names, node)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	for (Uint64 i = 0; i < n_values; i++) {
+	for (Size i = 0; i < n_values; i++) {
 		Node *node = tree_clone_node(tree, statement->values[i]);
 		if (!node || !array_push(values, node)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	Node *result = tree_new_declaration_statement(tree, type, names, values);
-	if (result) {
-		return result;
-	}
-L_error:
-	array_free(values);
-	array_free(names);
-	return 0;
+	return tree_new_declaration_statement(tree, type, names, values);
 }
 
 static Node *tree_clone_if_statement(Tree *tree, const IfStatement *statement) {
@@ -1139,21 +1043,16 @@ static Node *tree_clone_if_statement(Tree *tree, const IfStatement *statement) {
 }
 
 Node *tree_clone_return_statement(Tree *tree, const ReturnStatement *statement) {
+	Context *context = tree->context;
 	Array(Node*) results = 0;
-	const Uint64 n_results = array_size(statement->results);
-	for (Uint64 i = 0; i < n_results; i++) {
+	const Size n_results = array_size(statement->results);
+	for (Size i = 0; i < n_results; i++) {
 		Node *result = tree_clone_node(tree, statement->results[i]);
 		if (!result || !array_push(results, result)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	Node *result = tree_new_return_statement(tree, results);
-	if (result) {
-		return result;
-	}
-L_error:
-	array_free(results);
-	return 0;
+	return tree_new_return_statement(tree, results);
 }
 
 static Node *tree_clone_for_statement(Tree *tree, const ForStatement *statement) {
@@ -1215,25 +1114,21 @@ static Node *tree_clone_literal_value(Tree *tree, const LiteralValue *literal_va
 }
 
 static Node *tree_clone_compound_literal(Tree *tree, const CompoundLiteral *compound_literal) {
+	Context *context = tree->context;
+
 	Node *type = tree_clone_node(tree, compound_literal->type);
 	if (!type) {
 		return 0;
 	}
 	Array(Node*) elements = 0;
-	const Uint64 n_elements = array_size(compound_literal->elements);
-	for (Uint64 i = 0; i < n_elements; i++) {
+	const Size n_elements = array_size(compound_literal->elements);
+	for (Size i = 0; i < n_elements; i++) {
 		Node *element = tree_clone_node(tree, compound_literal->elements[i]);
 		if (!element || !array_push(elements, element)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	Node *result = tree_new_compound_literal(tree, type, elements);
-	if (result) {
-		return result;
-	}
-L_error:
-	array_free(elements);
-	return 0;
+	return tree_new_compound_literal(tree, type, elements);
 }
 
 static Node *tree_clone_field(Tree *tree, const Field *field) {
@@ -1243,21 +1138,17 @@ static Node *tree_clone_field(Tree *tree, const Field *field) {
 }
 
 static Node *tree_clone_field_list(Tree *tree, const FieldList *field_list) {
+	Context *context = tree->context;
+
 	Array(Node*) fields = 0;
-	const Uint64 n_fields = array_size(field_list->fields);
-	for (Uint64 i = 0; i < n_fields; i++) {
+	const Size n_fields = array_size(field_list->fields);
+	for (Size i = 0; i < n_fields; i++) {
 		Node *field = tree_clone_node(tree, field_list->fields[i]);
 		if (!field || !array_push(fields, field)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	Node *result = tree_new_field_list(tree, fields);
-	if (result) {
-		return result;
-	}
-L_error:
-	array_free(fields);
-	return 0;
+	return tree_new_field_list(tree, fields);
 }
 
 static Node *tree_clone_procedure(Tree *tree, const Procedure *procedure) {
@@ -1267,21 +1158,17 @@ static Node *tree_clone_procedure(Tree *tree, const Procedure *procedure) {
 }
 
 static Node *tree_clone_procedure_group(Tree *tree, const ProcedureGroup *procedure_group) {
+	Context *context = tree->context;
+
 	Array(Node*) procedures = 0;
-	const Uint64 n_procedures = array_size(procedure_group->procedures);
-	for (Uint64 i = 0; i < n_procedures; i++) {
+	const Size n_procedures = array_size(procedure_group->procedures);
+	for (Size i = 0; i < n_procedures; i++) {
 		Node *procedure = tree_clone_node(tree, procedure_group->procedures[i]);
 		if (!procedure || !array_push(procedures, procedure)) {
-			goto L_error;
+			return 0;
 		}
 	}
-	Node *result = tree_new_procedure_group(tree, procedures);
-	if (result) {
-		return result;
-	}
-L_error:
-	array_free(procedures);
-	return 0;
+	return tree_new_procedure_group(tree, procedures);
 }
 
 static Node *tree_clone_directive(Tree *tree, const Directive *directive) {

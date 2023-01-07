@@ -4,10 +4,12 @@
 
 #include "array.h"
 
+typedef struct Context Context;
 typedef struct ThreadPool ThreadPool;
 typedef struct Work Work;
 
 struct ThreadPool {
+	Context *context;
 	Array(thrd_t) threads;
 	Array(Work) work;
 	cnd_t cond;
@@ -15,7 +17,7 @@ struct ThreadPool {
 	Bool quit;
 };
 
-Bool threadpool_init(ThreadPool *pool, Uint64 n_threads);
+Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context);
 Bool threadpool_free(ThreadPool *pool);
 Bool threadpool_queue(ThreadPool *pool, void (*function)(void*), void *user, void (*dispose)(void*));
 

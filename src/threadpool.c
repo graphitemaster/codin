@@ -31,10 +31,11 @@ static int worker(void *user) {
 	}
 }
 
-Bool threadpool_init(ThreadPool *pool, Uint64 n_threads) {
+Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
 	cnd_init(&pool->cond);
 	mtx_init(&pool->mutex, mtx_plain);
 
+	pool->context = context;
 	pool->threads = 0;
 	pool->work = 0;
 
@@ -42,7 +43,7 @@ Bool threadpool_init(ThreadPool *pool, Uint64 n_threads) {
 		return false;
 	}
 
-	for (Uint64 i = 0; i < n_threads; i++) {
+	for (Size i = 0; i < n_threads; i++) {
 		thrd_create(&pool->threads[i], worker, pool);
 	}
 
@@ -50,13 +51,15 @@ Bool threadpool_init(ThreadPool *pool, Uint64 n_threads) {
 }
 
 Bool threadpool_free(ThreadPool *pool) {
+	Context *context = pool->context;
+
 	mtx_lock(&pool->mutex);
 	pool->quit = true;
 	cnd_broadcast(&pool->cond);
 	mtx_unlock(&pool->mutex);
 
-	const Uint64 n_threads = array_size(pool->threads);
-	for (Uint64 i = 0; i < n_threads; i++) {
+	const Size n_threads = array_size(pool->threads);
+	for (Size i = 0; i < n_threads; i++) {
 		thrd_join(pool->threads[i], 0);
 	}
 
@@ -65,8 +68,8 @@ Bool threadpool_free(ThreadPool *pool) {
 	cnd_destroy(&pool->cond);
 	mtx_destroy(&pool->mutex);
 
-	const Uint64 n_work = array_size(pool->work);
-	for (Uint64 i = 0; i < n_work; i++) {
+	const Size n_work = array_size(pool->work);
+	for (Size i = 0; i < n_work; i++) {
 		Work *work = &pool->work[i];
 		if (work->dispose) {
 			work->dispose(work->user);
@@ -78,6 +81,8 @@ Bool threadpool_free(ThreadPool *pool) {
 }
 
 Bool threadpool_queue(ThreadPool *pool, void (*function)(void*), void *user, void (*dispose)(void*)) {
+	Context *context = pool->context;
+
 	mtx_lock(&pool->mutex);
 	if (!array_push(pool->work, ((Work){function, user, dispose}))) {
 		if (dispose) {

@@ -1,12 +1,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <setjmp.h>
 
 #include "parser.h"
 #include "lexer.h"
 #include "report.h"
 #include "tree.h"
+#include "context.h"
+#include "utility.h"
 
 #define TRACE 0
 
@@ -17,7 +18,8 @@
 #define ERROR(...) \
 	do { \
 		report_error(&parser->source, &parser->lexer.location, __VA_ARGS__); \
-		longjmp(parser->jmp, 1); \
+		THROW(1); \
+		exit(1); \
 	} while (0)
 
 #define ICE(...) \
@@ -26,36 +28,21 @@
 #define UNIMPLEMENTED(what) \
 	ERROR("Unimplemented: %s", (what))
 
-void source_free(Source *source) {
-	string_free(source->contents);
-	string_free(source->name);
-}
-
-static Bool source_read(Source *source, String filename) {
-	source->contents = STRING_NIL;
+static Bool source_read(Source *source, String filename, Context *context) {
+	Array(Uint8) contents = readfile(filename);
+	if (!contents) {
+		return false;
+	}
+	source->contents.contents = contents;
+	source->contents.length = array_size(contents);
 	source->name = STRING_NIL;
-	String *contents = &source->contents;
-	char *terminated = string_to_null(filename);
-	FILE *fp = fopen(terminated, "rb");
-	free(terminated);
-	if (!fp) goto L_error;
-	if (fseek(fp, 0, SEEK_END) != 0) goto L_error;
-	contents->length = ftell(fp);
-	if (fseek(fp, 0, SEEK_SET) != 0) goto L_error;
-	contents->contents = malloc(contents->length);
-	if (!contents->contents) goto L_error;
-	if (fread(contents->contents, contents->length, 1, fp) != 1) goto L_error;
-	fclose(fp);
-	source->name = string_copy(filename);
 	return true;
-L_error:
-	if (fp) fclose(fp);
-	return false;
 }
 
 typedef struct Parser Parser;
 
 struct Parser {
+	Context *context;
 	Source source;
 	Lexer lexer;
 	Tree *tree;
@@ -64,10 +51,8 @@ struct Parser {
 	Node *this_procedure;
 	Sint32 trace_depth;
 	Sint32 expression_depth;
-	jmp_buf jmp;
 	Uint64 unique_id;
 };
-
 
 static void parser_trace_enter(Parser *parser, const char *function) {
 	if (TRACE) {
@@ -86,23 +71,23 @@ static void parser_trace_leave(Parser *parser) {
 #define TRACE_ENTER() parser_trace_enter(parser, __FUNCTION__)
 #define TRACE_LEAVE() parser_trace_leave(parser)
 
-static void parser_free(Parser *parser) {
-	source_free(&parser->source);
-}
-
-static Bool parser_init(Parser *parser, String filename) {
-	if (source_read(&parser->source, filename)) {
-		if (lexer_init(&parser->lexer, &parser->source)) {
-			parser->this_token = TOKEN_NIL;
-			parser->last_token = TOKEN_NIL;
-			parser->trace_depth = 0;
-			parser->expression_depth = 0;
-			parser->unique_id = 0;
-			return true;
-		}
+static Bool parser_init(Parser *parser, String filename, Context *context) {
+	if (!source_read(&parser->source, filename, context)) {
+		return false;
 	}
-	parser_free(parser);
-	return false;
+
+	if (!lexer_init(&parser->lexer, &parser->source)) {
+		return false;
+	}
+
+	parser->context = context;
+	parser->this_token = TOKEN_NIL;
+	parser->last_token = TOKEN_NIL;
+	parser->trace_depth = 0;
+	parser->expression_depth = 0;
+	parser->unique_id = 0;
+
+	return true;
 }
 
 static FORCE_INLINE Bool is_kind(Token token, Kind kind) {
@@ -149,6 +134,7 @@ static Bool accepted_keyword(Parser *parser, KeywordKind keyword) {
 
 static Bool accepted_separator(Parser *parser) {
 	const Token token = parser->this_token;
+	Context *context = parser->context;
 	if (accepted_operator(parser, OPERATOR_COMMA)) {
 		return true;
 	}
@@ -216,6 +202,7 @@ static Token advancep(Parser *parser) {
 }
 
 static Token expect_kind(Parser *parser, Kind kind) {
+	Context *context = parser->context;
 	const Token token = parser->this_token;
 	if (!is_kind(token, kind)) {
 		const String want = kind_to_string(kind);
@@ -226,6 +213,7 @@ static Token expect_kind(Parser *parser, Kind kind) {
 }
 
 static Token expect_operator(Parser *parser, OperatorKind op) {
+	Context *context = parser->context;
 	const Token token = parser->this_token;
 	if (!is_operator(token, op)) {
 		const String want = operator_to_string(op);
@@ -236,6 +224,7 @@ static Token expect_operator(Parser *parser, OperatorKind op) {
 }
 
 static Token expect_keyword(Parser* parser, KeywordKind keyword) {
+	Context *context = parser->context;
 	const Token token = parser->this_token;
 	if (!is_keyword(token, keyword)) {
 		const String want = keyword_to_string(keyword);
@@ -246,6 +235,7 @@ static Token expect_keyword(Parser* parser, KeywordKind keyword) {
 }
 
 static Token expect_assignment(Parser *parser, AssignmentKind assignment) {
+	Context *context = parser->context;
 	const Token token = parser->this_token;
 	if (!is_assignment(token, assignment)) {
 		const String want = assignment_to_string(assignment);
@@ -256,6 +246,7 @@ static Token expect_assignment(Parser *parser, AssignmentKind assignment) {
 }
 
 static Token expect_literal(Parser *parser, LiteralKind literal) {
+	Context *context = parser->context;
 	const Token token = parser->this_token;
 	if (!is_literal(token, literal)) {
 		const String want = literal_to_string(literal);
@@ -266,6 +257,8 @@ static Token expect_literal(Parser *parser, LiteralKind literal) {
 }
 
 static void expect_semicolon(Parser *parser) {
+	Context *context = parser->context;
+
 	if (accepted_kind(parser, KIND_SEMICOLON)) {
 		return;
 	}
@@ -298,6 +291,7 @@ static CallingConvention string_to_calling_convention(String string) {
 
 static Node *parse_identifier(Parser *parser) {
 	TRACE_ENTER();
+	Context *context = parser->context;
 	const Token token = parser->this_token;
 	if (is_kind(token, KIND_IDENTIFIER) || is_keyword(token, KEYWORD_TYPEID)) {
 		// NOTE(dweiler): Should write this a different way?
@@ -327,6 +321,7 @@ static Node *parse_type_or_identifier(Parser *parser) {
 
 static Node *parse_type(Parser *parser) {
 	TRACE_ENTER();
+	Context *context = parser->context;
 	Node *type = parse_type_or_identifier(parser);
 	if (!type) {
 		advancep(parser);
@@ -354,6 +349,7 @@ enum FieldFlag {
 
 static FieldFlag parse_field_flag(Parser *parser) {
 	const Token token = parser->this_token;
+	Context *context = parser->context;
 	if (is_keyword(token, KEYWORD_USING)) {
 		return FIELD_FLAG_USING;
 	} else if (is_operator(token, OPERATOR_AUTO_CAST)) {
@@ -381,6 +377,7 @@ static FieldFlag parse_field_flag(Parser *parser) {
 
 static FieldFlag parse_field_flags(Parser *parser) {
 	TRACE_ENTER();
+	Context *context = parser->context;
 	FieldFlag flags = FIELD_FLAG_INVALID;
 	for (;;) {
 		const FieldFlag flag = parse_field_flag(parser);
@@ -399,12 +396,15 @@ static FieldFlag parse_field_flags(Parser *parser) {
 
 static Node *parse_result_list(Parser *parser) {
 	TRACE_ENTER();
+	Context *context = parser->context;
 	UNIMPLEMENTED("parse_result_list");
 	TRACE_LEAVE();
 	return 0;
 }
 
 static Node *parse_results(Parser *parser, Bool *diverging) {
+	Context *context = parser->context;
+
 	TRACE_ENTER();
 	if (!accepted_operator(parser, OPERATOR_ARROW)) {
 		TRACE_LEAVE();
@@ -442,6 +442,9 @@ static Node *parse_results(Parser *parser, Bool *diverging) {
 
 static Node *parse_parameter_list(Parser *parser) {
 	TRACE_ENTER();
+
+	Context *context = parser->context;
+
 	Array(Node*) fields = 0;
 	Array(Node*) names = 0;
 	while (!is_operator(parser->this_token, OPERATOR_CLOSEPAREN) &&
@@ -454,8 +457,8 @@ static Node *parse_parameter_list(Parser *parser) {
 		if (is_operator(parser->this_token, OPERATOR_COLON)) {
 			expect_operator(parser, OPERATOR_COLON);
 			Node *type = parse_type_or_identifier(parser);
-			const Uint64 n_names = array_size(names);
-			for (Uint64 i = 0; i < n_names; i++) {
+			const Size n_names = array_size(names);
+			for (Size i = 0; i < n_names; i++) {
 				Node *field = tree_new_field(parser->tree, names[i], type);
 				array_push(fields, field);
 			}
@@ -476,6 +479,7 @@ static Node *parse_parameter_list(Parser *parser) {
 
 static Node *parse_procedure_type(Parser *parser) {
 	TRACE_ENTER();
+	Context *context = parser->context;
 	CallingConvention convention = CCONV_INVALID;
 	if (is_literal(parser->this_token, LITERAL_STRING)) {
 		const Token token = expect_literal(parser, LITERAL_STRING);
@@ -510,6 +514,7 @@ static Node *parse_body(Parser *parser);
 
 static Node *parse_procedure(Parser *parser) {
 	TRACE_ENTER();
+	Context *context = parser->context;
 	Node *type = parse_procedure_type(parser);
 
 	advance_possible_newline(parser, true);
@@ -573,6 +578,9 @@ static Node *parse_procedure(Parser *parser) {
 
 static Node *parse_procedure_group(Parser *parser) {
 	TRACE_ENTER();
+
+	Context *context = parser->context;
+
 	expect_kind(parser, KIND_LBRACE);
 	Array(Node*) procedures = 0;
 	while (!is_kind(parser->this_token, KIND_RBRACE) &&
@@ -603,7 +611,7 @@ static Node *parse_unary_expression(Parser *parser, Bool lhs);
 static Node *parse_directive_for_operand(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
 
-	(void)lhs;
+	Context *context = parser->context;
 
 	const Token token = expect_kind(parser, KIND_DIRECTIVE);
 	Node *node = 0;
@@ -670,6 +678,8 @@ static Node *parse_directive_for_operand(Parser *parser, Bool lhs) {
 static Node *parse_directive_for_statement(Parser *parser) {
 	TRACE_ENTER();
 
+	Context *context = parser->context;
+
 	const Token token = expect_kind(parser, KIND_DIRECTIVE);
 	Node *statement = 0;
 	switch (token.as_directive) {
@@ -710,6 +720,7 @@ static Node *parse_directive_for_statement(Parser *parser) {
 
 static Node *parse_operand(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
+	Context *context = parser->context;
 	const Token token = parser->this_token;
 	Node *node = 0;
 	switch (token.kind) {
@@ -860,6 +871,7 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 
 static Node *parse_value(Parser *parser) {
 	TRACE_ENTER();
+	Context *context = parser->context;
 	if (is_kind(parser->this_token, KIND_LBRACE)) {
 		UNIMPLEMENTED("Literal value");
 	}
@@ -870,6 +882,9 @@ static Node *parse_value(Parser *parser) {
 
 static Node *parse_call_expression(Parser *parser, Node *operand) {
 	TRACE_ENTER();
+
+	Context *context = parser->context;
+
 	Array(Node*) arguments = 0;
 	const Sint32 depth = parser->expression_depth;
 	parser->expression_depth = 0;
@@ -913,6 +928,9 @@ static Node *parse_call_expression(Parser *parser, Node *operand) {
 
 static Array(Node*) parse_element_list(Parser *parser) {
 	TRACE_ENTER();
+
+	Context *context = parser->context;
+
 	Array(Node*) elements = 0;
 	while (!is_kind(parser->this_token, KIND_RBRACE) && !is_kind(parser->this_token, KIND_EOF)) {
 		Node *element = parse_value(parser);
@@ -959,6 +977,9 @@ static Node *parse_literal_value(Parser *parser, Node *type) {
 
 static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
 	TRACE_ENTER();
+
+	Context *context = parser->context;
+
 	if (!operand) {
 		// if (allow_type) return 0
 		// ERROR("Expected an operand");
@@ -1120,6 +1141,8 @@ static Node *parse_unary_expression(Parser *parser, Bool lhs) {
 static Node *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec) {
 	TRACE_ENTER();
 
+	Context *context = parser->context;
+
 	Node *expr = parse_unary_expression(parser, lhs);
 
 	// Simple operator precedence climbing.
@@ -1180,6 +1203,9 @@ static FORCE_INLINE Node *parse_expression(Parser *parser, Bool lhs) {
 
 static Array(Node*) parse_expression_list(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
+
+	Context *context = parser->context;
+
 	Array(Node*) list = 0;
 	for (;;) {
 		Node *expr = parse_expression(parser, lhs);
@@ -1213,6 +1239,8 @@ static Node *parse_statement(Parser *parser);
 
 static Array(Node*) parse_statement_list(Parser *parser) {
 	TRACE_ENTER();
+
+	Context *context = parser->context;
 
 	Array(Node*) statements = 0;
 
@@ -1260,6 +1288,8 @@ static Node *parse_block_statement(Parser *parser, Bool when) {
 	// The block statement may be part of a compile-time when statement.
 	TRACE_ENTER();
 
+	Context *context = parser->context;
+
 	advance_possible_newline(parser, true);
 
 	if (when) {
@@ -1280,6 +1310,9 @@ static Node *parse_block_statement(Parser *parser, Bool when) {
 static Node *parse_declaration_statement(Parser *parser, Array(Node*) names) {
 	// ':'
 	TRACE_ENTER();
+
+	Context *context = parser->context;
+
 	Array(Node*) values = 0;
 	Node *type = parse_type_or_identifier(parser);
 	const Token token = parser->this_token;
@@ -1290,8 +1323,8 @@ static Node *parse_declaration_statement(Parser *parser, Array(Node*) names) {
 		const Token seperator = advancep(parser);
 		constant = is_operator(seperator, OPERATOR_COLON);
 		values = parse_rhs_expression_list(parser);
-		const Uint64 n_names = array_size(names);
-		const Uint64 n_values = array_size(values);
+		const Size n_names = array_size(names);
+		const Size n_values = array_size(values);
 		if (n_values != n_names) {
 			ERROR("Expected %d values on the right-hand side of this declaration", CAST(Sint32, n_names));
 		}
@@ -1312,6 +1345,9 @@ static Node *parse_declaration_statement(Parser *parser, Array(Node*) names) {
 
 static Node *parse_simple_statement(Parser* parser, Bool allow_in) {
 	TRACE_ENTER();
+
+	Context *context = parser->context;
+
 	Array(Node*) lhs = parse_lhs_expression_list(parser);
 	const Token token = parser->this_token;
 	switch (token.kind) {
@@ -1378,6 +1414,7 @@ static Node *parse_simple_statement(Parser* parser, Bool allow_in) {
 
 static Node *parse_import_declaration(Parser *parser) {
 	TRACE_ENTER();
+
 	expect_keyword(parser, KEYWORD_IMPORT);
 
 	Token name = TOKEN_NIL;
@@ -1399,6 +1436,9 @@ static Node *parse_import_declaration(Parser *parser) {
 
 static Node *convert_statement_to_body(Parser *parser, Node *statement) {
 	ASSERT(statement->kind == NODE_STATEMENT);
+
+	Context *context = parser->context;
+
 	const StatementKind kind = statement->statement.kind;
 	if (kind == STATEMENT_BLOCK || kind == STATEMENT_EMPTY) {
 		ERROR("Expected a regular statement");
@@ -1409,6 +1449,8 @@ static Node *convert_statement_to_body(Parser *parser, Node *statement) {
 }
 
 static Node *convert_statement_to_expression(Parser *parser, Node *statement) {
+	Context *context = parser->context;
+
 	if (!statement) {
 		return 0;
 	}
@@ -1444,6 +1486,8 @@ static Bool accepted_control_statement_separator(Parser *parser) {
 
 static Node *parse_if_statement(Parser *parser) {
 	TRACE_ENTER();
+
+	Context *context = parser->context;
 
 	expect_keyword(parser, KEYWORD_IF);
 
@@ -1496,6 +1540,8 @@ static Node *parse_if_statement(Parser *parser) {
 
 static Node *parse_for_statement(Parser *parser) {
 	TRACE_ENTER();
+
+	Context *context = parser->context;
 
 	Node *init = 0;
 	Node *cond = 0;
@@ -1581,6 +1627,7 @@ static Node *parse_for_statement(Parser *parser) {
 
 static Node *parse_defer_statement(Parser *parser) {
 	TRACE_ENTER();
+	Context *context = parser->context;
 	expect_keyword(parser, KEYWORD_DEFER);
 	Node *node = parse_statement(parser);
 	switch (node->statement.kind) {
@@ -1600,6 +1647,8 @@ static Node *parse_defer_statement(Parser *parser) {
 
 static Node *parse_return_statement(Parser *parser) {
 	TRACE_ENTER();
+
+	Context *context = parser->context;
 
 	expect_keyword(parser, KEYWORD_RETURN);
 
@@ -1629,6 +1678,7 @@ static Node *parse_return_statement(Parser *parser) {
 
 static Node *parse_statement(Parser *parser) {
 	TRACE_ENTER();
+	Context *context = parser->context;
 	Node *node = 0;
 	const Token token = parser->this_token;
 	switch (token.kind) {
@@ -1762,27 +1812,23 @@ static Node *parse_statement(Parser *parser) {
 	return 0;
 }
 
-Tree *parse(String filename) {
+Tree *parse(String filename, Context *context) {
 	Parser parse;
 	Parser *parser = &parse;
-	if (!parser_init(parser, filename)) {
+	if (!parser_init(parser, filename, context)) {
 		return 0;
 	}
 
-	TRACE_ENTER();
+	Allocator *allocator = context->allocator;
+	Tree *tree = allocator->allocate(allocator, sizeof *tree);
+	if (!tree) {
+		return 0;
+	}
 
-	Tree *tree = malloc(sizeof *tree);
-	tree_init(tree);
+	tree_init(tree, context);
 
-	parser->tree = tree;	
+	parser->tree = tree;
 	advancep(parser);
-
-	if (setjmp(parser->jmp) != 0) {
-		TRACE_LEAVE();
-		parser_free(parser);
-		tree_free(tree);
-		return 0;
-	}
 
 	// Every Odin source file must begin with the package it's part of.
 	if (!is_keyword(parser->this_token, KEYWORD_PACKAGE)) {
@@ -1802,7 +1848,7 @@ Tree *parse(String filename) {
 		ERROR("Cannot name package '_'");
 	}
 
-	for (Uint64 i = 0; i < sizeof(RESERVED_PACKAGES)/sizeof(*RESERVED_PACKAGES); i++) {
+	for (Size i = 0; i < sizeof(RESERVED_PACKAGES)/sizeof(*RESERVED_PACKAGES); i++) {
 		const String name = RESERVED_PACKAGES[i];
 		if (string_compare(package.string, name)) {
 			ERROR("Use of reserved package name '%.*s'", SFMT(name));
@@ -1820,8 +1866,6 @@ Tree *parse(String filename) {
 			}
 		}
 	}
-
-	parser_free(parser);
 
 	TRACE_LEAVE();
 

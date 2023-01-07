@@ -3,6 +3,8 @@
 #include "array.h"
 #include "lexer.h"
 
+typedef struct Context Context;
+
 typedef enum NodeKind NodeKind;
 typedef enum ExpressionKind ExpressionKind;
 typedef enum StatementKind StatementKind;
@@ -344,7 +346,7 @@ struct Type {
 		DynamicArrayType dynamic_array;
 		PointerType      pointer;
 		MultiPointerType multi_pointer;
-		TypeIdType       typeid;
+		TypeIdType       typeid_;
 	};
 };
 
@@ -387,6 +389,7 @@ FORCE_INLINE Bool node_is_type(const Node *node, TypeKind kind) {
 _Static_assert(sizeof(Node) <= 64, "Too big");
 
 struct Tree {
+	Context *context;
 	String package;
 	Array(Node*) nodes;
 	Array(Node*) statements;
@@ -438,8 +441,7 @@ Node *tree_clone_statement(Tree *tree, const Statement *statement);
 Node *tree_clone_return_statement(Tree *tree, const ReturnStatement *statement);
 Node *tree_clone_expression(Tree *tree, const Expression *expression);
 
-void tree_init(Tree *tree);
-void tree_free(Tree *tree);
+void tree_init(Tree *tree, Context *context);
 
 void tree_dump(Tree *tree);
 void tree_dump_node(const Node *node, Sint32 depth);

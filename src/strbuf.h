@@ -3,14 +3,15 @@
 #include "string.h"
 #include "array.h"
 
+typedef struct Context Context;
 typedef struct StrBuf StrBuf;
 
 struct StrBuf {
-  Array(Uint8) contents;
+	Context *context;
+	Array(Uint8) contents;
 };
 
-void strbuf_init(StrBuf *strbuf);
-void strbuf_free(StrBuf *strbuf);
+void strbuf_init(StrBuf *strbuf, Context *context);
 void strbuf_clear(StrBuf *strbuf);
 Bool strbuf_put_rune(StrBuf *strbuf, Rune ch);
 Bool strbuf_put_string(StrBuf *strbuf, String string);

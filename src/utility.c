@@ -20,14 +20,13 @@ static Bool sizefile(FILE *fp, Uint64 *size) {
 	return true;
 }
 
-Array(Uint8) readfile(String filename) {
+Array(Uint8) _readfile(String filename, Context *context) {
 	// Need to introduce the NUL to call fopen.
 	StrBuf strbuf;
-	strbuf_init(&strbuf);
+	strbuf_init(&strbuf, context);
 	strbuf_put_string(&strbuf, string_unquote(filename, "\""));
 	strbuf_put_rune(&strbuf, '\0');
 	FILE *fp = fopen(CAST(const char *, strbuf.contents), "rb");
-	strbuf_free(&strbuf);
 	if (!fp) {
 		return 0;
 	}
