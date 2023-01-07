@@ -1,3 +1,6 @@
+#ifndef CODIN_CONTEXT_H
+#define CODIN_CONTEXT_H
+
 #include <setjmp.h>
 #include "support.h"
 
@@ -21,3 +24,5 @@ struct Context {
 	Allocator *allocator;
 	jmp_buf jmp;
 };
+
+#endif // CODIN_CONTEXT_H
