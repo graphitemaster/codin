@@ -23,7 +23,7 @@ Bool path_mkdir(const char *pathname) {
 	} else {
 		return false;
 	}
-#elif defined(OS_LINUX)
+#elif defined(OS_LINUX) || defined(OS_APPLE)
 	return mkdir(pathname, 0777) == 0;
 #else
 	return false;
@@ -34,7 +34,7 @@ Array(String) _path_list(String path, Context *context) {
 	Array(String) results = 0;
 #if defined(OS_WINDOWS)
 	// TODO(dweiler): Implement.
-#elif defined(OS_LINUX)
+#elif defined(OS_LINUX) || defined(OS_APPLE)
 	char *name = string_to_null(path);
 	DIR *dp = opendir(name);
 	context->allocator->deallocate(context->allocator, name);

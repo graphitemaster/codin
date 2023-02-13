@@ -995,7 +995,7 @@ static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 		{ "f16",     "unsigned short"     },
 		{ "f32",     "float"              },
 		{ "f64",     "double"             },
-	
+
 		{ "cstring", "const char*"        },
 
 		{ "rawptr",  "void*"              },
@@ -1027,7 +1027,7 @@ static Bool gen_c0_prelude(Generator *generator, StrBuf *strbuf) {
 	gen_c0_rel_prelude(generator->used_rel, strbuf);
 	gen_c0_bit_prelude(generator->used_bit, strbuf);
 
-	strbuf_put_string(strbuf, SCLIT("static FORCE_INLINE noti32(i32 x) { return !x;}\n"));
+	strbuf_put_string(strbuf, SCLIT("static FORCE_INLINE i32 noti32(i32 x) { return !x; }\n"));
 
 	return true;
 }

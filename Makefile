@@ -16,13 +16,24 @@ PROFILE ?= 0
 SRCDIR ?= src
 UNUSED ?= 1
 
+ifeq ($(OS),Windows_NT)
+	PLATFORM := Windows
+else
+	PLATFORM := $(shell sh -c 'uname 2>/dev/null || echo Unknown')
+endif
+
 # Some recursive make functions to avoid shelling out.
 rwildcard = $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 
 # Compiler and linker
-CC := gcc
-CC ?= clang
+ifeq ($(PLATFORM),Darwin)
+	DEFAULT_CC := clang
+else
+	DEFAULT_CC := gcc
+endif
+
+CC ?= $(DEFAULT_CC)
 LD := $(CC)
 
 # Determine build type.
@@ -136,12 +147,18 @@ DEPFLAGS += -MP
 #
 # Linker flags.
 #
+ifeq ($(PLATFORM),Darwin)
+	LD_REMOVE_UNUSED := -Wl,-dead_strip
+else
+	LD_REMOVE_UNUSED := -Wl,--gc-sections
+endif
+
 LDFLAGS := -lm
 LDFLAGS += -lpthread
 
 # Strip unused symbols if requested.
 ifeq ($(UNUSED), 1)
-	LDFLAGS += -Wl,--gc-sections
+	LDFLAGS += $(LD_REMOVE_UNUSED)
 endif
 
 # Enable profiling if requested.
