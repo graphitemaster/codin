@@ -1,3 +1,7 @@
+#include "support.h"
+#include "path.h"
+#include "context.h"
+
 #include <stdlib.h> // free
 #include <string.h> // strcmp
 
@@ -7,13 +11,9 @@
 #else
 #include <sys/stat.h> // mkdir
 #include <dirent.h> // DIR, dirent, readdir
-#endif
+#endif // #if defined(OS_WINDOWS)
 
-#include <stdio.h> //
-#include "path.h"
-#include "context.h"
-
-Bool path_mkdir(const char *pathname) {
+Bool _path_mkdir(const char *pathname, Context *context) {
 #if defined(OS_WINDOWS)
 	Uint16 *pathname_utf16 = 0;
 	if (utf8_to_utf16(pathname, &pathname_utf16)) {
@@ -33,7 +33,39 @@ Bool path_mkdir(const char *pathname) {
 Array(String) _path_list(String path, Context *context) {
 	Array(String) results = 0;
 #if defined(OS_WINDOWS)
-	// TODO(dweiler): Implement.
+	// null terminated wildcard mask
+	Allocator *allocator = context->allocator;
+	char *mask = allocator->allocate(allocator, path.length + 3);
+	if (!mask) {
+		return 0;
+	}
+	memcpy(mask, path.contents, path.length);
+	mask[path.length + 0] = '\\';
+	mask[path.length + 1] = '*';
+	mask[path.length + 2] = '\0';
+
+	WIN32_FIND_DATA fd;
+	HANDLE find = FindFirstFile(mask, &fd);
+	context->allocator->deallocate(context->allocator, mask);
+	if (find == INVALID_HANDLE_VALUE) {
+		return 0;
+	}
+
+	do {
+		const char *name = fd.cFileName;
+		if (!strcmp(name, ".") || !strcmp(name, "..")) {
+			continue;
+		}
+		if (!array_push(results, string_copy_from_null(name))) {
+			goto L_error;
+		}
+	} while (FindNextFile(find, &fd));
+L_return:
+	FindClose(find);
+	return results;
+L_error:
+	array_free(results);
+	goto L_return;
 #elif defined(OS_LINUX) || defined(OS_APPLE)
 	char *name = string_to_null(path);
 	DIR *dp = opendir(name);

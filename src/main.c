@@ -17,11 +17,11 @@ struct Command {
 	String description;
 };
 
-static const Command COMMANDS[] = {
-	{ SCLIT("build"),    SCLIT("compile directory of .odin files, as an executable\n\t\t\tone must contain the program's entry point, all must be the same package.") },
-	{ SCLIT("run"),      SCLIT("same as 'build', but also runs the newly compiled executable.") },
-	{ SCLIT("dump-ast"), SCLIT("dump the generated syntax tree to stdout.") },
-	{ SCLIT("dump-c"),   SCLIT("dump the generated c to stdout.") },
+static Command COMMANDS[] = {
+	{ SLIT("build"),    SLIT("compile directory of .odin files, as an executable\n\t\t\tone must contain the program's entry point, all must be the same package.") },
+	{ SLIT("run"),      SLIT("same as 'build', but also runs the newly compiled executable.") },
+	{ SLIT("dump-ast"), SLIT("dump the generated syntax tree to stdout.") },
+	{ SLIT("dump-c"),   SLIT("dump the generated c to stdout.") },
 };
 
 String project_name(String path) {
@@ -99,7 +99,7 @@ static Bool transpile(String path, Context *context) {
 	strbuf_put_rune(&file, '\0');
 
 	// Ensure a build directory exists to shove the generated C0.
-	path_mkdir(".build");
+	_path_mkdir(".build", context);
 
 	const String filename = strbuf_result(&file);
 	FILE *fp = fopen(CAST(const char *, filename.contents), "wb");
@@ -139,7 +139,7 @@ static Bool build(const char *app, Context *context, String path, Size n_threads
 		}
 	} else {
 		// Transpile many files.
-		Array(String) files = path_list(path);
+		Array(String) files = _path_list(path, context);
 		const Size n_files = array_size(files);
 		if (n_files == 0) {
 			fprintf(stderr, "ERROR: `%s build` takes a package as its first argument.\n", app);
@@ -160,6 +160,8 @@ static Bool build(const char *app, Context *context, String path, Size n_threads
 				threadpool_queue(&pool, transpile_worker, worker, free);
 			}
 		}
+		threadpool_free(&pool);
+		array_free(files);
 	}
 
 	// Generate one of the following commands to build the C0.

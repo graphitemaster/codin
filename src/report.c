@@ -4,7 +4,7 @@
 
 #include "report.h"
 
-noreturn void report_assertion(const char *expression, const char *file, int line) {
+_Noreturn void report_assertion(const char *expression, const char *file, int line) {
 	fprintf(stderr, "Assertion failed: %s:%d: %s\n", file, line, expression);
 	abort();
 }

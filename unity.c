@@ -1,4 +1,5 @@
 // Unity build script. Just compile this with cl.exe on Windows
+// cl.exe /std:c11 /W3 /D_CRT_SECURE_NO_WARNINGS unity.c
 #include "src/array.c"
 #include "src/context.c"
 #include "src/gen.c"

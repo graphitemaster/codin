@@ -2,7 +2,6 @@
 #define CODIN_SUPPORT_H
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdnoreturn.h>
 
 #if defined(_WIN32)
 	#define OS_WINDOWS
@@ -89,7 +88,7 @@ typedef int32_t Rune; // Unicode codepoint.
 #define RUNE_BOM CAST(Rune, 0xfeff)
 #define RUNE_EOF CAST(Rune, -1)
 
-noreturn void report_assertion(const char *expression, const char *file, int line);
+extern _Noreturn void report_assertion(const char *expression, const char *file, int line);
 
 #define ASSERT(expression) \
 	((void)((expression) ? (void)0 : report_assertion(#expression, __FILE__, __LINE__)))
