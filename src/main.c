@@ -274,5 +274,5 @@ int main(int argc, char **argv) {
 
 	allocator->finalize(allocator);
 
-	return result ? 1 : 0;
+	return result ? 0 : 1;
 }
