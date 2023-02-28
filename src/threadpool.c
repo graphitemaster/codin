@@ -32,6 +32,7 @@ static int worker(void *user) {
 }
 
 Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
+	// TODO(pankkor): init can fail
 	cnd_init(&pool->cond);
 	mtx_init(&pool->mutex, mtx_plain);
 

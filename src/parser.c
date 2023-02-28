@@ -4,6 +4,7 @@
 
 #include "parser.h"
 #include "lexer.h"
+#include "support.h"
 #include "report.h"
 #include "tree.h"
 #include "context.h"
@@ -11,11 +12,7 @@
 
 #define TRACE 0
 
-#ifdef ERROR
-#undef ERROR
-#endif
-
-#define ERROR(...) \
+#define PARSER_ERROR(...) \
 	do { \
 		report_error(&parser->source, &parser->lexer.location, __VA_ARGS__); \
 		THROW(1); \
@@ -23,10 +20,10 @@
 	} while (0)
 
 #define ICE(...) \
-	ERROR(__VA_ARGS__)
+	PARSER_ERROR(__VA_ARGS__)
 
 #define UNIMPLEMENTED(what) \
-	ERROR("Unimplemented: %s", (what))
+	PARSER_ERROR("Unimplemented: %s", (what))
 
 static Bool source_read(Source *source, String filename, Context *context) {
 	Array(Uint8) contents = readfile(filename);
@@ -139,7 +136,7 @@ static Bool accepted_separator(Parser *parser) {
 		return true;
 	}
 	if (is_kind(token, KIND_SEMICOLON) && !string_compare(token.string, SCLIT("\n"))) {
-		ERROR("Expected a comma");
+		PARSER_ERROR("Expected a comma");
 	}
 	return false;
 }
@@ -207,7 +204,7 @@ static Token expect_kind(Parser *parser, Kind kind) {
 	if (!is_kind(token, kind)) {
 		const String want = kind_to_string(kind);
 		const String have = token_to_string(token);
-		ERROR("Expected '%.*s', got '%.*s'\n", SFMT(want), SFMT(have));
+		PARSER_ERROR("Expected '%.*s', got '%.*s'\n", SFMT(want), SFMT(have));
 	}
 	return advancep(parser);
 }
@@ -218,7 +215,7 @@ static Token expect_operator(Parser *parser, OperatorKind op) {
 	if (!is_operator(token, op)) {
 		const String want = operator_to_string(op);
 		const String have = token_to_string(token);
-		ERROR("Expected operator '%.*s', got '%.*s'", SFMT(want), SFMT(have));
+		PARSER_ERROR("Expected operator '%.*s', got '%.*s'", SFMT(want), SFMT(have));
 	}
 	return advancep(parser);
 }
@@ -229,7 +226,7 @@ static Token expect_keyword(Parser* parser, KeywordKind keyword) {
 	if (!is_keyword(token, keyword)) {
 		const String want = keyword_to_string(keyword);
 		const String have = token_to_string(token);
-		ERROR("Expected keyword '%.*s', got '%.*s'", SFMT(want), SFMT(have));
+		PARSER_ERROR("Expected keyword '%.*s', got '%.*s'", SFMT(want), SFMT(have));
 	}
 	return advancep(parser);
 }
@@ -240,7 +237,7 @@ static Token expect_assignment(Parser *parser, AssignmentKind assignment) {
 	if (!is_assignment(token, assignment)) {
 		const String want = assignment_to_string(assignment);
 		const String have = token_to_string(token);
-		ERROR("Expected assignment '%.*s', got '%.*s'", SFMT(want), SFMT(have));
+		PARSER_ERROR("Expected assignment '%.*s', got '%.*s'", SFMT(want), SFMT(have));
 	}
 	return advancep(parser);
 }
@@ -251,7 +248,7 @@ static Token expect_literal(Parser *parser, LiteralKind literal) {
 	if (!is_literal(token, literal)) {
 		const String want = literal_to_string(literal);
 		const String have = token_to_string(token);
-		ERROR("Expected literal '%.*s', got '%.*s'", SFMT(want), SFMT(have));
+		PARSER_ERROR("Expected literal '%.*s', got '%.*s'", SFMT(want), SFMT(have));
 	}
 	return advancep(parser);
 }
@@ -269,7 +266,7 @@ static void expect_semicolon(Parser *parser) {
 	}
 
 	if (token.location.line == parser->last_token.location.line) {
-		ERROR("Expected ';'");
+		PARSER_ERROR("Expected ';'");
 	}
 }
 
@@ -297,7 +294,7 @@ static Node *parse_identifier(Parser *parser) {
 		// NOTE(dweiler): Should write this a different way?
 		advancep(parser);
 	} else {
-		ERROR("Expected identifier or 'typeid'");
+		PARSER_ERROR("Expected identifier or 'typeid'");
 	}
 	Node *identifier = tree_new_identifier(parser->tree, token.string);
 	TRACE_LEAVE();
@@ -325,7 +322,7 @@ static Node *parse_type(Parser *parser) {
 	Node *type = parse_type_or_identifier(parser);
 	if (!type) {
 		advancep(parser);
-		ERROR("Expected a type");
+		PARSER_ERROR("Expected a type");
 	}
 	TRACE_LEAVE();
 	return type;
@@ -369,7 +366,7 @@ static FieldFlag parse_field_flag(Parser *parser) {
 		case DIRECTIVE_BY_PTR:
 			return FIELD_FLAG_BY_PTR;
 		default:
-			ERROR("Unsupported directive in field");
+			PARSER_ERROR("Unsupported directive in field");
 		}
 	}
 	return FIELD_FLAG_INVALID;
@@ -385,7 +382,7 @@ static FieldFlag parse_field_flags(Parser *parser) {
 			break;
 		}
 		if (flags & flag) {
-			ERROR("Duplicate in field list");
+			PARSER_ERROR("Duplicate in field list");
 		}
 		flags |= flag;
 		advancep(parser);
@@ -469,7 +466,7 @@ static Node *parse_parameter_list(Parser *parser) {
 		}
 	}
 	if (array_size(names) != 0) {
-		ERROR("Expected type");
+		PARSER_ERROR("Expected type");
 	}
 	array_free(names);
 	Node *node = tree_new_field_list(parser->tree, fields);
@@ -486,7 +483,7 @@ static Node *parse_procedure_type(Parser *parser) {
 		const String string = token.string;
 		convention = string_to_calling_convention(string_unquote(string, "\"`"));
 		if (convention == CCONV_INVALID) {
-			ERROR("Unknown calling convention '%.*s'", SFMT(string));
+			PARSER_ERROR("Unknown calling convention '%.*s'", SFMT(string));
 			TRACE_LEAVE();
 			return 0;
 		}
@@ -554,7 +551,7 @@ static Node *parse_procedure(Parser *parser) {
 			flags &= ~PROC_FLAG_TYPE_ASSERT;
 			break;
 		default:
-			ERROR("Cannot use directive '%.*s' on a procedure", SFMT(name));
+			PARSER_ERROR("Cannot use directive '%.*s' on a procedure", SFMT(name));
 		}
 	}
 
@@ -596,7 +593,7 @@ static Node *parse_procedure_group(Parser *parser) {
 		}
 	}
 	if (array_size(procedures) == 0) {
-		ERROR("Expected at least one procedure in procedure group");
+		PARSER_ERROR("Expected at least one procedure in procedure group");
 	}
 	expect_kind(parser, KIND_RBRACE);
 	Node *group = tree_new_procedure_group(parser->tree, procedures);
@@ -651,7 +648,7 @@ static Node *parse_directive_for_operand(Parser *parser, Bool lhs) {
 	case DIRECTIVE_FORCE_NO_INLINE:
 		node = parse_unary_expression(parser, false);
 		if (node->kind != NODE_PROCEDURE && !node_is_expression(node, EXPRESSION_CALL)) {
-			ERROR("Directive '%.*s' must be followed by a procedure literal or call expression");
+			PARSER_ERROR("Directive '%.*s' must be followed by a procedure literal or call expression");
 		}
 		switch (token.as_directive) {
 		case DIRECTIVE_FORCE_INLINE:
@@ -667,7 +664,7 @@ static Node *parse_directive_for_operand(Parser *parser, Bool lhs) {
 	default:
 		{
 			const String directive = directive_to_string(token.as_directive);
-			ERROR("Cannot use directive '%.*s' on a expression", SFMT(directive));
+			PARSER_ERROR("Cannot use directive '%.*s' on a expression", SFMT(directive));
 		}
 	}
 
@@ -709,7 +706,7 @@ static Node *parse_directive_for_statement(Parser *parser) {
 	default:
 		{
 			const String directive = directive_to_string(token.as_directive);
-			ERROR("Unsupported directive '%.*s' in statement", SFMT(directive));
+			PARSER_ERROR("Unsupported directive '%.*s' in statement", SFMT(directive));
 		}
 		break;
 	}
@@ -804,7 +801,7 @@ static Node *parse_operand(Parser *parser, Bool lhs) {
 			{
 				expect_operator(parser, OPERATOR_OPENPAREN);
 				if (is_operator(parser->last_token, OPERATOR_CLOSEPAREN)) {
-					ERROR("Empty parenthesized expression");
+					PARSER_ERROR("Empty parenthesized expression");
 				}
 				const Sint32 depth = parser->expression_depth;
 				parser->expression_depth = (depth > 0 ? depth : 0) + 1;
@@ -891,9 +888,9 @@ static Node *parse_call_expression(Parser *parser, Node *operand) {
 	expect_operator(parser, OPERATOR_OPENPAREN);
 	while (!is_operator(parser->this_token, OPERATOR_CLOSEPAREN) && !is_kind(parser->this_token, KIND_EOF)) {
 		if (is_operator(parser->this_token, OPERATOR_COMMA)) {
-			ERROR("Expected an expression COMMA");
+			PARSER_ERROR("Expected an expression COMMA");
 		} else if (is_assignment(parser->this_token, ASSIGNMENT_EQ)) {
-			ERROR("Expected an expression EQ");
+			PARSER_ERROR("Expected an expression EQ");
 		}
 	
 		Bool has_ellipsis = false;
@@ -906,7 +903,7 @@ static Node *parse_call_expression(Parser *parser, Node *operand) {
 		if (is_assignment(parser->this_token, ASSIGNMENT_EQ)) {
 			expect_assignment(parser, ASSIGNMENT_EQ);
 			if (has_ellipsis) {
-				ERROR("Cannot apply '..' to field");
+				PARSER_ERROR("Cannot apply '..' to field");
 			}
 
 			Node *value = parse_value(parser);
@@ -982,11 +979,11 @@ static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
 
 	if (!operand) {
 		// if (allow_type) return 0
-		// ERROR("Expected an operand");
+		// PARSER_ERROR("Expected an operand");
 		TRACE_LEAVE();
 		return 0;
 	}
-	// ERROR("Unimplemented atom expression");
+	// PARSER_ERROR("Unimplemented atom expression");
 	Node *node = 0;
 	Node *type = 0;
 	for (;;) {
@@ -1026,7 +1023,7 @@ static Node *parse_atom_expression(Parser *parser, Node *operand, Bool lhs) {
 					}
 					break;
 				default:
-					ERROR("Expected selector");
+					PARSER_ERROR("Expected selector");
 					advancep(parser);
 					break;
 				}
@@ -1167,7 +1164,7 @@ static Node *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec) {
 			if (last.location.line < token.location.line) {
 				return expr;
 			}
-			ERROR("Unimplemented ternary if or when expression");
+			PARSER_ERROR("Unimplemented ternary if or when expression");
 			break;
 		} else if (!is_kind(token, KIND_OPERATOR)) {
 			break;
@@ -1178,7 +1175,7 @@ static Node *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec) {
 		// Expect operator or if/when keywords.
 		Node *rhs = parse_binary_expression(parser, false, op_prec + 1);
 		if (!rhs) {
-			ERROR("Expected expression on the right-hand side");
+			PARSER_ERROR("Expected expression on the right-hand side");
 		}
 
 		if (is_operator(token, OPERATOR_OR_ELSE)) {
@@ -1297,7 +1294,7 @@ static Node *parse_block_statement(Parser *parser, Bool when) {
 	}
 
 	if (!when && !parser->this_procedure) {
-		ERROR("Cannot use block statement at file scope");
+		PARSER_ERROR("Cannot use block statement at file scope");
 	}
 
 	Node *body = parse_body(parser);
@@ -1326,12 +1323,12 @@ static Node *parse_declaration_statement(Parser *parser, Array(Node*) names) {
 		const Size n_names = array_size(names);
 		const Size n_values = array_size(values);
 		if (n_values != n_names) {
-			ERROR("Expected %d values on the right-hand side of this declaration", CAST(Sint32, n_names));
+			PARSER_ERROR("Expected %d values on the right-hand side of this declaration", CAST(Sint32, n_names));
 		}
 	}
 
 	if (constant && array_size(values) == 0) {
-		ERROR("Expected constant initializer");
+		PARSER_ERROR("Expected constant initializer");
 	}
 
 	if (parser->expression_depth >= 0) {
@@ -1353,12 +1350,12 @@ static Node *parse_simple_statement(Parser* parser, Bool allow_in) {
 	switch (token.kind) {
 	case KIND_ASSIGNMENT:
 		if (!parser->this_procedure) {
-			ERROR("Cannot use assignment statement at file scope");
+			PARSER_ERROR("Cannot use assignment statement at file scope");
 		}
 		advancep(parser);
 		Array(Node*) rhs = parse_rhs_expression_list(parser);
 		if (array_size(rhs) == 0) {
-			ERROR("Missing right-hand side in assignment");
+			PARSER_ERROR("Missing right-hand side in assignment");
 			return 0;
 		}
 		Node *node = tree_new_assignment_statement(parser->tree, token.as_assignment, lhs, rhs);
@@ -1391,14 +1388,14 @@ static Node *parse_simple_statement(Parser* parser, Bool allow_in) {
 		break;
 	default:
 		// const String string = token_to_string(token);
-		// ERROR("Unexpected '%.*s'",
+		// PARSER_ERROR("Unexpected '%.*s'",
 		// 	CAST(int,          string.size),
 		// 	CAST(const char *, string.data));
 		break;
 	}
 
 	if (array_size(lhs) == 0 || array_size(lhs) > 1) {
-		ERROR("Expected one expression on the left-hand side");
+		PARSER_ERROR("Expected one expression on the left-hand side");
 		return 0;
 	}
 
@@ -1441,7 +1438,7 @@ static Node *convert_statement_to_body(Parser *parser, Node *statement) {
 
 	const StatementKind kind = statement->statement.kind;
 	if (kind == STATEMENT_BLOCK || kind == STATEMENT_EMPTY) {
-		ERROR("Expected a regular statement");
+		PARSER_ERROR("Expected a regular statement");
 	}
 	Array(Node*) statements = 0;
 	array_push(statements, statement);
@@ -1458,7 +1455,7 @@ static Node *convert_statement_to_expression(Parser *parser, Node *statement) {
 	if (kind == STATEMENT_EXPRESSION) {
 		return statement->statement.expression.expression;
 	}
-	ERROR("Expected a statement");
+	PARSER_ERROR("Expected a statement");
 	return 0;
 }
 
@@ -1506,7 +1503,7 @@ static Node *parse_if_statement(Parser *parser) {
 	parser->expression_depth = depth;
 
 	if (!cond) {
-		ERROR("Expected condition in if statement");
+		PARSER_ERROR("Expected condition in if statement");
 	}
 
 	Node *body = 0;
@@ -1529,7 +1526,7 @@ static Node *parse_if_statement(Parser *parser) {
 			expect_keyword(parser, KEYWORD_DO);
 			elif = parse_do_body(parser);
 		} else {
-			ERROR("Expected block on 'else' statement");
+			PARSER_ERROR("Expected block on 'else' statement");
 		}
 	}
 
@@ -1586,14 +1583,14 @@ static Node *parse_for_statement(Parser *parser) {
 			const Token token = parser->this_token;
 		
 			if (is_kind(token, KIND_LBRACE) || is_keyword(token, KEYWORD_DO)) {
-				ERROR("Expected ';'");
+				PARSER_ERROR("Expected ';'");
 			} else {
 				if (!is_kind(token, KIND_SEMICOLON)) {
 					// for [...] <Statement>
 					cond = parse_simple_statement(parser, false);
 				}
 				if (!is_kind(parser->this_token, KIND_SEMICOLON)) {
-					ERROR("Expected ';'");
+					PARSER_ERROR("Expected ';'");
 				} else {
 					expect_kind(parser, KIND_SEMICOLON);
 				}
@@ -1632,11 +1629,11 @@ static Node *parse_defer_statement(Parser *parser) {
 	Node *node = parse_statement(parser);
 	switch (node->statement.kind) {
 	case STATEMENT_EMPTY:
-		ERROR("Empty statement in defer");
+		PARSER_ERROR("Empty statement in defer");
 	case STATEMENT_DEFER:
-		ERROR("Cannot defer a defer statement");
+		PARSER_ERROR("Cannot defer a defer statement");
 	case STATEMENT_RETURN:
-		ERROR("Cannot defer a return statement");
+		PARSER_ERROR("Cannot defer a return statement");
 	default:
 		break;
 	}
@@ -1653,7 +1650,7 @@ static Node *parse_return_statement(Parser *parser) {
 	expect_keyword(parser, KEYWORD_RETURN);
 
 	if (parser->expression_depth > 0) {
-		ERROR("Cannot use return statement within expression");
+		PARSER_ERROR("Cannot use return statement within expression");
 	}
 
 	Array(Node*) results = 0;
@@ -1803,7 +1800,7 @@ static Node *parse_statement(Parser *parser) {
 	}
 
 	if (is_keyword(token, KEYWORD_ELSE)) {
-		ERROR("'else' unattached to an 'if' or 'when' statement");
+		PARSER_ERROR("'else' unattached to an 'if' or 'when' statement");
 	}
 
 	ICE("Expected statement");
@@ -1832,7 +1829,7 @@ Tree *parse(String filename, Context *context) {
 
 	// Every Odin source file must begin with the package it's part of.
 	if (!is_keyword(parser->this_token, KEYWORD_PACKAGE)) {
-		ERROR("Expected a package declaration at the beginning of the file");
+		PARSER_ERROR("Expected a package declaration at the beginning of the file");
 	}
 
 	static const String RESERVED_PACKAGES[] = {
@@ -1845,13 +1842,13 @@ Tree *parse(String filename, Context *context) {
 	expect_keyword(parser, KEYWORD_PACKAGE);
 	const Token package = expect_kind(parser, KIND_IDENTIFIER);
 	if (string_compare(package.string, SCLIT("_"))) {
-		ERROR("Cannot name package '_'");
+		PARSER_ERROR("Cannot name package '_'");
 	}
 
 	for (Size i = 0; i < sizeof(RESERVED_PACKAGES)/sizeof(*RESERVED_PACKAGES); i++) {
 		const String name = RESERVED_PACKAGES[i];
 		if (string_compare(package.string, name)) {
-			ERROR("Use of reserved package name '%.*s'", SFMT(name));
+			PARSER_ERROR("Use of reserved package name '%.*s'", SFMT(name));
 		}
 	}
 

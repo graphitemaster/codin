@@ -443,21 +443,29 @@ static void tree_dump_expression(const Expression *expression, Sint32 depth) {
 	tree_dump_pad(depth);
 	switch (expression->kind) {
 	case EXPRESSION_UNARY:
-		return tree_dump_unary_expression(&expression->unary, depth);
+		tree_dump_unary_expression(&expression->unary, depth);
+		break;
 	case EXPRESSION_BINARY:
-		return tree_dump_binary_expression(&expression->binary, depth);
+		tree_dump_binary_expression(&expression->binary, depth);
+		break;
 	case EXPRESSION_CAST:
-		return tree_dump_cast_expression(&expression->cast, depth);
+		tree_dump_cast_expression(&expression->cast, depth);
+		break;
 	case EXPRESSION_SELECTOR:
-		return tree_dump_selector_expression(&expression->selector, depth);
+		tree_dump_selector_expression(&expression->selector, depth);
+		break;
 	case EXPRESSION_CALL:
-		return tree_dump_call_expression(&expression->call, depth);
+		tree_dump_call_expression(&expression->call, depth);
+		break;
 	case EXPRESSION_ASSERTION:
-		return tree_dump_assertion_expression(&expression->assertion, depth);
+		tree_dump_assertion_expression(&expression->assertion, depth);
+		break;
 	case EXPRESSION_IN:
-		return tree_dump_in_expression(&expression->in, depth);
+		tree_dump_in_expression(&expression->in, depth);
+		break;
 	case EXPRESSION_DEREFERENCE:
-		return tree_dump_dereference_expression(&expression->dereference, depth);
+		tree_dump_dereference_expression(&expression->dereference, depth);
+		break;
 	}
 }
 
@@ -609,25 +617,35 @@ static void tree_dump_statement(const Statement *statement, Sint32 depth) {
 	tree_dump_pad(depth);
 	switch (statement->kind) {
 	case STATEMENT_EMPTY:
-		return tree_dump_empty_statement(&statement->empty, depth);
+		tree_dump_empty_statement(&statement->empty, depth);
+		break;
 	case STATEMENT_BLOCK:
-		return tree_dump_block_statement(&statement->block, depth);
+		tree_dump_block_statement(&statement->block, depth);
+		break;
 	case STATEMENT_IMPORT:
-		return tree_dump_import_statement(&statement->import, depth);
+		tree_dump_import_statement(&statement->import, depth);
+		break;
 	case STATEMENT_EXPRESSION:
-		return tree_dump_expression_statement(&statement->expression, depth);
+		tree_dump_expression_statement(&statement->expression, depth);
+		break;
 	case STATEMENT_ASSIGNMENT:
-		return tree_dump_assignment_statement(&statement->assignment, depth);
+		tree_dump_assignment_statement(&statement->assignment, depth);
+		break;
 	case STATEMENT_DECLARATION:
-		return tree_dump_declaration_statement(&statement->declaration, depth);
+		tree_dump_declaration_statement(&statement->declaration, depth);
+		break;
 	case STATEMENT_IF:
-		return tree_dump_if_statement(&statement->if_, depth);
+		tree_dump_if_statement(&statement->if_, depth);
+		break;
 	case STATEMENT_RETURN:
-		return tree_dump_return_statement(&statement->return_, depth);
+		tree_dump_return_statement(&statement->return_, depth);
+		break;
 	case STATEMENT_FOR:
-		return tree_dump_for_statement(&statement->for_, depth);
+		tree_dump_for_statement(&statement->for_, depth);
+		break;
 	case STATEMENT_DEFER:
-		return tree_dump_defer_statement(&statement->defer, depth);
+		tree_dump_defer_statement(&statement->defer, depth);
+		break;
 	}
 }
 
@@ -772,7 +790,8 @@ static void tree_dump_directive(const Directive *directive, Sint32 depth) {
 static void tree_dump_type(const Type* type, Sint32 depth) {
 	switch (type->kind) {
 	case TYPE_PROCEDURE:
-		return tree_dump_procedure_type(&type->procedure, depth);
+		tree_dump_procedure_type(&type->procedure, depth);
+		break;
 	case TYPE_TYPEID:
 		tree_dump_pad(depth);
 		printf("(typeid)");
@@ -815,29 +834,41 @@ static void tree_dump_type(const Type* type, Sint32 depth) {
 void tree_dump_node(const Node *node, Sint32 depth) {
 	switch (node->kind) {
 	case NODE_EXPRESSION:
-		return tree_dump_expression(&node->expression, depth);
+		tree_dump_expression(&node->expression, depth);
+		break;
 	case NODE_STATEMENT:
-		return tree_dump_statement(&node->statement, depth);
+		tree_dump_statement(&node->statement, depth);
+		break;
 	case NODE_IDENTIFIER:
-		return tree_dump_identifier(&node->identifier, depth);
+		tree_dump_identifier(&node->identifier, depth);
+		break;
 	case NODE_VALUE:
-		return tree_dump_value(&node->value, depth);
+		tree_dump_value(&node->value, depth);
+		break;
 	case NODE_LITERAL_VALUE:
-		return tree_dump_literal_value(&node->literal_value, depth);
+		tree_dump_literal_value(&node->literal_value, depth);
+		break;
 	case NODE_COMPOUND_LITERAL:
-		return tree_dump_compound_literal(&node->compound_literal, depth);
+		tree_dump_compound_literal(&node->compound_literal, depth);
+		break;
 	case NODE_FIELD:
-		return tree_dump_field(&node->field, depth);
+		tree_dump_field(&node->field, depth);
+		break;
 	case NODE_FIELD_LIST:
-		return tree_dump_field_list(&node->field_list, depth);
+		tree_dump_field_list(&node->field_list, depth);
+		break;
 	case NODE_PROCEDURE:
-		return tree_dump_procedure(&node->procedure, depth);
+		tree_dump_procedure(&node->procedure, depth);
+		break;
 	case NODE_PROCEDURE_GROUP:
-		return tree_dump_procedure_group(&node->procedure_group, depth);
+		tree_dump_procedure_group(&node->procedure_group, depth);
+		break;
 	case NODE_DIRECTIVE:
-		return tree_dump_directive(&node->directive, depth);
+		tree_dump_directive(&node->directive, depth);
+		break;
 	case NODE_TYPE:
-		return tree_dump_type(&node->type, depth);
+		tree_dump_type(&node->type, depth);
+		break;
 	}
 	UNREACHABLE();
 }

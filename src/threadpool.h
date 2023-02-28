@@ -1,6 +1,7 @@
 #ifndef CODIN_THREADPOOL_H
 #define CODIN_THREADPOOL_H
-#include <threads.h> // thrd_t, cnd_t, mtx_t
+
+#include "cthreads.h" // thrd_t, cnd_t, mtx_t
 
 #include "array.h"
 

@@ -13,7 +13,7 @@ $ make
 
 To build on Windows
 ```
-$ cl.exe unity.c
+$ cl.exe /std:c11 /W3 /D_CRT_SECURE_NO_WARNINGS unity.c
 ```
 
 ### Running
