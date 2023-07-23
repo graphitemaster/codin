@@ -7,7 +7,6 @@
 #include "path.h"
 #include "parser.h"
 #include "threadpool.h"
-#include "lower.h"
 #include "context.h"
 
 typedef struct Command Command;
@@ -69,14 +68,15 @@ static Bool transpile(String path, Context *context) {
 		return false;
 	}
 
+	/*
 	Tree *lowered = lower(tree);
 	if (!lowered) {
 		fprintf(stderr, "Failed to lower\n");
 		return false;
-	}
+	}*/
 
 	StrBuf strbuf;
-	if (!generate(context, lowered, &strbuf)) {
+	if (!generate(context, tree, &strbuf)) {
 		fprintf(stderr, "Failed to generate C0\n");
 		return false;
 	}
@@ -202,12 +202,7 @@ static Bool dump_ast(Context *context, String file) {
 		return false;
 	}
 
-	Tree *lowered = lower(tree);
-	if (!lowered) {
-		return false;
-	}
-
-	tree_dump(lowered);
+	tree_dump(tree);
 
 	return true;
 }
@@ -218,13 +213,8 @@ static Bool dump_c(Context *context, String file) {
 		return 0;
 	}
 
-	Tree *lowered = lower(tree);
-	if (!lowered) {
-		return 0;
-	}
-
 	StrBuf strbuf;
-	if (!generate(context, lowered, &strbuf)) {
+	if (!generate(context, tree, &strbuf)) {
 		return 0;
 	}
 

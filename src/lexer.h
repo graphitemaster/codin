@@ -2,6 +2,8 @@
 #define CODIN_LEXER_H
 #include "string.h"
 
+typedef struct Context Context;
+
 typedef struct Lexer Lexer;
 typedef struct Token Token;
 typedef struct Location Location;
@@ -99,6 +101,7 @@ struct Input {
 };
 
 struct Lexer {
+	Context *context;
 	Input input;
 	Location location; 
 	const Uint8 *here;
@@ -107,7 +110,7 @@ struct Lexer {
 	Token peek;
 };
 
-Bool lexer_init(Lexer *lexer, const Source *source);
+Bool lexer_init(Lexer *lexer, Context *context, const Source *source);
 Token lexer_next(Lexer *lexer);
 Token lexer_peek(Lexer *lexer);
 

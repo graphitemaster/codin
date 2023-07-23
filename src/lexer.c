@@ -5,6 +5,7 @@
 #include "lexer.h"
 #include "support.h"
 #include "report.h"
+#include "context.h"
 
 #ifdef ERROR
 #undef ERROR
@@ -16,7 +17,7 @@ const Source SOURCE_NIL = { { 0, 0 }, { 0, 0 } };
 #define ERROR(...) \
 	do { \
 		report_error(lexer->input.source, &lexer->location, __VA_ARGS__); \
-		exit(1); \
+		THROW(1); \
 	} while (0)
 
 // Searches for a keyword
@@ -218,11 +219,13 @@ L_exponent:
 	return token;
 }
 
-Bool lexer_init(Lexer *lexer, const Source *source) {
+Bool lexer_init(Lexer *lexer, Context *context, const Source *source) {
 	const String *const string = &source->contents;
 	if (string->length == 0) {
 		return false;
 	}
+
+	lexer->context = context;
 
 	lexer->input.source = source;
 	lexer->input.cur = string->contents;
@@ -258,6 +261,7 @@ Token lexer_peek(Lexer *lexer) {
 }
 
 Token lexer_next(Lexer *lexer) {
+	Context *context = lexer->context;
 	if (lexer->peek.kind != KIND_INVALID) {
 		const Token token = lexer->peek;
 		lexer->peek.kind = KIND_INVALID;

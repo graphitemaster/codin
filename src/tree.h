@@ -435,11 +435,6 @@ Node *tree_new_procedure(Tree *tree, ProcedureFlag flags, Node *type, Node *body
 Node *tree_new_procedure_group(Tree *tree, Array(Node*) procedures);
 Node *tree_new_directive(Tree *tree, DirectiveKind directive);
 
-Node *tree_clone_node(Tree *tree, const Node *node);
-Node *tree_clone_statement(Tree *tree, const Statement *statement);
-Node *tree_clone_return_statement(Tree *tree, const ReturnStatement *statement);
-Node *tree_clone_expression(Tree *tree, const Expression *expression);
-
 void tree_init(Tree *tree, Context *context);
 
 void tree_dump(Tree *tree);

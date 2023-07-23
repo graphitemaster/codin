@@ -2,7 +2,6 @@
 #define CODIN_SUPPORT_H
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdnoreturn.h>
 
 #if defined(_WIN32)
 	#define OS_WINDOWS
@@ -24,10 +23,13 @@
 
 #if defined(__cplusplus)
 	#define FALLTHROUGH() [[fallthrough]]
+	#define NORETURN      [[noreturn]]
 #elif defined(_MSC_VER)
 	#define FALLTHROUGH()
+	#define NORETURN      __declspec(noreturn)
 #else
-	#define FALLTHROUGH() __attribute__((fallthrough))
+	#define FALLTHROUGH() __attribute__((__fallthrough__))
+	#define NORETURN      __attribute__((__noreturn__))
 #endif
 
 typedef int8_t Sint8;
@@ -55,7 +57,7 @@ typedef int32_t Rune; // Unicode codepoint.
 #define RUNE_BOM CAST(Rune, 0xfeff)
 #define RUNE_EOF CAST(Rune, -1)
 
-noreturn void report_assertion(const char *expression, const char *file, int line);
+NORETURN void report_assertion(const char *expression, const char *file, int line);
 
 #define ASSERT(expression) \
   ((void)((expression) ? (void)0 : report_assertion(#expression, __FILE__, __LINE__)))

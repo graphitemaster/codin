@@ -76,7 +76,7 @@ static Bool parser_init(Parser *parser, String filename, Context *context) {
 		return false;
 	}
 
-	if (!lexer_init(&parser->lexer, &parser->source)) {
+	if (!lexer_init(&parser->lexer, parser->context, &parser->source)) {
 		return false;
 	}
 
