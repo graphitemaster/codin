@@ -268,19 +268,11 @@ static void expect_semicolon(Parser *parser) {
 	}
 }
 
-static CallingConvention string_to_calling_convention(String string) {
-	/**/ if (string_compare(string, SCLIT("odin")))        return CCONV_ODIN;
-	else if (string_compare(string, SCLIT("contextless"))) return CCONV_CONTEXTLESS;
-	else if (string_compare(string, SCLIT("cdecl")))       return CCONV_CDECL;
-	else if (string_compare(string, SCLIT("c")))           return CCONV_CDECL;
-	else if (string_compare(string, SCLIT("stdcall")))     return CCONV_STDCALL;
-	else if (string_compare(string, SCLIT("std")))         return CCONV_STDCALL;
-	else if (string_compare(string, SCLIT("fastcall")))    return CCONV_FASTCALL;
-	else if (string_compare(string, SCLIT("fast")))        return CCONV_FASTCALL;
-	else if (string_compare(string, SCLIT("none")))        return CCONV_NONE;
-	else if (string_compare(string, SCLIT("naked")))       return CCONV_NAKED;
-	else if (string_compare(string, SCLIT("win64")))       return CCONV_STDCALL;
-	else if (string_compare(string, SCLIT("sysv")))        return CCONV_CDECL;
+static CallingConvention string_to_calling_convention(String input) {
+	#define CCONVENTION(string, enumerator) \
+		if (string_compare(input, SCLIT(string))) return CCONV_ ## enumerator;
+	#include "lexemes.h"
+	#undef CCONVENTION
 	return CCONV_INVALID;
 }
 

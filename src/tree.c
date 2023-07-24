@@ -749,23 +749,19 @@ static Bool tree_dump_procedure(const Procedure *procedure, Sint32 depth) {
 	return true;
 }
 
-static const char *calling_convention_to_string(CallingConvention convention) {
-	static const char *CALLING_CONVENTIONS[] = {
-		[CCONV_INVALID]     = "invalid",
-		[CCONV_ODIN]        = "odin",
-		[CCONV_CONTEXTLESS] = "contextless",
-		[CCONV_CDECL]       = "cdecl",
-		[CCONV_STDCALL]     = "stdcall",
-		[CCONV_FASTCALL]    = "fastcall",
-		[CCONV_NAKED]       = "naked",
-		[CCONV_NONE]        = "none",
+static String calling_convention_to_string(CallingConvention convention) {
+	#define CCONVENTION(string, ...) SLIT(string),
+	static const String CALLING_CONVENTIONS[] = {
+		#include "lexemes.h"
 	};
+	#undef CCONVENTION
 	return CALLING_CONVENTIONS[convention];
 }
 
 static Bool tree_dump_procedure_type(const ProcedureType *procedure, Sint32 depth) {
 	tree_dump_pad(depth);
-	printf("(cconv \"%s\")\n", calling_convention_to_string(procedure->convention));
+	const String cconv = calling_convention_to_string(procedure->convention);
+	printf("(cconv \"%.*s\")\n", SFMT(cconv));
 	tree_dump_pad(depth);
 	printf("(parameters\n");
 	if (procedure->params) {

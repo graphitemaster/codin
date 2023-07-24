@@ -28,6 +28,10 @@
 #define ATTRIBUTE(...)
 #endif
 
+#ifndef CCONVENTION
+#define CCONVENTION(...)
+#endif
+
 // Token kinds
 //   ENUM,         NAME
 KIND(INVALID,      "invalid")
@@ -224,6 +228,20 @@ ATTRIBUTE(PRIVATE,                  "private",                ATTRIBUTE_PROC | A
 ATTRIBUTE(OBJC_CLASS,               "objc_class",             ATTRIBUTE_TYPE)
 */
 
+// Calling conventions
+CCONVENTION("odin",        ODIN)
+CCONVENTION("contextless", CONTEXTLESS)
+CCONVENTION("cdecl",       CDECL)
+CCONVENTION("c",           CDECL)
+CCONVENTION("stdcall",     STDCALL)
+CCONVENTION("std",         STDCALL)
+CCONVENTION("fastcall",    FASTCALL)
+CCONVENTION("fast",        FASTCALL)
+CCONVENTION("none",        NONE)
+CCONVENTION("naked",       NAKED)
+CCONVENTION("win64",       STDCALL)
+CCONVENTION("sysv",        CDECL)
+
 // NOTE(dweiler): Actual types are not keywords because in Odin a type can be
 // replaced within a package. This makes types regular identifiers.
 
@@ -234,3 +252,4 @@ ATTRIBUTE(OBJC_CLASS,               "objc_class",             ATTRIBUTE_TYPE)
 #undef LITERAL
 #undef ASSIGNMENT
 #undef KIND
+#undef CCONVENTION
