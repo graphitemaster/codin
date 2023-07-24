@@ -36,6 +36,14 @@
 	#define ALIGN(n)      __attribute__((__aligned__(n)))
 #endif
 
+// LIT
+#if defined(__cplusplus)
+#define LIT(T, ...) (T { __VA_ARGS__ })
+#else
+#define LIT(T, ...) ((T) { __VA_ARGS__ })
+#endif
+
+// STATIC_ASSERT(expr, message)
 #if defined(__cplusplus)
 	#define STATIC_ASSERT(expr, message) \
 		static_assert(expr, message)
@@ -49,7 +57,7 @@
 	#endif
 #endif
 
-// Easier to search for.
+// Casts
 #if defined(__cplusplus)
 	#define CAST(T, expr) static_cast<T>(expr)
 	#define RCAST(T, expr) reinterpret_cast<T>(expr)

@@ -22,8 +22,8 @@ String _string_copy_from_data(const Uint8 *data, Uint64 length, Context *context
 	if (!storage) {
 		return STRING_NIL;
 	}
-	memcpy(storage, data, length);	
-	return (String) { storage, length };
+	memcpy(storage, data, length);
+	return LIT(String, storage, length);
 }
 
 String _string_copy_from_null(const char *string, Context *context) {
@@ -35,7 +35,7 @@ String _string_copy_from_null(const char *string, Context *context) {
 }
 
 String string_from_null(const char *string) {
-	return (String) { RCAST(Uint8*, CCAST(char*, string)), strlen(string) };
+	return LIT(String, RCAST(Uint8*, CCAST(char*, string)), strlen(string));
 }
 
 String _string_copy(String string, Context *context) {
@@ -53,7 +53,7 @@ String string_unquote(String string, const char *quote_set) {
 	}
 	const char *ch = strchr(quote_set, string.contents[0]);
 	if (ch && string.contents[string.length - 1] == *ch) {
-		return (String) { string.contents + 1, string.length - 2 };
+		return LIT(String, string.contents + 1, string.length - 2);
 	}
 	return string;
 }
@@ -104,7 +104,7 @@ Bool string_find_last_byte(String string, Uint8 byte, Uint64 *index) {
 }
 
 String string_slice(String string, Uint64 from, Uint64 to) {
-	return (String) { string.contents + from, to - from };
+	return LIT(String, string.contents + from, to - from);
 }
 
 static void utf8_to_utf16_core(const char *const source, Uint16 *destination, Uint64 *const length) {

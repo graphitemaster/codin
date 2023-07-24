@@ -63,8 +63,6 @@ Bool strbuf_put_formatted(StrBuf *strbuf, const char *fmt, ...) {
 }
 
 String strbuf_result(StrBuf *strbuf) {
-	String result;
-	result.contents = strbuf->contents;
-	result.length = array_size(strbuf->contents);
-	return result;
+	Array(Uint8) contents = strbuf->contents;
+	return LIT(String, contents, array_size(contents));
 }

@@ -84,7 +84,8 @@ Bool threadpool_queue(ThreadPool *pool, void (*function)(void*), void *user, voi
 	Context *context = pool->context;
 
 	mutex_lock(&pool->mutex);
-	if (!array_push(pool->work, ((Work){function, user, dispose}))) {
+	const Work work = LIT(Work, function, user, dispose);
+	if (!array_push(pool->work, work)) {
 		if (dispose) {
 			dispose(user);
 		}
