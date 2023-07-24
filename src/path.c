@@ -8,6 +8,7 @@
 #include <sys/stat.h> // mkdir
 #include <dirent.h> // DIR, dirent, readdir
 #elif defined(OS_WINDOWS)
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
 
@@ -18,9 +19,7 @@ Bool _path_mkdir(const char *pathname, Context *context) {
 #elif defined(OS_WINDOWS)
 	Uint16 *pathname_utf16 = 0;
 	if (utf8_to_utf16(pathname, &pathname_utf16)) {
-		const Bool result = CreateDirectoryW(pathname_utf16, 0);
-		free(pathname_utf16);
-		return result;
+		return CreateDirectoryW(pathname_utf16, 0);
 	} else {
 		return false;
 	}

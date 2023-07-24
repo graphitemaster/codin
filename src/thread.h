@@ -1,5 +1,7 @@
 #ifndef CODIN_THREAD_H
 #define CODIN_THREAD_H
+#include <stdalign.h>
+
 #include "support.h"
 
 typedef struct Context Context;
@@ -8,9 +10,17 @@ typedef struct Thread Thread;
 typedef struct Mutex Mutex;
 typedef struct Cond Cond;
 
-struct Thread { Uint8 storage[64]; };
-struct Cond { Uint8 storage[64]; };
-struct Mutex { Uint8 storage[64]; };
+struct Thread {
+	alignas(16) Uint8 storage[64];
+};
+
+struct Cond { 
+	alignas(16) Uint8 storage[64];
+};
+
+struct Mutex { 
+	alignas(16) Uint8 storage[64];
+};
 
 #define thread_create(thread, proc, data) \
 	_thread_create((thread), (proc), (data), context)

@@ -3,6 +3,9 @@
 #include <stdio.h>  // fprintf, fputc
 
 #include "report.h"
+#include "support.h"
+#include "string.h"
+#include "lexer.h"
 
 NORETURN void report_assertion(const char *expression, const char *file, int line) {
 	fprintf(stderr, "Assertion failed: %s:%d: %s\n", file, line, expression);
