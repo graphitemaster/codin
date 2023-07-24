@@ -23,8 +23,13 @@ struct String {
 
 // Use this anywhere SLIT won't work, like taking the address of a String or
 // passing a String to a function.
+#if defined(__cplusplus)
+#define SCLIT(content) \
+	(String SLIT(content))
+#else
 #define SCLIT(content) \
 	((const String) SLIT(content))
+#endif
 
 #define SFMT(string) \
 	CAST(Sint32, string.length), RCAST(const char *, string.contents)

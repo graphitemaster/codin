@@ -22,14 +22,14 @@
 	#define UNREACHABLE() __builtin_unreachable()
 #endif
 
-#if defined(__cplusplus)
-	#define FALLTHROUGH() [[fallthrough]]
-	#define NORETURN      [[noreturn]]
-	#define ALIGN(n)      alignas(n)
-#elif defined(_MSC_VER)
+#if defined(_MSC_VER)
 	#define FALLTHROUGH()
 	#define NORETURN      __declspec(noreturn)
 	#define ALIGN(n)      __declspec(align(n))
+#elif defined(__cplusplus)
+	#define FALLTHROUGH() [[fallthrough]]
+	#define NORETURN      [[noreturn]]
+	#define ALIGN(n)      alignas(n)
 #else
 	#define FALLTHROUGH() __attribute__((__fallthrough__))
 	#define NORETURN      __attribute__((__noreturn__))
@@ -37,9 +37,16 @@
 #endif
 
 #if defined(__cplusplus)
-	#define STATIC_ASSERT(expr, message) static_assert(expr, message)
+	#define STATIC_ASSERT(expr, message) \
+		static_assert(expr, message)
 #else
-	#define STATIC_ASSERT(expr, message) _Static_assert(expr, message)
+	#if __STDC_VERSION__ >= 201112L
+		#define STATIC_ASSERT(expr, message) \
+			_Static_assert(expr, message)
+	#else
+		#define STATIC_ASSERT(expr, ...) \
+			typedef int static_assert_ ## __LINE __ [(expr) ? 1 : -1]
+	#endif
 #endif
 
 // Easier to search for.

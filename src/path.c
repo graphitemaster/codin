@@ -19,7 +19,7 @@ Bool _path_mkdir(const char *pathname, Context *context) {
 #elif defined(OS_WINDOWS)
 	Uint16 *pathname_utf16 = 0;
 	if (utf8_to_utf16(pathname, &pathname_utf16)) {
-		return CreateDirectoryW(pathname_utf16, 0);
+		return CreateDirectoryW(RCAST(LPCWSTR, pathname_utf16), 0);
 	} else {
 		return false;
 	}
