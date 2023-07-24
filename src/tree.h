@@ -439,6 +439,6 @@ Node *tree_new_directive(Tree *tree, DirectiveKind directive);
 void tree_init(Tree *tree, Context *context);
 
 void tree_dump(Tree *tree);
-void tree_dump_node(const Node *node, Sint32 depth);
+Bool tree_dump_node(const Node *node, Sint32 depth);
 
 #endif // CODIN_TREE_H

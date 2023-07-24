@@ -328,15 +328,16 @@ void tree_init(Tree *tree, Context *context) {
 	tree->statements = 0;
 }
 
-void tree_dump_node(const Node *node, Sint32 depth);
+Bool tree_dump_node(const Node *node, Sint32 depth);
 
-static void tree_dump_pad(Sint32 depth) {
+static Bool tree_dump_pad(Sint32 depth) {
 	for (Sint32 i = 0; i < depth; i++) {
 		printf("..");
 	}
+	return true;
 }
 
-static void tree_dump_unary_expression(const UnaryExpression *expression, Sint32 depth) {
+static Bool tree_dump_unary_expression(const UnaryExpression *expression, Sint32 depth) {
 	(void)depth;
 	const String operation = operator_to_string(expression->operation);
 	printf("(unary\n");
@@ -347,9 +348,10 @@ static void tree_dump_unary_expression(const UnaryExpression *expression, Sint32
 		tree_dump_node(expression->operand, depth + 1);
 	}
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_binary_expression(const BinaryExpression *expression, Sint32 depth) {
+static Bool tree_dump_binary_expression(const BinaryExpression *expression, Sint32 depth) {
 	(void)depth;
 	const String operation = operator_to_string(expression->operation);
 	printf("(binary\n");
@@ -359,9 +361,10 @@ static void tree_dump_binary_expression(const BinaryExpression *expression, Sint
 	putchar('\n');
 	tree_dump_node(expression->rhs, depth + 1);
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_cast_expression(const CastExpression *expression, Sint32 depth) {
+static Bool tree_dump_cast_expression(const CastExpression *expression, Sint32 depth) {
 	(void)depth;
 	printf("(cast\n");
 	if (expression->type) {
@@ -370,9 +373,10 @@ static void tree_dump_cast_expression(const CastExpression *expression, Sint32 d
 	}
 	tree_dump_node(expression->expression, depth + 1);
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_selector_expression(const SelectorExpression *expression, Sint32 depth) {
+static Bool tree_dump_selector_expression(const SelectorExpression *expression, Sint32 depth) {
 	(void)depth;
 	printf("(selector\n");
 	if (expression->operand) {
@@ -381,9 +385,10 @@ static void tree_dump_selector_expression(const SelectorExpression *expression, 
 	}
 	tree_dump_node(expression->identifier, depth + 1);
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_call_expression(const CallExpression *expression, Sint32 depth) {
+static Bool tree_dump_call_expression(const CallExpression *expression, Sint32 depth) {
 	(void)depth;
 	printf("(call\n");
 	if (expression->operand) {
@@ -405,18 +410,20 @@ static void tree_dump_call_expression(const CallExpression *expression, Sint32 d
 		printf("<empty>");
 	}
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_assertion_expression(const AssertionExpression *expression, Sint32 depth) {
+static Bool tree_dump_assertion_expression(const AssertionExpression *expression, Sint32 depth) {
 	(void)depth;
 	printf("(assert\n");
 	tree_dump_node(expression->operand, depth + 1);
 	putchar('\n');
 	tree_dump_node(expression->type, depth + 1);
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_in_expression(const InExpression *expression, Sint32 depth) {
+static Bool tree_dump_in_expression(const InExpression *expression, Sint32 depth) {
 	printf("(in\n");
 	tree_dump_pad(depth + 1);
 	printf("(lhs\n");
@@ -430,16 +437,18 @@ static void tree_dump_in_expression(const InExpression *expression, Sint32 depth
 	printf("(rhs\n");
 	tree_dump_node(expression->rhs, depth + 2);
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_dereference_expression(const DereferenceExpression *expression, Sint32 depth) {;
+static Bool tree_dump_dereference_expression(const DereferenceExpression *expression, Sint32 depth) {;
 	printf("(dereference\n");
 	tree_dump_node(expression->operand, depth + 1);
 	putchar(')');
+	return true;
 }
 
 // expressions
-static void tree_dump_expression(const Expression *expression, Sint32 depth) {
+static Bool tree_dump_expression(const Expression *expression, Sint32 depth) {
 	tree_dump_pad(depth);
 	switch (expression->kind) {
 	case EXPRESSION_UNARY:
@@ -459,16 +468,18 @@ static void tree_dump_expression(const Expression *expression, Sint32 depth) {
 	case EXPRESSION_DEREFERENCE:
 		return tree_dump_dereference_expression(&expression->dereference, depth);
 	}
+	return true;
 }
 
 // statements
-static void tree_dump_empty_statement(const EmptyStatement *statement, Sint32 depth) {
+static Bool tree_dump_empty_statement(const EmptyStatement *statement, Sint32 depth) {
 	(void)statement;
 	(void)depth;
 	printf("(empty)");
+	return true;
 }
 
-static void tree_dump_block_statement(const BlockStatement *statement, Sint32 depth) {
+static Bool tree_dump_block_statement(const BlockStatement *statement, Sint32 depth) {
 	const Size n_statements = array_size(statement->statements);
 	printf("(block\n");
 	for (Size i = 0; i < n_statements; i++) {
@@ -482,22 +493,25 @@ static void tree_dump_block_statement(const BlockStatement *statement, Sint32 de
 		printf("<empty>");
 	}
 	printf(")");
+	return true;
 }
 
-static void tree_dump_import_statement(const ImportStatement *statement, Sint32 depth) {
+static Bool tree_dump_import_statement(const ImportStatement *statement, Sint32 depth) {
 	(void)depth;
 	const String package = statement->package;
 	printf("(import '%.*s')", SFMT(package));
+	return true;
 }
 
-void tree_dump_expression_statement(const ExpressionStatement *statement, Sint32 depth) {
+static Bool tree_dump_expression_statement(const ExpressionStatement *statement, Sint32 depth) {
 	(void)depth;
 	printf("(expression\n");
 	tree_dump_node(statement->expression, depth + 1);
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_assignment_statement(const AssignmentStatement *statement, Sint32 depth) {
+static Bool tree_dump_assignment_statement(const AssignmentStatement *statement, Sint32 depth) {
 	(void)depth;
 	const String assignment = assignment_to_string(statement->assignment);
 	printf("(assignment\n");
@@ -515,9 +529,10 @@ static void tree_dump_assignment_statement(const AssignmentStatement *statement,
 		}
 	}
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_declaration_statement(const DeclarationStatement *statement, Sint32 depth) {
+static Bool tree_dump_declaration_statement(const DeclarationStatement *statement, Sint32 depth) {
 	printf("(decl\n");
 	if (statement->type) {
 		tree_dump_pad(depth + 1);
@@ -540,9 +555,10 @@ static void tree_dump_declaration_statement(const DeclarationStatement *statemen
 		}
 	}
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_if_statement(const IfStatement *statement, Sint32 depth) {
+static Bool tree_dump_if_statement(const IfStatement *statement, Sint32 depth) {
 	printf("(if\n");
 	if (statement->init) {
 		tree_dump_pad(depth + 1);
@@ -558,9 +574,10 @@ static void tree_dump_if_statement(const IfStatement *statement, Sint32 depth) {
 		tree_dump_node(statement->elif, depth + 1);
 	}
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_return_statement(const ReturnStatement *statement, Sint32 depth) {
+static Bool tree_dump_return_statement(const ReturnStatement *statement, Sint32 depth) {
 	printf("(return\n");
 	const Size n_results = array_size(statement->results);
 	if (n_results == 0) {
@@ -575,9 +592,10 @@ static void tree_dump_return_statement(const ReturnStatement *statement, Sint32 
 		}
 	}
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_for_statement(const ForStatement *statement, Sint32 depth) {
+static Bool tree_dump_for_statement(const ForStatement *statement, Sint32 depth) {
 	printf("(for\n");
 	if (statement->init) {
 		tree_dump_pad(depth + 1);
@@ -597,21 +615,24 @@ static void tree_dump_for_statement(const ForStatement *statement, Sint32 depth)
 		tree_dump_node(statement->body, depth + 1);
 	}
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_defer_statement(const DeferStatement *statement, Sint32 depth) {
+static Bool tree_dump_defer_statement(const DeferStatement *statement, Sint32 depth) {
 	printf("(defer\n");
 	tree_dump_node(statement->statement, depth + 1);
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_break_statement(const BreakStatement *statement, Sint32 depth) {
+static Bool tree_dump_break_statement(const BreakStatement *statement, Sint32 depth) {
 	(void)statement;
 	(void)depth;
 	printf("(break)");
+	return true;
 }
 
-static void tree_dump_statement(const Statement *statement, Sint32 depth) {
+static Bool tree_dump_statement(const Statement *statement, Sint32 depth) {
 	tree_dump_pad(depth);
 	switch (statement->kind) {
 	case STATEMENT_EMPTY:
@@ -637,32 +658,36 @@ static void tree_dump_statement(const Statement *statement, Sint32 depth) {
 	case STATEMENT_BREAK:
 		return tree_dump_break_statement(&statement->break_, depth);
 	}
+	return true;
 }
 
-static void tree_dump_identifier(const Identifier *identifier, Sint32 depth) {
+static Bool tree_dump_identifier(const Identifier *identifier, Sint32 depth) {
 	tree_dump_pad(depth);
 	(void)depth;
 	const String contents = identifier->contents;
 	printf("(ident '%.*s')", SFMT(contents));
+	return true;
 }
 
-static void tree_dump_value(const Value *value, Sint32 depth) {
+static Bool tree_dump_value(const Value *value, Sint32 depth) {
 	tree_dump_pad(depth);
 	(void)value;
 	(void)depth;
 	// TODO(dweiler): Implement.
 	printf("(value)");
+	return true;
 }
 
-static void tree_dump_literal_value(const LiteralValue *literal_value, Sint32 depth) {
+static Bool tree_dump_literal_value(const LiteralValue *literal_value, Sint32 depth) {
 	tree_dump_pad(depth);
 	(void)depth;
 	const String literal = literal_to_string(literal_value->literal);
 	const String value = literal_value->value;
 	printf("(literal %.*s '%.*s')", SFMT(literal), SFMT(value));
+	return true;
 }
 
-static void tree_dump_compound_literal(const CompoundLiteral *compound_literal, Sint32 depth) {
+static Bool tree_dump_compound_literal(const CompoundLiteral *compound_literal, Sint32 depth) {
 	const Size n_elements = array_size(compound_literal->elements);
 	tree_dump_pad(depth);
 	printf("(compound\n");
@@ -681,18 +706,20 @@ static void tree_dump_compound_literal(const CompoundLiteral *compound_literal, 
 		}
 	}
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_field(const Field *field, Sint32 depth) {
+static Bool tree_dump_field(const Field *field, Sint32 depth) {
 	tree_dump_pad(depth);
 	printf("(field\n");
 	tree_dump_node(field->type, depth + 1);
 	putchar('\n');
 	tree_dump_node(field->name, depth + 1);
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_field_list(const FieldList* field_list, Sint32 depth) {
+static Bool tree_dump_field_list(const FieldList* field_list, Sint32 depth) {
 	const Size n_fields = array_size(field_list->fields);
 	tree_dump_pad(depth);
 	printf("(fields\n");
@@ -708,9 +735,10 @@ static void tree_dump_field_list(const FieldList* field_list, Sint32 depth) {
 		}
 	}
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_procedure(const Procedure *procedure, Sint32 depth) {
+static Bool tree_dump_procedure(const Procedure *procedure, Sint32 depth) {
 	tree_dump_pad(depth);
 	(void)depth;
 	printf("(proc\n");
@@ -718,6 +746,7 @@ static void tree_dump_procedure(const Procedure *procedure, Sint32 depth) {
 	putchar('\n');
 	tree_dump_node(procedure->body, depth + 1);
 	putchar(')');
+	return true;
 }
 
 static const char *calling_convention_to_string(CallingConvention convention) {
@@ -734,7 +763,7 @@ static const char *calling_convention_to_string(CallingConvention convention) {
 	return CALLING_CONVENTIONS[convention];
 }
 
-static void tree_dump_procedure_type(const ProcedureType *procedure, Sint32 depth) {
+static Bool tree_dump_procedure_type(const ProcedureType *procedure, Sint32 depth) {
 	tree_dump_pad(depth);
 	printf("(cconv \"%s\")\n", calling_convention_to_string(procedure->convention));
 	tree_dump_pad(depth);
@@ -755,9 +784,10 @@ static void tree_dump_procedure_type(const ProcedureType *procedure, Sint32 dept
 		printf("<empty>");
 	}
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_procedure_group(const ProcedureGroup *group, Sint32 depth) {
+static Bool tree_dump_procedure_group(const ProcedureGroup *group, Sint32 depth) {
 	tree_dump_pad(depth);
 	const Size n_procedures = array_size(group->procedures);
 	printf("(procgroup\n");
@@ -769,15 +799,17 @@ static void tree_dump_procedure_group(const ProcedureGroup *group, Sint32 depth)
 		}
 	}
 	putchar(')');
+	return true;
 }
 
-static void tree_dump_directive(const Directive *directive, Sint32 depth) {
+static Bool tree_dump_directive(const Directive *directive, Sint32 depth) {
 	tree_dump_pad(depth);
 	const String string = directive_to_string(directive->kind);
 	printf("(directive '%.*s\')", SFMT(string));
+	return true;
 }
 
-static void tree_dump_type(const Type* type, Sint32 depth) {
+static Bool tree_dump_type(const Type* type, Sint32 depth) {
 	switch (type->kind) {
 	case TYPE_PROCEDURE:
 		return tree_dump_procedure_type(&type->procedure, depth);
@@ -818,9 +850,10 @@ static void tree_dump_type(const Type* type, Sint32 depth) {
 		putchar(')');
 		break;
 	}
+	return true;
 }
 
-void tree_dump_node(const Node *node, Sint32 depth) {
+Bool tree_dump_node(const Node *node, Sint32 depth) {
 	switch (node->kind) {
 	case NODE_EXPRESSION:
 		return tree_dump_expression(&node->expression, depth);
@@ -847,7 +880,7 @@ void tree_dump_node(const Node *node, Sint32 depth) {
 	case NODE_TYPE:
 		return tree_dump_type(&node->type, depth);
 	}
-	UNREACHABLE();
+	return false;
 }
 
 void tree_dump(Tree *tree) {

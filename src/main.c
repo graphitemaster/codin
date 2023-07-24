@@ -16,19 +16,18 @@ struct Command {
 	String description;
 };
 
-static const Command COMMANDS[] = {
-	{ SCLIT("build"),    SCLIT("compile directory of .odin files, as an executable\n\t\t\tone must contain the program's entry point, all must be the same package.") },
-	{ SCLIT("run"),      SCLIT("same as 'build', but also runs the newly compiled executable.") },
-	{ SCLIT("dump-ast"), SCLIT("dump the generated syntax tree to stdout.") },
-	{ SCLIT("dump-c"),   SCLIT("dump the generated c to stdout.") },
-};
-
 String project_name(String path) {
 	(void)path;
 	return SCLIT("main");
 }
 
 static int usage(const char *app) {
+	static const Command COMMANDS[] = {
+		{ SCLIT("build"),    SCLIT("compile directory of .odin files, as an executable\n\t\t\tone must contain the program's entry point, all must be the same package.") },
+		{ SCLIT("run"),      SCLIT("same as 'build', but also runs the newly compiled executable.") },
+		{ SCLIT("dump-ast"), SCLIT("dump the generated syntax tree to stdout.") },
+		{ SCLIT("dump-c"),   SCLIT("dump the generated c to stdout.") },
+	};
 	printf("Usage:\n");
 	printf("\t%s command [arguments]\n", app);
 	printf("Commands:\n");
