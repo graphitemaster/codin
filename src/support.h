@@ -37,9 +37,9 @@
 #endif
 
 #if defined(__cplusplus)
-	#define STATIC_ASSERT(expr, message) static_assert((expr), message)
+	#define STATIC_ASSERT(expr, message) static_assert(expr, message)
 #else
-	#define STATIC_ASSERT(expr, message) _Static_assert((expr), message)
+	#define STATIC_ASSERT(expr, message) _Static_assert(expr, message)
 #endif
 
 // Easier to search for.
