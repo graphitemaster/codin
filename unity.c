@@ -1,7 +1,6 @@
 // Unity build script. Just compile this with cl.exe on Windows
 #include "src/array.c"
 #include "src/context.c"
-#include "src/gen.c"
 #include "src/lexer.c"
 #include "src/main.c"
 #include "src/parser.c"
