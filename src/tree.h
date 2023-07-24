@@ -5,14 +5,6 @@
 
 typedef struct Context Context;
 
-typedef enum NodeKind NodeKind;
-typedef enum ExpressionKind ExpressionKind;
-typedef enum StatementKind StatementKind;
-typedef enum TypeKind TypeKind;
-
-typedef enum CallingConvention CallingConvention;
-typedef enum BlockFlag BlockFlag;
-
 typedef struct Tree Tree;
 typedef struct Node Node;
 
@@ -102,11 +94,16 @@ enum TypeKind {
 	TYPE_PROCEDURE,      // proc
 	TYPE_SLICE,          // []T
 	TYPE_ARRAY,          // [N]T, or [?]T
-	TYPE_DYNAMIC_ARRAY,  // [dynamicT]
+	TYPE_DYNAMIC_ARRAY,  // [dynamic]T
 	TYPE_POINTER,        // ^
 	TYPE_MULTI_POINTER,  // [^]
 	TYPE_TYPEID,         // typeid
 };
+
+typedef enum NodeKind NodeKind;
+typedef enum ExpressionKind ExpressionKind;
+typedef enum StatementKind StatementKind;
+typedef enum TypeKind TypeKind;
 
 struct UnaryExpression {
 	OperatorKind operation;
@@ -179,6 +176,8 @@ enum BlockFlag {
 	BLOCK_FLAG_BOUNDS_CHECK = 1 << 0,
 	BLOCK_FLAG_TYPE_ASSERT  = 1 << 1,
 };
+
+typedef enum BlockFlag BlockFlag;
 
 struct BlockStatement {
 	BlockFlag flags;
@@ -269,8 +268,6 @@ struct FieldList {
 	Array(Node*) fields;
 };
 
-typedef enum ProcedureFlag ProcedureFlag;
-
 enum ProcedureFlag {
 	PROC_FLAG_DIVERGING                 = 1 << 0,
 	PROC_FLAG_OPTIONAL_OK               = 1 << 1,
@@ -279,6 +276,8 @@ enum ProcedureFlag {
 	PROC_FLAG_TYPE_ASSERT               = 1 << 4,
 	PROC_FLAG_FORCE_INLINE              = 1 << 5,
 };
+
+typedef enum ProcedureFlag ProcedureFlag;
 
 struct Procedure {
 	ProcedureFlag flags;
@@ -296,6 +295,8 @@ enum CallingConvention {
 	CCONV_NAKED,
 	CCONV_NONE,
 };
+
+typedef enum CallingConvention CallingConvention;
 
 struct ProcedureGroup {
 	Array(Node*) procedures;
@@ -386,7 +387,7 @@ FORCE_INLINE Bool node_is_type(const Node *node, TypeKind kind) {
 	return node_is_kind(node, NODE_TYPE) && node->type.kind == kind;
 }
 
-_Static_assert(sizeof(Node) <= 64, "Too big");
+STATIC_ASSERT(sizeof(Node) <= 64, "Too big");
 
 struct Tree {
 	Context *context;

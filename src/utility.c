@@ -26,7 +26,7 @@ Array(Uint8) _readfile(String filename, Context *context) {
 	strbuf_init(&strbuf, context);
 	strbuf_put_string(&strbuf, string_unquote(filename, "\""));
 	strbuf_put_rune(&strbuf, '\0');
-	FILE *fp = fopen(CAST(const char *, strbuf.contents), "rb");
+	FILE *fp = fopen(RCAST(const char *, strbuf.contents), "rb");
 	if (!fp) {
 		return 0;
 	}
@@ -38,7 +38,7 @@ Array(Uint8) _readfile(String filename, Context *context) {
 			const Uint8 ch = fgetc(fp);
 			if (!array_push(result, ch)) {
 				array_free(result);
-				return false;
+				return 0;
 			}
 		}
 		return result;
@@ -220,7 +220,7 @@ Float16 f32_to_f16(Float32 f) {
 }
 
 Float32 f16_to_f32(Float16 f) {
-	union { Uint32 u; Float32 f; } o = { (Uint32)(f & 0x7fff) << 13 };
+	union { Uint32 u; Float32 f; } o = { CAST(Uint32, (f & 0x7fff) << 13) };
 	const Uint32 exp = 0x0f800000 & o.u;
 	o.u += 0x38000000;
 	if (exp == 0x0f800000) o.u += 0x38000000;

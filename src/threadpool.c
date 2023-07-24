@@ -9,19 +9,19 @@ struct Work {
 static int worker(void *user) {
 	ThreadPool *pool = CAST(ThreadPool*, user);
 	for (;;) {
-		mtx_lock(&pool->mutex);
+		mutex_lock(&pool->mutex);
 		while (!pool->quit && array_size(pool->work) == 0) {
-			cnd_wait(&pool->cond, &pool->mutex);
+			cond_wait(&pool->cond, &pool->mutex);
 		}
 
 		if (pool->quit && array_size(pool->work) == 0) {
-			mtx_unlock(&pool->mutex);
+			mutex_unlock(&pool->mutex);
 			return 0;
 		}
 	
 		Array *meta = array_meta(pool->work);
 		Work work = pool->work[--meta->size];
-		mtx_unlock(&pool->mutex);
+		mutex_unlock(&pool->mutex);
 
 		work.function(work.user);
 
@@ -32,8 +32,8 @@ static int worker(void *user) {
 }
 
 Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
-	cnd_init(&pool->cond);
-	mtx_init(&pool->mutex, mtx_plain);
+	cond_init(&pool->cond);
+	mutex_init(&pool->mutex);
 
 	pool->context = context;
 	pool->threads = 0;
@@ -44,7 +44,7 @@ Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
 	}
 
 	for (Size i = 0; i < n_threads; i++) {
-		thrd_create(&pool->threads[i], worker, pool);
+		thread_create(&pool->threads[i], worker, pool);
 	}
 
 	return true;
@@ -53,20 +53,20 @@ Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
 Bool threadpool_free(ThreadPool *pool) {
 	Context *context = pool->context;
 
-	mtx_lock(&pool->mutex);
+	mutex_lock(&pool->mutex);
 	pool->quit = true;
-	cnd_broadcast(&pool->cond);
-	mtx_unlock(&pool->mutex);
+	cond_broadcast(&pool->cond);
+	mutex_unlock(&pool->mutex);
 
 	const Size n_threads = array_size(pool->threads);
 	for (Size i = 0; i < n_threads; i++) {
-		thrd_join(pool->threads[i], 0);
+		thread_join(&pool->threads[i]);
 	}
 
 	array_free(pool->threads);
 
-	cnd_destroy(&pool->cond);
-	mtx_destroy(&pool->mutex);
+	cond_destroy(&pool->cond);
+	mutex_destroy(&pool->mutex);
 
 	const Size n_work = array_size(pool->work);
 	for (Size i = 0; i < n_work; i++) {
@@ -83,15 +83,15 @@ Bool threadpool_free(ThreadPool *pool) {
 Bool threadpool_queue(ThreadPool *pool, void (*function)(void*), void *user, void (*dispose)(void*)) {
 	Context *context = pool->context;
 
-	mtx_lock(&pool->mutex);
+	mutex_lock(&pool->mutex);
 	if (!array_push(pool->work, ((Work){function, user, dispose}))) {
 		if (dispose) {
 			dispose(user);
 		}
-		mtx_unlock(&pool->mutex);
+		mutex_unlock(&pool->mutex);
 		return false;
 	}
-	cnd_signal(&pool->cond);
-	mtx_unlock(&pool->mutex);
+	cond_signal(&pool->cond);
+	mutex_unlock(&pool->mutex);
 	return true;
 }

@@ -2,6 +2,7 @@
 #define CODIN_ARRAY_H
 #include <stdalign.h>
 #include <string.h> // memmove
+
 #include "support.h"
 
 typedef struct Context Context;
@@ -11,7 +12,7 @@ struct Array {
 	alignas(16) Size capacity;
 	Size size;
 };
-_Static_assert(alignof(Array) == 16, "not aligned");
+STATIC_ASSERT(alignof(Array) == 16, "not aligned");
 
 #define Array(T) T*
 

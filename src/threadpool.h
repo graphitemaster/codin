@@ -1,7 +1,7 @@
 #ifndef CODIN_THREADPOOL_H
 #define CODIN_THREADPOOL_H
-#include <threads.h> // thrd_t, cnd_t, mtx_t
 
+#include "thread.h"
 #include "array.h"
 
 typedef struct Context Context;
@@ -10,10 +10,10 @@ typedef struct Work Work;
 
 struct ThreadPool {
 	Context *context;
-	Array(thrd_t) threads;
+	Array(Thread) threads;
 	Array(Work) work;
-	cnd_t cond;
-	mtx_t mutex;
+	Cond cond;
+	Mutex mutex;
 	Bool quit;
 };
 

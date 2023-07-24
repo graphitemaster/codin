@@ -53,6 +53,8 @@ DEPS := $(filter %.d,$(SRCS:%.c=$(DEPDIR)/%.d))
 CFLAGS := -Wall
 CFLAGS += -Wextra
 CFLAGS += -std=c11
+CFLAGS += -D_DEFAULT_SOURCE
+CFLAGS += -D_WIN32_WINNT=0x0600
 
 ifeq ($(DEBUG),1)
 	# Optimize for debugging.

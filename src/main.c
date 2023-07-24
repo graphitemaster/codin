@@ -33,11 +33,11 @@ static int usage(const char *app) {
 	printf("\t%s command [arguments]\n", app);
 	printf("Commands:\n");
 	Uint64 max = 0;
-	for (Uint32 i = 0; i < sizeof(COMMANDS)/sizeof(*COMMANDS); i++) {
+	for (Uint32 i = 0; i < sizeof(COMMANDS)/sizeof *COMMANDS; i++) {
 		const Command *command = &COMMANDS[i];
 		if (command->name.length > max) max = command->name.length;
 	}
-	for (Uint32 i = 0; i < sizeof(COMMANDS)/sizeof(*COMMANDS); i++) {
+	for (Uint32 i = 0; i < sizeof(COMMANDS)/sizeof *COMMANDS; i++) {
 		const Command *command = &COMMANDS[i];
 		printf("\t%.*s%*c\t%.*s\n",
 			SFMT(command->name),
@@ -102,7 +102,7 @@ static Bool transpile(String path, Context *context) {
 	path_mkdir(".build");
 
 	const String filename = strbuf_result(&file);
-	FILE *fp = fopen(CAST(const char *, filename.contents), "wb");
+	FILE *fp = fopen(RCAST(const char *, filename.contents), "wb");
 	if (!fp) {
 		fprintf(stderr, "Failed to write C0\n");
 		return false;
@@ -153,7 +153,7 @@ static Bool build(const char *app, Context *context, String path, Size n_threads
 			const String name = files[i];
 			if (string_ends_with(name, SCLIT(".odin"))) {
 				strbuf_put_formatted(&strbuf, "%.*s/%.*s", SFMT(path), SFMT(name));
-				Worker *worker = malloc(sizeof *worker);
+				Worker *worker = CAST(Worker*, malloc(sizeof *worker));
 				worker->path = string_copy(strbuf_result(&strbuf));
 				worker->context = context;
 				strbuf_clear(&strbuf);
@@ -177,7 +177,7 @@ static Bool build(const char *app, Context *context, String path, Size n_threads
 
 	// Compile it.
 	const String compile = strbuf_result(&strbuf);
-	const Bool status = system(CAST(const char *, compile.contents)) == 0;
+	const Bool status = system(RCAST(const char *, compile.contents)) == 0;
 
 	return status;
 }
@@ -192,7 +192,7 @@ static Bool run(String path, Context *context) {
 	strbuf_put_formatted(&strbuf, "./%.*s.bin", SFMT(project));
 #endif
 	strbuf_put_rune(&strbuf, '\0');
-	const Bool result = system(CAST(const char *, strbuf.contents)) == 0;
+	const Bool result = system(RCAST(const char *, strbuf.contents)) == 0;
 	return result;
 }
 

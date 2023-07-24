@@ -5,9 +5,9 @@
 #include "context.h"
 
 static void *our_memrrchr(const void *m, int c, size_t n) {
-	const unsigned char *s = m;
+	const unsigned char *s = CAST(const unsigned char *, m);
 	c = CAST(unsigned char, c);
-	while (n--) if (s[n] == c) return CAST(void *, s + n);
+	while (n--) if (s[n] == c) return CCAST(unsigned char *, s + n);
 	return 0;
 }
 
@@ -18,7 +18,7 @@ String _string_copy_from_data(const Uint8 *data, Uint64 length, Context *context
 		return STRING_NIL;
 	}
 	Allocator *allocator = context->allocator;
-	Uint8 *storage = allocator->allocate(allocator, length);
+	Uint8 *storage = CAST(Uint8*, allocator->allocate(allocator, length));
 	if (!storage) {
 		return STRING_NIL;
 	}
@@ -31,11 +31,11 @@ String _string_copy_from_null(const char *string, Context *context) {
 		return STRING_NIL;
 	}
 	const Uint64 length = strlen(string);
-	return _string_copy_from_data(CAST(const Uint8 *, string), length, context);
+	return _string_copy_from_data(RCAST(const Uint8 *, string), length, context);
 }
 
 String string_from_null(const char *string) {
-	return (String) { CAST(Uint8*, string), strlen(string) };
+	return (String) { RCAST(Uint8*, CCAST(char*, string)), strlen(string) };
 }
 
 String _string_copy(String string, Context *context) {
@@ -66,7 +66,7 @@ void _string_free(String string, Context *context) {
 char* _string_to_null(String string, Context *context) {
 	Allocator *allocator = context->allocator;
 	const Uint64 length = string.length;
-	char *result = allocator->allocate(allocator, length + 1);
+	char *result = CAST(char*, allocator->allocate(allocator, length + 1));
 	if (!result) {
 		return 0;
 	}
@@ -86,7 +86,7 @@ Bool string_ends_with(String string, String suffix) {
 }
 
 Bool string_find_first_byte(String string, Uint8 byte, Uint64 *index) {
-	const Uint8 *find = memchr(string.contents, byte, string.length);
+	const Uint8 *find = CAST(const Uint8*, memchr(string.contents, byte, string.length));
 	if (find) {
 		*index = find - string.contents;
 		return true;
@@ -95,7 +95,7 @@ Bool string_find_first_byte(String string, Uint8 byte, Uint64 *index) {
 }
 
 Bool string_find_last_byte(String string, Uint8 byte, Uint64 *index) {
-	const Uint8 *find = our_memrrchr(string.contents, byte, string.length);
+	const Uint8 *find = CAST(const Uint8*, our_memrrchr(string.contents, byte, string.length));
 	if (find) {
 		*index = find - string.contents;
 		return true;
@@ -148,7 +148,7 @@ Bool _utf8_to_utf16(const char *source, Uint16 **const destination, Context *con
 	utf8_to_utf16_core(source, 0, &length);
 
 	Allocator *allocator = context->allocator;
-	Uint16 *dest = allocator->allocate(allocator, (length + 1) * sizeof(Uint16));
+	Uint16 *dest = CAST(Uint16*, allocator->allocate(allocator, (length + 1) * sizeof *dest));
 	if (!dest) {
 		return false;
 	}

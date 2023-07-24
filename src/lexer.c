@@ -11,7 +11,7 @@
 #undef ERROR
 #endif
 
-const Token TOKEN_NIL = { KIND_INVALID, { 0, 0 }, { 0, 0 }, { 0 } };
+const Token TOKEN_NIL = { KIND_INVALID, { 0, 0 }, { 0, 0 }, { } };
 const Source SOURCE_NIL = { { 0, 0 }, { 0, 0 } };
 
 #define ERROR(...) \
@@ -138,7 +138,7 @@ static void scan(Lexer* lexer, Sint32 base) {
 static Token scan_numeric(Lexer *lexer, Bool dot) {
 	Token token;
 	token.kind = KIND_LITERAL;
-	token.string.contents = CAST(Uint8*, lexer->here);
+	token.string.contents = CCAST(Uint8*, lexer->here);
 	token.string.length = 1;
 	token.as_literal = LITERAL_INTEGER;
 	token.location = lexer->location;
@@ -273,7 +273,7 @@ Token lexer_next(Lexer *lexer) {
 	Token token;
 	token.kind = KIND_INVALID;
 
-	token.string.contents = CAST(Uint8*, lexer->here);
+	token.string.contents = CCAST(Uint8*, lexer->here);
 	token.string.length = 1; // One rune.
 
 	token.location = lexer->location;

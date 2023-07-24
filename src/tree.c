@@ -8,7 +8,7 @@
 static Node *new_node(Tree *tree, NodeKind kind) {
 	Context *context = tree->context;
 	Allocator *allocator = context->allocator;
-	Node *node = allocator->allocate(allocator, sizeof *node);
+	Node *node = CAST(Node*, allocator->allocate(allocator, sizeof *node));
 	memset(node, 0, sizeof *node);
 	node->kind = kind;
 	return array_push(tree->nodes, node) ? node : 0;

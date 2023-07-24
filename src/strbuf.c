@@ -54,7 +54,7 @@ Bool strbuf_put_formatted(StrBuf *strbuf, const char *fmt, ...) {
 	if (array_expand(strbuf->contents, bytes + 1)) {
 		va_list ap;
 		va_start(ap, fmt);
-		vsnprintf(CAST(char *, &strbuf->contents[size]), bytes + 1, fmt, ap);
+		vsnprintf(RCAST(char *, &strbuf->contents[size]), bytes + 1, fmt, ap);
 		array_meta(strbuf->contents)->size--; // Remove NUL from vsnprintf.
 		va_end(ap);
 		return true;

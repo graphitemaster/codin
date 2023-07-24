@@ -35,7 +35,7 @@ static Bool source_read(Source *source, String filename, Context *context) {
 	}
 	source->contents.contents = contents;
 	source->contents.length = array_size(contents);
-	source->name = STRING_NIL;
+	source->name = filename;
 	return true;
 }
 
@@ -105,6 +105,9 @@ static FORCE_INLINE Bool is_assignment(Token token, AssignmentKind assignment) {
 static FORCE_INLINE Bool is_literal(Token token, LiteralKind literal) {
 	return is_kind(token, KIND_LITERAL) && token.as_literal == literal;
 }
+static FORCE_INLINE Bool is_newline(Token token) {
+	return is_kind(token, KIND_SEMICOLON) && string_compare(token.string, SCLIT("\n"));
+}
 
 static Token advancep(Parser *parser);
 
@@ -147,7 +150,7 @@ static Bool accepted_separator(Parser *parser) {
 static Bool ignore_newline(const Parser *parser) {
 	// BUG(dweiler): Determine why this has to be >= and not > in the case of
 	// procedure groups.
-	return parser->expression_depth >= 0;
+	return parser->expression_depth > 0;
 }
 
 static Token peekp(Parser *parser) {
@@ -158,32 +161,28 @@ static Token peekp(Parser *parser) {
 	return token;
 }
 
-static Bool advance_possible_newline(Parser *parser, Bool literal) {
-	const Token token = parser->this_token;
-
-	Bool skip = false;
-
-	if (is_kind(token, KIND_SEMICOLON) && string_compare(token.string, SCLIT("\n"))) {
-		if (literal) {
-			const Token next = peekp(parser);
-			const Location this_location = token.location;
-			const Location next_location = next.location;
-			if (this_location.line + 1 >= next_location.line) {
-				skip = is_keyword(next, KEYWORD_ELSE)  ||
-				       is_keyword(next, KEYWORD_WHERE) ||
-				       is_kind(next, KIND_LBRACE);
-			}
-		} else {
-			skip = true;
-		}
-	}
-
-	if (skip) {
+static Bool advance_possible_newline(Parser *parser) {
+	if (is_newline(parser->this_token)) {
 		advancep(parser);
 		return true;
 	}
-
 	return false;
+}
+
+static Bool advance_possible_newline_within(Parser *parser) {
+	const Token token = parser->this_token;
+	if (!is_newline(token)) {
+		return false;
+	}
+	const Token next = peekp(parser);
+	if (token.location.line + 1 < next.location.line) {
+		return false;
+	}
+	if (!(is_kind(next, KIND_LBRACE) || is_keyword(next, KEYWORD_ELSE) || is_keyword(next, KEYWORD_WHERE))) {
+		return false;
+	}
+	advancep(parser);
+	return true;
 }
 
 static Token advancep(Parser *parser) {
@@ -333,8 +332,6 @@ static Node *parse_type(Parser *parser) {
 
 static Node *parse_literal_value(Parser *parser, Node *type);
 
-typedef enum FieldFlag FieldFlag;
-
 enum FieldFlag {
 	FIELD_FLAG_INVALID   = 0,
 	FIELD_FLAG_USING     = 1 << 0,
@@ -346,6 +343,8 @@ enum FieldFlag {
 	FIELD_FLAG_SUBTYPE   = 1 << 6,
 	FIELD_FLAG_BY_PTR    = 1 << 7,
 };
+
+typedef enum FieldFlag FieldFlag;
 
 static FieldFlag parse_field_flag(Parser *parser) {
 	const Token token = parser->this_token;
@@ -517,17 +516,15 @@ static Node *parse_procedure(Parser *parser) {
 	Context *context = parser->context;
 	Node *type = parse_procedure_type(parser);
 
-	advance_possible_newline(parser, true);
+	advance_possible_newline_within(parser);
 
 	if (is_keyword(parser->this_token, KEYWORD_WHERE)) {
 		expect_keyword(parser, KEYWORD_WHERE);
 		UNIMPLEMENTED("where specialization for procedures");
 	}
 
-	advance_possible_newline(parser, true);
-
 	// We start each procedure with these flags.
-	ProcedureFlag flags = 0;
+	ProcedureFlag flags = CAST(ProcedureFlag, 0);
 	flags |= PROC_FLAG_BOUNDS_CHECK;
 	flags |= PROC_FLAG_TYPE_ASSERT;
 
@@ -557,6 +554,8 @@ static Node *parse_procedure(Parser *parser) {
 			ERROR("Cannot use directive '%.*s' on a procedure", SFMT(name));
 		}
 	}
+
+	advance_possible_newline_within(parser);
 
 	if (accepted_kind(parser, KIND_UNDEFINED)) {
 		UNIMPLEMENTED("Undefined procedure literal");
@@ -1274,7 +1273,7 @@ static Node *parse_body(Parser *parser) {
 	parser->expression_depth = depth;
 	// NOTE(dweiler): We should be inheriting the flags from the parent block
 	// but we don't have access to that here.
-	BlockFlag flags = 0;
+	BlockFlag flags = CAST(BlockFlag, 0);
 	// Convert the procedure flags to block flags.
 	const ProcedureFlag proc_flags = parser->this_procedure->procedure.flags;
 	if (proc_flags & PROC_FLAG_BOUNDS_CHECK) flags |= BLOCK_FLAG_BOUNDS_CHECK;
@@ -1290,7 +1289,7 @@ static Node *parse_block_statement(Parser *parser, Bool when) {
 
 	Context *context = parser->context;
 
-	advance_possible_newline(parser, true);
+	advance_possible_newline(parser);
 
 	if (when) {
 		UNIMPLEMENTED("when block");
@@ -1352,18 +1351,20 @@ static Node *parse_simple_statement(Parser* parser, Bool allow_in) {
 	const Token token = parser->this_token;
 	switch (token.kind) {
 	case KIND_ASSIGNMENT:
-		if (!parser->this_procedure) {
-			ERROR("Cannot use assignment statement at file scope");
+		{
+			if (!parser->this_procedure) {
+				ERROR("Cannot use assignment statement at file scope");
+			}
+			advancep(parser);
+			Array(Node*) rhs = parse_rhs_expression_list(parser);
+			if (array_size(rhs) == 0) {
+				ERROR("Missing right-hand side in assignment");
+				return 0;
+			}
+			Node *node = tree_new_assignment_statement(parser->tree, token.as_assignment, lhs, rhs);
+			TRACE_LEAVE();
+			return node;
 		}
-		advancep(parser);
-		Array(Node*) rhs = parse_rhs_expression_list(parser);
-		if (array_size(rhs) == 0) {
-			ERROR("Missing right-hand side in assignment");
-			return 0;
-		}
-		Node *node = tree_new_assignment_statement(parser->tree, token.as_assignment, lhs, rhs);
-		TRACE_LEAVE();
-		return node;
 	case KIND_OPERATOR:
 		switch (token.as_operator) {
 		case OPERATOR_IN:
@@ -1371,17 +1372,19 @@ static Node *parse_simple_statement(Parser* parser, Bool allow_in) {
 				// [lhs] in <Expression>
 				accepted_operator(parser, OPERATOR_IN);
 				Node *rhs = parse_expression(parser, true);
-				node = tree_new_in_expression(parser->tree, lhs, rhs);
+				Node *node = tree_new_in_expression(parser->tree, lhs, rhs);
 				TRACE_LEAVE();
 				return node;
 			}
 			break;
 		case OPERATOR_COLON:
-			expect_operator(parser, OPERATOR_COLON);
-			// TODO(dweiler): Label check.
-			Node *node = parse_declaration_statement(parser, lhs);
-			TRACE_LEAVE();
-			return node;
+			{
+				expect_operator(parser, OPERATOR_COLON);
+				// TODO(dweiler): Label check.
+				Node *node = parse_declaration_statement(parser, lhs);
+				TRACE_LEAVE();
+				return node;
+			}
 		default:
 			{
 				const String string = operator_to_string(token.as_operator);
@@ -1445,7 +1448,7 @@ static Node *convert_statement_to_body(Parser *parser, Node *statement) {
 	}
 	Array(Node*) statements = 0;
 	array_push(statements, statement);
-	return tree_new_block_statement(parser->tree, 0, statements);
+	return tree_new_block_statement(parser->tree, CAST(BlockFlag, 0), statements);
 }
 
 static Node *convert_statement_to_expression(Parser *parser, Node *statement) {
@@ -1516,7 +1519,7 @@ static Node *parse_if_statement(Parser *parser) {
 		body = parse_block_statement(parser, false);
 	}
 
-	advance_possible_newline(parser, true);
+	advance_possible_newline(parser);
 
 	Node *elif = 0;
 	if (is_keyword(parser->this_token, KEYWORD_ELSE)) {
@@ -1820,7 +1823,7 @@ Tree *parse(String filename, Context *context) {
 	}
 
 	Allocator *allocator = context->allocator;
-	Tree *tree = allocator->allocate(allocator, sizeof *tree);
+	Tree *tree = CAST(Tree*, allocator->allocate(allocator, sizeof *tree));
 	if (!tree) {
 		return 0;
 	}
@@ -1848,7 +1851,7 @@ Tree *parse(String filename, Context *context) {
 		ERROR("Cannot name package '_'");
 	}
 
-	for (Size i = 0; i < sizeof(RESERVED_PACKAGES)/sizeof(*RESERVED_PACKAGES); i++) {
+	for (Size i = 0; i < sizeof(RESERVED_PACKAGES)/sizeof *RESERVED_PACKAGES; i++) {
 		const String name = RESERVED_PACKAGES[i];
 		if (string_compare(package.string, name)) {
 			ERROR("Use of reserved package name '%.*s'", SFMT(name));

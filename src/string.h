@@ -19,7 +19,7 @@ struct String {
 //
 // Use this for static String or string arrays.
 #define SLIT(content) \
-	{ CAST(Uint8*, content), sizeof(content) - 1 }
+	{ RCAST(Uint8*, CCAST(char*, content)), sizeof(content) - 1 }
 
 // Use this anywhere SLIT won't work, like taking the address of a String or
 // passing a String to a function.
@@ -27,7 +27,7 @@ struct String {
 	((String) SLIT(content))
 
 #define SFMT(string) \
-	CAST(Sint32, string.length), CAST(const char *, string.contents)
+	CAST(Sint32, string.length), RCAST(const char *, string.contents)
 
 extern const String STRING_NIL;
 

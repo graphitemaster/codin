@@ -7,7 +7,7 @@ static const Size DEFAULT_CAPACITY = 4096;
 static const Float32 RESIZE_THRESHOLD = 0.75;
 static const Uint32 PRIME1 = 73;
 static const Uint32 PRIME2 = 5009;
-#define TOMBSTONE CAST(void *, 1)
+#define TOMBSTONE RCAST(void *, 1)
 
 typedef struct DefaultAllocator DefaultAllocator;
 
@@ -19,14 +19,14 @@ struct DefaultAllocator {
 };
 
 static DefaultAllocator *create_default_allocator(Size capacity) {
-	DefaultAllocator *allocator = calloc(1, sizeof *allocator);
+	DefaultAllocator *allocator = CAST(DefaultAllocator*, calloc(1, sizeof *allocator));
 	if (!allocator) {
 		return 0;
 	}
 
 	allocator->size = 0;
 	allocator->capacity = capacity;
-	allocator->items = calloc(capacity, sizeof *allocator->items);
+	allocator->items = CAST(void**, calloc(capacity, sizeof *allocator->items));
 	if (!allocator->items) {
 		free(allocator);
 		return 0;
@@ -57,7 +57,7 @@ static Bool default_allocator_maybe_rehash(DefaultAllocator *allocator) {
 	}
 
 	Size capacity = allocator->capacity * 2;
-	void **items = calloc(allocator->capacity, sizeof *items);
+	void **items = CAST(void**, calloc(allocator->capacity, sizeof *items));
 	if (!items) {
 		return false;
 	}
@@ -84,7 +84,7 @@ static Bool default_allocator_add(DefaultAllocator *allocator, void *item) {
 		return false;
 	}
 
-	Uint64 hash = CAST(Uint64, item); // TODO(dweiler): MixInt
+	Uint64 hash = RCAST(Uint64, item); // TODO(dweiler): MixInt
 	const Size mask = allocator->capacity - 1;
 
 	Size index = mask & (PRIME1 * hash);
@@ -109,7 +109,7 @@ static Bool default_allocator_add(DefaultAllocator *allocator, void *item) {
 }
 
 static Bool default_allocator_remove(DefaultAllocator *allocator, void *item) {
-	Uint64 hash = CAST(Uint64, item); // TODO(dweiler): MixInt
+	Uint64 hash = RCAST(Uint64, item); // TODO(dweiler): MixInt
 	const Size mask = allocator->capacity - 1;
 	Size index = mask & (PRIME1 * hash);
 	for (;;) {

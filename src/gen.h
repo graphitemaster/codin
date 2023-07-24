@@ -6,12 +6,6 @@
 typedef struct Context Context;
 typedef struct Generator Generator;
 
-typedef enum IntInstruction IntInstruction;
-typedef enum FltInstruction FltInstruction;
-typedef enum CmpInstruction CmpInstruction;
-typedef enum RelInstruction RelInstruction;
-typedef enum BitInstruction BitInstruction;
-
 #define INT(name, ...) INSTR_ ## name,
 enum IntInstruction {
 	#include "instructions.h"
@@ -42,11 +36,17 @@ enum BitInstruction {
 	INSTR_BIT_COUNT,
 };
 
-_Static_assert(INSTR_INT_COUNT <= 64, "Too many instructions");
-_Static_assert(INSTR_FLT_COUNT <= 64, "Too many instructions");
-_Static_assert(INSTR_CMP_COUNT <= 64, "Too many instructions");
-_Static_assert(INSTR_REL_COUNT <= 64, "Too many instructions");
-_Static_assert(INSTR_BIT_COUNT <= 64, "Too many instructions");
+typedef enum IntInstruction IntInstruction;
+typedef enum FltInstruction FltInstruction;
+typedef enum CmpInstruction CmpInstruction;
+typedef enum RelInstruction RelInstruction;
+typedef enum BitInstruction BitInstruction;
+
+STATIC_ASSERT(INSTR_INT_COUNT <= 64, "Too many instructions");
+STATIC_ASSERT(INSTR_FLT_COUNT <= 64, "Too many instructions");
+STATIC_ASSERT(INSTR_CMP_COUNT <= 64, "Too many instructions");
+STATIC_ASSERT(INSTR_REL_COUNT <= 64, "Too many instructions");
+STATIC_ASSERT(INSTR_BIT_COUNT <= 64, "Too many instructions");
 
 struct Generator {
 	const Tree *tree;
