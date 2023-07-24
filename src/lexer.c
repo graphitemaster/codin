@@ -7,7 +7,7 @@
 #include "report.h"
 #include "context.h"
 
-const Token TOKEN_NIL = { KIND_INVALID, { 0, 0 }, { 0, 0 }, { 0, } };
+const Token TOKEN_NIL = { KIND_INVALID, { 0, 0 }, { 0, 0 }, { CAST(LiteralKind, 0), } };
 const Source SOURCE_NIL = { { 0, 0 }, { 0, 0 } };
 
 #define LEX_ERROR(...) \
