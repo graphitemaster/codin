@@ -25,12 +25,15 @@
 #if defined(__cplusplus)
 	#define FALLTHROUGH() [[fallthrough]]
 	#define NORETURN      [[noreturn]]
+	#define ALIGN(n)      alignas(n)
 #elif defined(_MSC_VER)
 	#define FALLTHROUGH()
 	#define NORETURN      __declspec(noreturn)
+	#define ALIGN(n)      __declspec(align(n))
 #else
 	#define FALLTHROUGH() __attribute__((__fallthrough__))
 	#define NORETURN      __attribute__((__noreturn__))
+	#define ALIGN(n)      __attribute__((__aligned__(n)))
 #endif
 
 #if defined(__cplusplus)
