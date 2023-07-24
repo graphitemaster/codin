@@ -7,14 +7,10 @@
 #include "report.h"
 #include "context.h"
 
-#ifdef ERROR
-#undef ERROR
-#endif
-
-const Token TOKEN_NIL = { KIND_INVALID, { 0, 0 }, { 0, 0 }, { } };
+const Token TOKEN_NIL = { KIND_INVALID, { 0, 0 }, { 0, 0 }, { 0, } };
 const Source SOURCE_NIL = { { 0, 0 }, { 0, 0 } };
 
-#define ERROR(...) \
+#define LEX_ERROR(...) \
 	do { \
 		report_error(lexer->input.source, &lexer->location, __VA_ARGS__); \
 		THROW(1); \
@@ -330,7 +326,7 @@ Token lexer_next(Lexer *lexer) {
 				for (;;) {
 					const Rune r = lexer->rune;
 					if ((rune == '"' && r == '\n') || r == EOF) {
-						ERROR("Unterminated string literal");
+						LEX_ERROR("Unterminated string literal");
 						break;
 					}
 					advancel(lexer);
@@ -491,7 +487,7 @@ Token lexer_next(Lexer *lexer) {
 					advancel(lexer);
 					token.kind = KIND_UNDEFINED;
 				} else {
-					ERROR("The decrement operator '--' does not exist");
+					LEX_ERROR("The decrement operator '--' does not exist");
 				}
 				break;
 			case '>':
