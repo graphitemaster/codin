@@ -62,6 +62,11 @@ int main(int argc, char **argv) {
 	argc--;
 	argv++;
 
+	// Hack for now
+	argc = 2;
+	argv[0] = "dump-ast";
+	argv[1] = "tests/main.odin";
+
 	if (argc <= 1) {
 		return usage(app);
 	}
