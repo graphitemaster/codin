@@ -792,7 +792,7 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 				UNIMPLEMENTED("Bracket");
 			case OPERATOR_POINTER:
 				expect_operator(parser, OPERATOR_POINTER);
-				operand = CAST(Expression *, tree_new_dereference_expression(parser->tree, operand));
+				operand = CAST(Expression *, tree_new_unary_expression(parser->tree, OPERATOR_POINTER, operand));
 				break;
 			case OPERATOR_OR_RETURN:
 				UNIMPLEMENTED("or_return");
@@ -939,36 +939,40 @@ static FORCE_INLINE Expression *parse_expression(Parser *parser, Bool lhs) {
 	return expression;
 }
 
-static Array(Expression*) parse_expression_list(Parser *parser, Bool lhs) {
+static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
 
 	Context *context = parser->context;
 
-	Array(Expression*) list = 0;
+	Array(Expression*) expressions = 0;
 	for (;;) {
 		Expression *expr = parse_expression(parser, lhs);
 		if (expr) {
-			array_push(list, expr);
+			array_push(expressions, expr);
 		}
 		if (is_kind(parser->this_token, KIND_EOF) || !is_operator(parser->this_token, OPERATOR_COMMA)) {
 			break;
 		}
 		advancep(parser);
 	}
+
+	ListExpression *expression = tree_new_list_expression(parser->tree, expressions);
+
 	TRACE_LEAVE();
-	return list;
+
+	return expression;
 }
 
-static FORCE_INLINE Array(Expression*) parse_lhs_expression_list(Parser *parser) {
+static FORCE_INLINE ListExpression *parse_lhs_list_expression(Parser *parser) {
 	TRACE_ENTER();
-	Array(Expression*) result = parse_expression_list(parser, true);
+	ListExpression *result = parse_list_expression(parser, true);
 	TRACE_LEAVE();
 	return result;
 }
 
-static FORCE_INLINE Array(Expression*) parse_rhs_expression_list(Parser *parser) {
+static FORCE_INLINE ListExpression *parse_rhs_list_expression(Parser *parser) {
 	TRACE_ENTER();
-	Array(Expression*) result = parse_expression_list(parser, false);
+	ListExpression *result = parse_list_expression(parser, false);
 	TRACE_LEAVE();
 	return result;
 }
@@ -1046,7 +1050,7 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, Array(I
 
 	Context *context = parser->context;
 
-	Array(Expression*) values = 0;
+	ListExpression *values = 0;
 	Identifier *type = parse_type_or_identifier(parser);
 	const Token token = parser->this_token;
 	Bool constant = false;
@@ -1055,9 +1059,9 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, Array(I
 	if (is_assignment(token, ASSIGNMENT_EQ) || is_operator(token, OPERATOR_COLON)) {
 		const Token seperator = advancep(parser);
 		constant = is_operator(seperator, OPERATOR_COLON);
-		values = parse_rhs_expression_list(parser);
+		values = parse_rhs_list_expression(parser);
 		const Size n_names = array_size(names);
-		const Size n_values = array_size(values);
+		const Size n_values = array_size(values->expressions);
 		if (n_values != n_names) {
 			PARSE_ERROR("Expected %d values on the right-hand side of this declaration", CAST(Sint32, n_names));
 		}
@@ -1083,7 +1087,7 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 
 	Context *context = parser->context;
 
-	Array(Expression*) lhs = parse_lhs_expression_list(parser);
+	ListExpression *lhs = parse_lhs_list_expression(parser);
 	const Token token = parser->this_token;
 	switch (token.kind) {
 	case KIND_ASSIGNMENT:
@@ -1092,8 +1096,8 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 				PARSE_ERROR("Cannot use assignment statement at file scope");
 			}
 			advancep(parser);
-			Array(Expression*) rhs = parse_rhs_expression_list(parser);
-			if (array_size(rhs) == 0) {
+			ListExpression *rhs = parse_rhs_list_expression(parser);
+			if (array_size(rhs->expressions) == 0) {
 				PARSE_ERROR("Missing right-hand side in assignment");
 				return 0;
 			}
@@ -1108,7 +1112,7 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 				// [lhs] in <Expression>
 				accepted_operator(parser, OPERATOR_IN);
 				Expression *rhs = parse_expression(parser, true);
-				InExpression *expression = tree_new_in_expression(parser->tree, lhs, rhs);
+				BinaryExpression *expression = tree_new_binary_expression(parser->tree, OPERATOR_IN, CAST(Expression *, lhs), rhs);
 				ExpressionStatement *statement = tree_new_expression_statement(parser->tree, CAST(Expression *, expression));
 				TRACE_LEAVE();
 				return CAST(Statement *, statement);
@@ -1118,10 +1122,10 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 			{
 				expect_operator(parser, OPERATOR_COLON);
 				// Everything inside 'lhs' should be an IdentifierExpression
-				const Uint64 n_names = array_size(lhs);
+				const Uint64 n_names = array_size(lhs->expressions);
 				Array(Identifier *) names = 0;
 				for (Uint64 i = 0; i < n_names; i++) {
-					const Expression *expression = lhs[i];
+					const Expression *expression = lhs->expressions[i];
 					if (expression->kind != EXPRESSION_IDENTIFIER) {
 						PARSE_ERROR("Expected identifier");
 					}
@@ -1146,16 +1150,13 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 		break;
 	}
 
-	if (array_size(lhs) == 0 || array_size(lhs) > 1) {
+	Array(Expression*) expressions = lhs->expressions;
+	if (array_size(expressions) == 0 || array_size(expressions) > 1) {
 		PARSE_ERROR("Expected one expression on the left-hand side");
 		return 0;
 	}
 
-	Expression *lhs0 = lhs[0];
-
-	array_free(lhs);
-
-	ExpressionStatement *statement = tree_new_expression_statement(parser->tree, lhs0);
+	ExpressionStatement *statement = tree_new_expression_statement(parser->tree, expressions[0]);
 
 	TRACE_LEAVE();
 
@@ -1325,7 +1326,7 @@ static ForStatement *parse_for_statement(Parser *parser) {
 				body = parse_block_statement(parser, false);
 			}
 			parser->expression_depth = depth;
-			cond = CAST(Expression *, tree_new_in_expression(parser->tree, 0, rhs));
+			cond = CAST(Expression *, tree_new_unary_expression(parser->tree, OPERATOR_IN, rhs));
 			ForStatement *statement = tree_new_for_statement(parser->tree, 0, cond, body, 0);
 			TRACE_LEAVE();
 			return statement;
@@ -1336,14 +1337,15 @@ static ForStatement *parse_for_statement(Parser *parser) {
 			Statement *statement = parse_simple_statement(parser, true);
 			if (statement->kind == STATEMENT_EXPRESSION) {
 				Expression *expression = CAST(ExpressionStatement *, statement)->expression;
-				if (expression->kind == EXPRESSION_IN) {
-					// for <statement> in <expression>
-					range = true;
-					cond = expression;
-				} else {
-					// for <expression>
-					cond = expression;
+				if (expression->kind == EXPRESSION_UNARY) {
+					BinaryExpression *bin = CAST(BinaryExpression *, expression);
+					if (bin->operation == OPERATOR_IN) {
+						// for <statement> in <expression>
+						init = statement;
+						range = true;
+					}
 				}
+				cond = expression;
 			} else {
 				// for <init>
 				init = statement;

@@ -5,6 +5,14 @@
 #include "tree.h"
 #include "context.h"
 
+ListExpression *tree_new_list_expression(Tree *tree, Array(Expression*) expressions) {
+	Allocator *allocator = tree->context->allocator;
+	ListExpression *expression = CAST(ListExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_LIST;
+	expression->expressions = expressions;
+	return expression;
+}
+
 UnaryExpression *tree_new_unary_expression(Tree *tree, OperatorKind operation, Expression *operand) {
 	Allocator *allocator = tree->context->allocator;
 	UnaryExpression *expression = CAST(UnaryExpression*, allocator->allocate(allocator, sizeof *expression));
@@ -48,23 +56,6 @@ AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *opera
 	expression->base.kind = EXPRESSION_ASSERTION;
 	expression->operand = operand;
 	expression->type = type;
-	return expression;
-}
-
-InExpression *tree_new_in_expression(Tree *tree, Array(Expression*) lhs, Expression *rhs) {
-	Allocator *allocator = tree->context->allocator;
-	InExpression *expression = CAST(InExpression*, allocator->allocate(allocator, sizeof *expression));
-	expression->base.kind = EXPRESSION_IN; // TODO(dweiler): This is a BinaryExpression since "in" and "not_in" are binary operators.
-	expression->lhs = lhs;
-	expression->rhs = rhs;
-	return expression;
-}
-
-DereferenceExpression *tree_new_dereference_expression(Tree *tree, Expression *operand) {
-	Allocator *allocator = tree->context->allocator;
-	DereferenceExpression *expression = CAST(DereferenceExpression*, allocator->allocate(allocator, sizeof *expression));
-	expression->base.kind = EXPRESSION_DEREFERENCE; // TODO(dweiler): This is a UnaryExpression since "^" is a unary operator.
-	expression->operand = operand;
 	return expression;
 }
 
@@ -129,7 +120,7 @@ BlockStatement *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Stat
 	return statement;
 }
 
-AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, Array(Expression*) lhs, Array(Expression*) rhs) {
+AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, ListExpression *lhs, ListExpression *rhs) {
 	Allocator *allocator = tree->context->allocator;
 	AssignmentStatement *statement = CAST(AssignmentStatement*, allocator->allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_ASSIGNMENT;
@@ -139,7 +130,7 @@ AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind as
 	return statement;
 }
 
-DeclarationStatement *tree_new_declaration_statement(Tree *tree, Identifier *type, Array(Identifier*) names, Array(Expression*) values) {
+DeclarationStatement *tree_new_declaration_statement(Tree *tree, Identifier *type, Array(Identifier*) names, ListExpression *values) {
 	Allocator *allocator = tree->context->allocator;
 	DeclarationStatement *statement = CAST(DeclarationStatement *, allocator->allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_DECLARATION;
@@ -273,11 +264,26 @@ Bool tree_dump_value(const Value *value, Sint32 depth) {
 
 Bool tree_dump_expression(const Expression *expression, Sint32 depth);
 
+Bool tree_dump_list_expression(const ListExpression *expression, Sint32 depth) {
+	pad(depth);
+	printf("(list\n");
+	const Uint64 n_elements = array_size(expression->expressions);
+	for (Uint64 i = 0; i < n_elements; i++) {
+		const Expression *expr = expression->expressions[i];
+		tree_dump_expression(expr, depth + 1);
+		if (i != n_elements - 1) {
+			printf("\n");
+		}
+	}
+	printf(")");
+	return true;
+}
+
 Bool tree_dump_unary_expression(const UnaryExpression *expression, Sint32 depth) {
 	const String op = operator_to_string(expression->operation);
 	pad(depth);
-	printf("(uop '%.*s' ", SFMT(op));
-	tree_dump_expression(expression->operand, 0);
+	printf("(uop '%.*s'\n", SFMT(op));
+	tree_dump_expression(expression->operand, depth + 1);
 	printf(")");
 	return true;
 }
@@ -285,10 +291,10 @@ Bool tree_dump_unary_expression(const UnaryExpression *expression, Sint32 depth)
 Bool tree_dump_binary_expression(const BinaryExpression *expression, Sint32 depth) {
 	const String op = operator_to_string(expression->operation);
 	pad(depth);
-	printf("(bop '%.*s' ", SFMT(op));
-	tree_dump_expression(expression->lhs, 0);
-	printf(" ");
-	tree_dump_expression(expression->rhs, 0);
+	printf("(bop '%.*s'\n", SFMT(op));
+	tree_dump_expression(expression->lhs, depth + 1);
+	printf("\n");
+	tree_dump_expression(expression->rhs, depth + 1);
 	printf(")");
 	return true;
 }
@@ -331,32 +337,6 @@ Bool tree_dump_assertion_expression(const AssertionExpression *expression, Sint3
 	return true;
 }
 
-Bool tree_dump_in_expression(const InExpression *expression, Sint32 depth) {
-	pad(depth);
-	printf("(in ");
-	const Uint64 n_elements = array_size(expression->lhs);
-	if (n_elements > 1) {
-		printf("(");
-	}
-	for (Uint64 i = 0; i < n_elements; i += 1) {
-		const Expression *element = expression->lhs[i];
-		tree_dump_expression(element, 0);
-		if (i != n_elements - 1) {
-			printf("\n");
-		}
-	}
-	if (n_elements > 1) {
-		printf(")");
-	}
-	printf("\n");
-	tree_dump_expression(expression->rhs, depth + 1);
-	return true;
-}
-
-Bool tree_dump_dereference_expression(const DereferenceExpression *expression, Sint32 depth) {
-	return true;
-}
-
 Bool tree_dump_value_expression(const ValueExpression *expression, Sint32 depth) {
 	return tree_dump_value(expression->value, depth);
 }
@@ -383,14 +363,13 @@ Bool tree_dump_procedure_expression(const ProcedureExpression *expression, Sint3
 
 Bool tree_dump_expression(const Expression *expression, Sint32 depth) {
 	switch (expression->kind) {
+	case EXPRESSION_LIST:        return tree_dump_list_expression(CAST(const ListExpression *, expression), depth);
 	case EXPRESSION_UNARY:       return tree_dump_unary_expression(CAST(const UnaryExpression *, expression), depth);
 	case EXPRESSION_BINARY:      return tree_dump_binary_expression(CAST(const BinaryExpression *, expression), depth);
 	case EXPRESSION_CAST:        return tree_dump_cast_expression(CAST(const CastExpression *, expression), depth);
 	case EXPRESSION_SELECTOR:    return tree_dump_selector_expression(CAST(const SelectorExpression *, expression), depth);
 	case EXPRESSION_CALL:        return tree_dump_call_expression(CAST(const CallExpression *, expression), depth);
 	case EXPRESSION_ASSERTION:   return tree_dump_assertion_expression(CAST(const AssertionExpression *, expression), depth);
-	case EXPRESSION_IN:          return tree_dump_in_expression(CAST(const InExpression *, expression), depth);
-	case EXPRESSION_DEREFERENCE: return tree_dump_dereference_expression(CAST(const DereferenceExpression *, expression), depth);
 	case EXPRESSION_VALUE:       return tree_dump_value_expression(CAST(const ValueExpression *, expression), depth);
 	case EXPRESSION_IDENTIFIER:  return tree_dump_identifier_expression(CAST(const IdentifierExpression *, expression), depth);
 	case EXPRESSION_PROCEDURE:   return tree_dump_procedure_expression(CAST(const ProcedureExpression *, expression), depth);
@@ -439,25 +418,17 @@ Bool tree_dump_assignment_statement(const AssignmentStatement *statement, Sint32
 	pad(depth);
 	const String assign = assignment_to_string(statement->assignment);
 	printf("(assign '%.*s'\n", SFMT(assign));
-	const Uint64 n_values = array_size(statement->lhs);
-	for (Uint64 i = 0; i < n_values; i++) {
-		const Expression *dst = statement->lhs[i];
-		const Expression *src = statement->rhs[i];
-		tree_dump_expression(dst, depth + 1);
-		printf(" ");
-		tree_dump_expression(src, 0);
-		if (i != n_values - 1) {
-			printf("\n");
-		}
-	}
+	tree_dump_list_expression(statement->lhs, depth + 1);
+	printf("\n");
+	tree_dump_list_expression(statement->rhs, depth + 1);
 	printf(")");
 	return true;
 }
 
 Bool tree_dump_declaration_statement(const DeclarationStatement *statement, Sint32 depth) {
-	const Uint64 n_values = array_size(statement->values);
+	const Uint64 n_values = array_size(statement->values->expressions);
 	for (Uint64 i = 0; i < n_values; i++) {
-		const Expression *value = statement->values[i];
+		const Expression *value = statement->values->expressions[i];
 		const Identifier *name = statement->names[i];
 		pad(depth);
 		printf("(decl '%.*s'\n", SFMT(name->contents));

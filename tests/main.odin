@@ -15,5 +15,6 @@ main :: proc() #no_bounds_check {
   a := 10;
   b, c := 10, 20;
   d := "hello world";
+  // x^ = 10;
   foo();
 }

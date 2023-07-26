@@ -9,14 +9,13 @@ typedef struct Tree Tree;
 
 // Expressions.
 typedef struct Expression Expression;
+typedef struct ListExpression ListExpression;
 typedef struct UnaryExpression UnaryExpression;
 typedef struct BinaryExpression BinaryExpression;
 typedef struct CastExpression CastExpression;
 typedef struct SelectorExpression SelectorExpression;
 typedef struct CallExpression CallExpression;
 typedef struct AssertionExpression AssertionExpression;
-typedef struct InExpression InExpression;
-typedef struct DereferenceExpression DereferenceExpression;
 typedef struct ValueExpression ValueExpression;
 typedef struct IdentifierExpression IdentifierExpression;
 typedef struct ProcedureExpression ProcedureExpression;
@@ -46,14 +45,13 @@ typedef struct Identifier Identifier;
 typedef struct ProcedureType ProcedureType;
 
 enum ExpressionKind {
+	EXPRESSION_LIST,
 	EXPRESSION_UNARY,
 	EXPRESSION_BINARY,
 	EXPRESSION_CAST,
 	EXPRESSION_SELECTOR,
 	EXPRESSION_CALL,
 	EXPRESSION_ASSERTION,
-	EXPRESSION_IN, // TODO(dweiler): Move to EXPRESSION_BINARY.
-	EXPRESSION_DEREFERENCE,
 	EXPRESSION_VALUE,
 	EXPRESSION_IDENTIFIER,
 	EXPRESSION_PROCEDURE,
@@ -119,6 +117,11 @@ struct Expression {
 	ExpressionKind kind;
 };
 
+struct ListExpression {
+	Expression base;
+	Array(Expression*) expressions;
+};
+
 struct UnaryExpression {
 	Expression base;
 	OperatorKind operation;
@@ -154,17 +157,6 @@ struct AssertionExpression {
 	Expression base;
 	Expression *operand;
 	Identifier *type;
-};
-
-struct InExpression {
-	Expression base;
-	Array(Expression) *lhs;
-	Expression *rhs;
-};
-
-struct DereferenceExpression {
-	Expression base;
-	Expression *operand;
 };
 
 struct ValueExpression {
@@ -214,15 +206,15 @@ struct BlockStatement {
 struct AssignmentStatement {
 	Statement base;
 	AssignmentKind assignment;
-	Array(Expression*) lhs;
-	Array(Expression*) rhs;
+	ListExpression *lhs;
+	ListExpression *rhs;
 };
 
 struct DeclarationStatement {
 	Statement base;
 	Identifier *type;
 	Array(Identifier*) names;
-	Array(Expression*) values;
+	ListExpression *values;
 };
 
 struct IfStatement {
@@ -312,13 +304,12 @@ struct Tree {
 void tree_init(Tree *tree, Context *context);
 void tree_dump(Tree *tree);
 
+ListExpression *tree_new_list_expression(Tree *tree, Array(Expression*) expressions);
 UnaryExpression *tree_new_unary_expression(Tree *tree, OperatorKind operation, Expression *operand);
 BinaryExpression *tree_new_binary_expression(Tree *tree, OperatorKind operation, Expression *lhs, Expression *rhs);
 SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand, Identifier *identifier);
 CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Expression*) arguments);
 AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Identifier *type);
-InExpression *tree_new_in_expression(Tree *tree, Array(Expression*) lhs, Expression *rhs);
-DereferenceExpression *tree_new_dereference_expression(Tree *tree, Expression *operand);
 ValueExpression *tree_new_value_expression(Tree *tree, Value *value);
 IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier);
 ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureFlag flags, ProcedureType *type, BlockStatement *body);
@@ -327,8 +318,8 @@ EmptyStatement *tree_new_empty_statement(Tree *tree);
 ImportStatement *tree_new_import_statement(Tree *tree, String name, String package);
 ExpressionStatement *tree_new_expression_statement(Tree *tree, Expression *expression);
 BlockStatement *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Statement*) statements);
-AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, Array(Expression*) lhs, Array(Expression*) rhs);
-DeclarationStatement *tree_new_declaration_statement(Tree *tree, Identifier *type, Array(Identifier*) names, Array(Expression*) values);
+AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, ListExpression *lhs, ListExpression *rhs);
+DeclarationStatement *tree_new_declaration_statement(Tree *tree, Identifier *type, Array(Identifier*) names, ListExpression *values);
 IfStatement *tree_new_if_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, BlockStatement *elif);
 ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, Statement *post);
 ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) results);
