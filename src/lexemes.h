@@ -44,6 +44,7 @@ KIND(KEYWORD,      "keyword")
 KIND(ASSIGNMENT,   "assignment")
 KIND(DIRECTIVE,    "directive")     // '#' is a directive (not an operator)
 KIND(ATTRIBUTE,    "attribute")     // '@' is a attribute (not an operator)
+KIND(CONST,        "const")         // '$' is a constant (not an operator)
 KIND(SEMICOLON,    "semicolon")     // ';' is a terminator
 KIND(LBRACE,       "left brace")    // '{' is not an operator
 KIND(RBRACE,       "right brace")   // '}' is not an operator
@@ -83,20 +84,20 @@ LITERAL(STRING,    "string")
 OPERATOR(NOT,          "!",         0)
 OPERATOR(POINTER,      "^",         0)
 OPERATOR(ARROW,        "->",        0)
-OPERATOR(OPENPAREN,    "(",         0)
-OPERATOR(CLOSEPAREN,   ")",         0)
-OPERATOR(OPENBRACKET,  "[",         0)
-OPERATOR(CLOSEBRACKET, "]",         0)
+OPERATOR(LPAREN,       "(",         0)
+OPERATOR(RPAREN,       ")",         0)
+OPERATOR(LBRACKET,     "[",         0)
+OPERATOR(RBRACKET,     "]",         0)
 OPERATOR(COLON,        ":",         0)
 OPERATOR(PERIOD,       ".",         0)
 OPERATOR(COMMA,        ",",         0)
-OPERATOR(IN,           "in",        0) // Produces a value, therefor an operator.
-OPERATOR(NOT_IN,       "not_in",    0) // Produces a value, therefor an operator.
-OPERATOR(AUTO_CAST,    "auto_cast", 0) // Produces a value, therefor an operator.
-OPERATOR(CAST,         "cast",      0) // Produces a value, therefor an operator.
-OPERATOR(TRANSMUTE,    "transmute", 0) // Produces a value, therefor an operator.
-OPERATOR(OR_ELSE,      "or_else",   0) // Produces a value, therefor an operator.
-OPERATOR(OR_RETURN,    "or_return", 0) // Produces a value, therefor an operator.
+OPERATOR(IN,           "in",        0) // Produces a value, therefore an operator.
+OPERATOR(NOT_IN,       "not_in",    0) // Produces a value, therefore an operator.
+OPERATOR(AUTO_CAST,    "auto_cast", 0) // Produces a value, therefore an operator.
+OPERATOR(CAST,         "cast",      0) // Produces a value, therefore an operator.
+OPERATOR(TRANSMUTE,    "transmute", 0) // Produces a value, therefore an operator.
+OPERATOR(OR_ELSE,      "or_else",   1) // Produces a value, therefore an operator.
+OPERATOR(OR_RETURN,    "or_return", 0) // Produces a value, therefore an operator.
 OPERATOR(QUESTION,     "?",         1)
 OPERATOR(ELLIPSIS,     "..",        2)
 OPERATOR(RANGEFULL,    "..=",       2)

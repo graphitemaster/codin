@@ -76,6 +76,7 @@ static Uint8 peekl(Lexer *lexer) {
 }
 
 static void advancel(Lexer *lexer) {
+	Context *context = lexer->context;
 	if (lexer->rune == '\n') {
 		lexer->location.column = 1;
 		lexer->location.line++;
@@ -85,7 +86,7 @@ static void advancel(Lexer *lexer) {
 		lexer->here = input->cur;
 		const Rune rune = *input->cur;
 		if (rune == 0) {
-			// ERROR: Unexpected NUL.
+			LEX_ERROR("Unexpected EOF");
 			input->cur++;
 		} else if (rune & 0x80) {
 			// TODO(dweiler): UTF-8.
@@ -362,10 +363,7 @@ Token lexer_next(Lexer *lexer) {
 			token.kind = KIND_ATTRIBUTE;
 			break;
 		case '$':
-			// TODO(dweiler): Not sure how to deal with this yet. Should we make it
-			// a separate token so the parser consumes it and then an identifier or
-			// should we just treat $ as a modifier on an existing identifier token
-			// since it can only come before an identifier.
+			token.kind = KIND_CONST;
 			break;
 		case '?':
 			token.kind = KIND_OPERATOR;
@@ -388,19 +386,19 @@ Token lexer_next(Lexer *lexer) {
 			break;
 		case '(':
 			token.kind = KIND_OPERATOR;
-			token.as_operator = OPERATOR_OPENPAREN;
+			token.as_operator = OPERATOR_LPAREN;
 			break;
 		case ')':
 			token.kind = KIND_OPERATOR;
-			token.as_operator = OPERATOR_CLOSEPAREN;
+			token.as_operator = OPERATOR_RPAREN;
 			break;
 		case '[':
 			token.kind = KIND_OPERATOR;
-			token.as_operator = OPERATOR_OPENBRACKET;
+			token.as_operator = OPERATOR_LBRACKET;
 			break;
 		case ']':
 			token.kind = KIND_OPERATOR;
-			token.as_operator = OPERATOR_CLOSEBRACKET;
+			token.as_operator = OPERATOR_RBRACKET;
 			break;
 		case '{':
 			token.kind = KIND_LBRACE;

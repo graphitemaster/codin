@@ -18,6 +18,7 @@ typedef struct CallExpression CallExpression;
 typedef struct AssertionExpression AssertionExpression;
 typedef struct ValueExpression ValueExpression;
 typedef struct ProcedureExpression ProcedureExpression;
+typedef struct OrReturnExpression OrReturnExpression;
 
 // Statements.
 typedef struct Statement Statement;
@@ -31,8 +32,7 @@ typedef struct IfStatement IfStatement;
 typedef struct ReturnStatement ReturnStatement;
 typedef struct ForStatement ForStatement;
 typedef struct DeferStatement DeferStatement;
-typedef struct BreakStatement BreakStatement;
-
+typedef struct BranchStatement BranchStatement;
 
 // Values.
 typedef struct Value Value;
@@ -40,9 +40,16 @@ typedef struct LiteralValue LiteralValue;
 typedef struct CompoundLiteralValue CompoundLiteralValue;
 typedef struct IdentifierValue IdentifierValue;
 
-// Cleanup.
-typedef struct Identifier Identifier;
+// Types.
+typedef struct Type Type;
 typedef struct ProcedureType ProcedureType;
+typedef struct ConcreteProcedureType ConcreteProcedureType;
+typedef struct GenericProcedureType GenericProcedureType;
+
+// Misc.
+typedef struct Identifier Identifier;
+
+typedef struct Field Field;
 
 enum ExpressionKind {
 	EXPRESSION_LIST,
@@ -54,6 +61,7 @@ enum ExpressionKind {
 	EXPRESSION_ASSERTION,
 	EXPRESSION_VALUE,
 	EXPRESSION_PROCEDURE,
+	EXPRESSION_OR_RETURN,
 };
 
 enum StatementKind {
@@ -67,13 +75,22 @@ enum StatementKind {
 	STATEMENT_RETURN,
 	STATEMENT_FOR,
 	STATEMENT_DEFER,
-	STATEMENT_BREAK,
+	STATEMENT_BRANCH, // break, continue, fallthrough
 };
 
 enum ValueKind {
 	VALUE_LITERAL,
 	VALUE_COMPOUND_LITERAL,
 	VALUE_IDENTIFIER,
+};
+
+enum ProcedureKind {
+	PROCEDURE_CONCRETE,
+	PROCEDURE_GENERIC,
+};
+
+enum TypeKind {
+	TYPE_PROCEDURE,
 };
 
 enum BlockFlag {
@@ -90,12 +107,23 @@ enum ProcedureFlag {
 	PROC_FLAG_FORCE_INLINE              = 1 << 5,
 };
 
+#define CCONVENTION(name, enumerator) CCONV_ ## enumerator,
+enum CallingConvention {
+	CCONV_INVALID,
+	#include "lexemes.h"
+};
+#undef CCONVENTION
+
 typedef enum ExpressionKind ExpressionKind;
 typedef enum StatementKind StatementKind;
 typedef enum ValueKind ValueKind;
+typedef enum ProcedureKind ProcedureKind;
+typedef enum TypeKind TypeKind;
 
 typedef enum BlockFlag BlockFlag;
 typedef enum ProcedureFlag ProcedureFlag;
+
+typedef enum CallingConvention CallingConvention;
 
 inline String block_flags_to_string(BlockFlag flags) {
 	switch (CAST(Sint32, flags)) {
@@ -113,6 +141,7 @@ inline String block_flags_to_string(BlockFlag flags) {
 
 String procedure_flags_to_string(ProcedureFlag flags, Context *context);
 
+// Expressions.
 struct Expression {
 	ExpressionKind kind;
 };
@@ -168,7 +197,13 @@ struct ProcedureExpression {
 	Expression base;
 	ProcedureFlag flags;
 	ProcedureType *type;
+	ListExpression *where_clauses;
 	BlockStatement *body;
+};
+
+struct OrReturnExpression {
+	Expression base;
+	Expression *operand;
 };
 
 
@@ -238,10 +273,13 @@ struct DeferStatement {
 	Statement *statement;
 };
 
-struct BreakStatement {
+struct BranchStatement {
 	Statement base;
+	KeywordKind branch;
+	Identifier *label; // Optional label.
 };
 
+// Values.
 struct Value {
 	ValueKind kind;
 };
@@ -263,19 +301,38 @@ struct IdentifierValue {
 	Identifier *identifier;
 };
 
-// Identifier
+// Types.
+struct Type {
+	TypeKind kind;
+};
+
+struct ProcedureType {
+	Type base;
+	ProcedureKind kind;
+	ProcedureFlag flags;
+	CallingConvention convention;
+	Array(Field*) params;
+};
+
+struct ConcreteProcedureType {
+	ProcedureType base;
+};
+
+struct GenericProcedureType {
+	ProcedureType base;
+};
+
+// Misc.
 struct Identifier {
 	String contents;
+	Bool poly;
 };
 
-#define CCONVENTION(name, enumerator) CCONV_ ## enumerator,
-enum CallingConvention {
-	CCONV_INVALID,
-	#include "lexemes.h"
+struct Field {
+	Identifier *name; // Always present
+	Identifier *type; // Optional.
+	Expression *value;
 };
-#undef CCONVENTION
-
-typedef enum CallingConvention CallingConvention;
 
 inline String calling_convention_to_string(CallingConvention cc) {
 	#define CCONVENTION(name, ...) SLIT(name),
@@ -285,15 +342,6 @@ inline String calling_convention_to_string(CallingConvention cc) {
 	};
 	#undef CCONVENTION
 	return TABLE[cc];
-}
-
-struct Directive {
-	DirectiveKind kind;
-};
-
-struct ProcedureType {
-	ProcedureFlag flags;
-	CallingConvention convention;
 };
 
 struct Tree {
@@ -312,7 +360,8 @@ SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand
 CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Expression*) arguments);
 AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Identifier *type);
 ValueExpression *tree_new_value_expression(Tree *tree, Value *value);
-ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureFlag flags, ProcedureType *type, BlockStatement *body);
+ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureFlag flags, ProcedureType *type, ListExpression *where_clauses, BlockStatement *body);
+OrReturnExpression *tree_new_or_return_expression(Tree *tree, Expression *operand);
 
 EmptyStatement *tree_new_empty_statement(Tree *tree);
 ImportStatement *tree_new_import_statement(Tree *tree, String name, String package);
@@ -323,9 +372,10 @@ DeclarationStatement *tree_new_declaration_statement(Tree *tree, Identifier *typ
 IfStatement *tree_new_if_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, BlockStatement *elif);
 ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, Statement *post);
 ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) results);
-BreakStatement *tree_new_break_statement(Tree *tree);
 DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
+BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label);
 
+// Values should be usable in constant contexts provided everything inside them is constant.
 LiteralValue *tree_new_literal_value(Tree *tree, LiteralKind kind, String value);
 CompoundLiteralValue *tree_new_compound_literal_value(Tree *tree, Expression *expression, Array(Expression*) expressions);
 IdentifierValue *tree_new_identifier_value(Tree *tree, Identifier *identifier);
@@ -333,6 +383,9 @@ IdentifierValue *tree_new_identifier_value(Tree *tree, Identifier *identifier);
 Identifier *tree_new_identifier(Tree *tree, String contents);
 
 // The first actual type!
-ProcedureType *tree_new_procedure_type(Tree *tree, ProcedureFlag flags, CallingConvention convention);
+ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, ProcedureFlag flags, CallingConvention convention);
+GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) params, ProcedureFlag flags, CallingConvention convention);
+
+Field *tree_new_field(Tree *tree, Identifier *type, Identifier *name, Expression *value);
 
 #endif // CODIN_TREE_H

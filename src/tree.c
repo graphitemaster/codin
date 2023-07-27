@@ -68,14 +68,23 @@ ValueExpression *tree_new_value_expression(Tree *tree, Value *value) {
 	return expression;
 }
 
-ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureFlag flags, ProcedureType *type, BlockStatement *body) {
+ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureFlag flags,  ProcedureType *type, ListExpression *where_clauses,BlockStatement *body) {
 	Allocator *allocator = tree->context->allocator;
-	ProcedureExpression *procedure = CAST(ProcedureExpression*, allocator->allocate(allocator, sizeof *procedure));
-	procedure->base.kind = EXPRESSION_PROCEDURE;
-	procedure->body = body;
-	procedure->flags = flags;
-	procedure->type = type;
-	return procedure;
+	ProcedureExpression *expression = CAST(ProcedureExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_PROCEDURE;
+	expression->flags = flags;
+	expression->type = type;
+	expression->where_clauses = where_clauses;
+	expression->body = body;
+	return expression;
+}
+
+OrReturnExpression *tree_new_or_return_expression(Tree *tree, Expression *operand) {
+	Allocator *allocator = tree->context->allocator;
+	OrReturnExpression *expression = CAST(OrReturnExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_OR_RETURN;
+	expression->operand = operand;
+	return expression;
 }
 
 // Statements.
@@ -163,10 +172,12 @@ ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) result
 	return statement;
 }
 
-BreakStatement *tree_new_break_statement(Tree *tree) {
+BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label) {
 	Allocator *allocator = tree->context->allocator;
-	BreakStatement *statement = CAST(BreakStatement *, allocator->allocate(allocator, sizeof *statement));
-	statement->base.kind = STATEMENT_BREAK;
+	BranchStatement *statement = CAST(BranchStatement *, allocator->allocate(allocator, sizeof *statement));
+	statement->base.kind = STATEMENT_BRANCH;
+	statement->branch = branch;
+	statement->label = label;
 	return statement;
 }
 
@@ -213,12 +224,35 @@ Identifier *tree_new_identifier(Tree *tree, String contents) {
 	return identifier;
 }
 
-ProcedureType *tree_new_procedure_type(Tree *tree, ProcedureFlag flags, CallingConvention convention) {
+ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, ProcedureFlag flags, CallingConvention convention) {
 	Allocator *allocator = tree->context->allocator;
-	ProcedureType *type = CAST(ProcedureType*, allocator->allocate(allocator, sizeof *type));
-	type->convention = convention;
-	type->flags = flags;
+	ConcreteProcedureType *type = CAST(ConcreteProcedureType*, allocator->allocate(allocator, sizeof *type));
+	type->base.base.kind = TYPE_PROCEDURE;
+	type->base.kind = PROCEDURE_CONCRETE;
+	type->base.convention = convention;
+	type->base.params = params;
+	type->base.flags = flags;
 	return type;
+}
+
+GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) params, ProcedureFlag flags, CallingConvention convention) {
+	Allocator *allocator = tree->context->allocator;
+	GenericProcedureType *type = CAST(GenericProcedureType*, allocator->allocate(allocator, sizeof *type));
+	type->base.base.kind = TYPE_PROCEDURE;
+	type->base.kind = PROCEDURE_GENERIC;
+	type->base.convention = convention;
+	type->base.params = params;
+	type->base.flags = flags;
+	return type;
+}
+
+Field *tree_new_field(Tree *tree, Identifier *type, Identifier *name, Expression *value) {
+	Allocator *allocator = tree->context->allocator;
+	Field *field = CAST(Field*, allocator->allocate(allocator, sizeof *field));
+	field->type = type;
+	field->name = name;
+	field->value = value;
+	return field;
 }
 
 void tree_init(Tree *tree, Context *context) {
@@ -243,6 +277,8 @@ Bool tree_dump_literal_value(const LiteralValue *value, Sint32 depth) {
 }
 
 Bool tree_dump_compound_literal_value(const CompoundLiteralValue *value, Sint32 depth) {
+	pad(depth);
+	(void)value;
 	return false;
 }
 
@@ -311,8 +347,8 @@ Bool tree_dump_cast_expression(const CastExpression *expression, Sint32 depth) {
 
 Bool tree_dump_selector_expression(const SelectorExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(sel ");
-	tree_dump_expression(expression->operand, 0);
+	printf("(sel\n");
+	tree_dump_expression(expression->operand, depth + 1);
 	const String target = expression->identifier->contents;
 	printf(" '%.*s'", SFMT(target));
 	printf(")");
@@ -340,6 +376,7 @@ Bool tree_dump_call_expression(const CallExpression *expression, Sint32 depth) {
 
 Bool tree_dump_assertion_expression(const AssertionExpression *expression, Sint32 depth) {
 	pad(depth);
+	(void)expression;
 	return true;
 }
 
@@ -386,16 +423,52 @@ String procedure_flags_to_string(ProcedureFlag flags, Context *context) {
 	return strbuf_result(&buf);
 }
 
+Bool tree_dump_procedure_type(const ProcedureType *type, Sint32 depth) {
+	pad(depth);
+	const String cc = calling_convention_to_string(type->convention);
+	printf("(cc '%.*s')\n", SFMT(cc));
+	const Uint64 n_params = array_size(type->params);
+	pad(depth);
+	printf("(args");
+	if (n_params != 0) {
+		printf("\n");
+	}
+	for (Uint64 i = 0; i < n_params; i++) {
+		const Field *field = type->params[i];
+		pad(depth + 1);
+		printf("('%.*s'", SFMT(field->name->contents));
+		if (field->type) {
+			printf(" '%.*s'", SFMT(field->type->contents));
+		}
+		printf(")");
+		if (i != n_params - 1) {
+			printf("\n");
+		}
+	}
+	printf(")");
+	return true;
+}
+
+Bool tree_dump_list_expression(const ListExpression *expression, Sint32 depth);
+
 Bool tree_dump_procedure_expression(const ProcedureExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(proc");
-	const String cc = calling_convention_to_string(expression->type->convention);
-	printf(" '%.*s'", SFMT(cc));
+	printf("(proc\n");
+	tree_dump_procedure_type(expression->type, depth + 1);
+	if (expression->where_clauses) {
+		printf("\n");
+		pad(depth + 1);
+		printf("(where\n");
+		tree_dump_list_expression(expression->where_clauses, depth + 2);
+		printf(")");
+	}
+	printf("\n");
 	if (expression->flags) {
 		Context context;
 		context.allocator = &DEFAULT_ALLOCATOR;
 		const String flags = procedure_flags_to_string(expression->flags, &context);
-		printf(" '%.*s'", SFMT(flags));
+		pad(depth + 1);
+		printf("(flags '%.*s')", SFMT(flags));
 	}
 	printf("\n");
 	tree_dump_block_statement(expression->body, depth + 1);
@@ -403,28 +476,31 @@ Bool tree_dump_procedure_expression(const ProcedureExpression *expression, Sint3
 	return true;
 }
 
+Bool tree_dump_or_return_expression(const OrReturnExpression *expression, Sint32 depth) {
+	pad(depth);
+	printf("(or_return\n");
+	tree_dump_expression(expression->operand, depth + 1);
+	printf(")");
+	return true;
+}
+
 Bool tree_dump_expression(const Expression *expression, Sint32 depth) {
 	switch (expression->kind) {
-	case EXPRESSION_LIST:        return tree_dump_list_expression(RCAST(const ListExpression *, expression), depth);
-	case EXPRESSION_UNARY:       return tree_dump_unary_expression(RCAST(const UnaryExpression *, expression), depth);
-	case EXPRESSION_BINARY:      return tree_dump_binary_expression(RCAST(const BinaryExpression *, expression), depth);
-	case EXPRESSION_CAST:        return tree_dump_cast_expression(RCAST(const CastExpression *, expression), depth);
-	case EXPRESSION_SELECTOR:    return tree_dump_selector_expression(RCAST(const SelectorExpression *, expression), depth);
-	case EXPRESSION_CALL:        return tree_dump_call_expression(RCAST(const CallExpression *, expression), depth);
-	case EXPRESSION_ASSERTION:   return tree_dump_assertion_expression(RCAST(const AssertionExpression *, expression), depth);
-	case EXPRESSION_VALUE:       return tree_dump_value_expression(RCAST(const ValueExpression *, expression), depth);
-	case EXPRESSION_PROCEDURE:   return tree_dump_procedure_expression(RCAST(const ProcedureExpression *, expression), depth);
+	case EXPRESSION_LIST:      return tree_dump_list_expression(RCAST(const ListExpression *, expression), depth);
+	case EXPRESSION_UNARY:     return tree_dump_unary_expression(RCAST(const UnaryExpression *, expression), depth);
+	case EXPRESSION_BINARY:    return tree_dump_binary_expression(RCAST(const BinaryExpression *, expression), depth);
+	case EXPRESSION_CAST:      return tree_dump_cast_expression(RCAST(const CastExpression *, expression), depth);
+	case EXPRESSION_SELECTOR:  return tree_dump_selector_expression(RCAST(const SelectorExpression *, expression), depth);
+	case EXPRESSION_CALL:      return tree_dump_call_expression(RCAST(const CallExpression *, expression), depth);
+	case EXPRESSION_ASSERTION: return tree_dump_assertion_expression(RCAST(const AssertionExpression *, expression), depth);
+	case EXPRESSION_VALUE:     return tree_dump_value_expression(RCAST(const ValueExpression *, expression), depth);
+	case EXPRESSION_PROCEDURE: return tree_dump_procedure_expression(RCAST(const ProcedureExpression *, expression), depth);
+	case EXPRESSION_OR_RETURN: return tree_dump_or_return_expression(RCAST(const OrReturnExpression *, expression), depth);
 	}
 	return false;
 }
 
 Bool tree_dump_statement(const Statement *statement, Sint32 depth);
-
-Bool tree_dump_empty_statement(const EmptyStatement *statement, Sint32 depth) {
-	pad(depth);
-	printf("(empty)\n");
-	return true;
-}
 
 Bool tree_dump_block_statement(const BlockStatement *statement, Sint32 depth) {
 	pad(depth);
@@ -550,14 +626,21 @@ Bool tree_dump_defer_statement(const DeferStatement *statement, Sint32 depth) {
 	return true;
 }
 
-Bool tree_dump_break_statement(const BreakStatement *statement, Sint32 depth) {
+Bool tree_dump_branch_statement(const BranchStatement *statement, Sint32 depth) {
+	(void)statement;
 	pad(depth);
+	const String branch = keyword_to_string(statement->branch);
+	printf("(%.*s", SFMT(branch));
+	if (statement->label) {
+		printf(" '%.*s'", SFMT(statement->label->contents));
+	}
+	printf(")");
 	return true;
 }
 
 Bool tree_dump_statement(const Statement *statement, Sint32 depth) {
 	switch (statement->kind) {
-	case STATEMENT_EMPTY:       return tree_dump_empty_statement(RCAST(const EmptyStatement *, statement), depth);
+	case STATEMENT_EMPTY:       return false;
 	case STATEMENT_BLOCK:       return tree_dump_block_statement(RCAST(const BlockStatement *, statement), depth);
 	case STATEMENT_IMPORT:      return tree_dump_import_statement(RCAST(const ImportStatement *, statement), depth);
 	case STATEMENT_EXPRESSION:  return tree_dump_expression_statement(RCAST(const ExpressionStatement *, statement), depth);
@@ -567,7 +650,7 @@ Bool tree_dump_statement(const Statement *statement, Sint32 depth) {
 	case STATEMENT_RETURN:      return tree_dump_return_statement(RCAST(const ReturnStatement *, statement), depth);
 	case STATEMENT_FOR:         return tree_dump_for_statement(RCAST(const ForStatement *, statement), depth);
 	case STATEMENT_DEFER:       return tree_dump_defer_statement(RCAST(const DeferStatement *, statement), depth);
-	case STATEMENT_BREAK:       return tree_dump_break_statement(RCAST(const BreakStatement *, statement), depth);
+	case STATEMENT_BRANCH:      return tree_dump_branch_statement(RCAST(const BranchStatement *, statement), depth);
 	}
 	return false;
 }
