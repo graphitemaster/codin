@@ -380,9 +380,6 @@ String procedure_flags_to_string(ProcedureFlag flags, Context *context) {
 }
 
 Bool tree_dump_procedure_expression(const ProcedureExpression *expression, Sint32 depth) {
-	// ProcedureFlag flags;
-	// ProcedureType *type;
-	// BlockStatement *body;
 	pad(depth);
 	printf("(proc");
 	const String cc = calling_convention_to_string(expression->type->convention);
