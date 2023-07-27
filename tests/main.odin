@@ -2,12 +2,6 @@ package main
 
 import "core:fmt"
 
-main :: proc() #no_bounds_check {
-  {
-    x :: proc() {
-      {
-
-      }
-    }
-  }
+foo :: proc(x, y: int, z: f32) {
+  fmt.println(x, y, z);
 }

@@ -128,11 +128,11 @@ typedef enum CallingConvention CallingConvention;
 inline String block_flags_to_string(BlockFlag flags) {
 	switch (CAST(Sint32, flags)) {
 	case BLOCK_FLAG_BOUNDS_CHECK:
-		return SCLIT("#bounds_check");
+		return SCLIT("'#bounds_check'");
 	case BLOCK_FLAG_TYPE_ASSERT:
-		return SCLIT("#type_assert");
+		return SCLIT("'#type_assert'");
 	case BLOCK_FLAG_BOUNDS_CHECK | BLOCK_FLAG_TYPE_ASSERT:
-		return SCLIT("#bounds_check, #type_assert");
+		return SCLIT("'#bounds_check' '#type_assert'");
 	default:
 		return SCLIT("");
 	}

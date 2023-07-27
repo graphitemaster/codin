@@ -348,16 +348,18 @@ Bool tree_dump_selector_expression(const SelectorExpression *expression, Sint32 
 	pad(depth);
 	printf("(sel\n");
 	tree_dump_expression(expression->operand, depth + 1);
+	printf("\n");
 	const String target = expression->identifier->contents;
-	printf(" '%.*s'", SFMT(target));
+	pad(depth + 1);
+	printf("'%.*s'", SFMT(target));
 	printf(")");
 	return true;
 }
 
 Bool tree_dump_call_expression(const CallExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(call ");
-	tree_dump_expression(expression->operand, 0);
+	printf("(call\n");
+	tree_dump_expression(expression->operand, depth + 1);
 	const Uint64 n_arguments = array_size(expression->arguments);
 	if (n_arguments != 0) {
 		printf("\n");
@@ -390,33 +392,33 @@ String procedure_flags_to_string(ProcedureFlag flags, Context *context) {
 	strbuf_init(&buf, context);
 	Sint32 i = 0;
 	if (flags & PROC_FLAG_DIVERGING) {
-		if (i) strbuf_put_string(&buf, SCLIT(", "));
-		strbuf_put_string(&buf, SCLIT("#diverging"));
+		if (i) strbuf_put_string(&buf, SCLIT(" "));
+		strbuf_put_string(&buf, SCLIT("'#diverging'"));
 		i++;
 	}
 	if (flags & PROC_FLAG_OPTIONAL_OK) {
-		if (i) strbuf_put_string(&buf, SCLIT(", "));
-		strbuf_put_string(&buf, SCLIT("#optional_ok"));
+		if (i) strbuf_put_string(&buf, SCLIT(" "));
+		strbuf_put_string(&buf, SCLIT("'#optional_ok'"));
 		i++;
 	}
 	if (flags & PROC_FLAG_OPTIONAL_ALLOCATION_ERROR) {
-		if (i) strbuf_put_string(&buf, SCLIT(", "));
-		strbuf_put_string(&buf, SCLIT("#optional_allocation_error"));
+		if (i) strbuf_put_string(&buf, SCLIT(" "));
+		strbuf_put_string(&buf, SCLIT("'#optional_allocation_error'"));
 		i++;
 	}
 	if (flags & PROC_FLAG_BOUNDS_CHECK) {
-		if (i) strbuf_put_string(&buf, SCLIT(", "));
-		strbuf_put_string(&buf, SCLIT("#bounds_check"));
+		if (i) strbuf_put_string(&buf, SCLIT(" "));
+		strbuf_put_string(&buf, SCLIT("'#bounds_check'"));
 		i++;
 	}
 	if (flags & PROC_FLAG_TYPE_ASSERT) {
-		if (i) strbuf_put_string(&buf, SCLIT(", "));
-		strbuf_put_string(&buf, SCLIT("#type_assert"));
+		if (i) strbuf_put_string(&buf, SCLIT(" "));
+		strbuf_put_string(&buf, SCLIT("'#type_assert'"));
 		i++;
 	}
 	if (flags & PROC_FLAG_FORCE_INLINE) {
-		if (i) strbuf_put_string(&buf, SCLIT(", "));
-		strbuf_put_string(&buf, SCLIT("#force_inline"));
+		if (i) strbuf_put_string(&buf, SCLIT(" "));
+		strbuf_put_string(&buf, SCLIT("'#force_inline'"));
 		i++;
 	}
 	return strbuf_result(&buf);
@@ -503,10 +505,11 @@ Bool tree_dump_statement(const Statement *statement, Sint32 depth);
 
 Bool tree_dump_block_statement(const BlockStatement *statement, Sint32 depth) {
 	pad(depth);
-	printf("(block");
+	printf("(block\n");
 	if (statement->flags) {
 		const String flags = block_flags_to_string(statement->flags);
-		printf(" '%.*s'", SFMT(flags));
+		pad(depth + 1);
+		printf("(flags %.*s)", SFMT(flags));
 	}
 	const Uint64 n_statements = array_size(statement->statements);
 	if (n_statements != 0) {
