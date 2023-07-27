@@ -1,5 +1,13 @@
 package main
 
-main :: proc() {
-  x := foo() or_else 1;
+import "core:fmt"
+
+main :: proc() #no_bounds_check {
+  {
+    x :: proc() {
+      {
+
+      }
+    }
+  }
 }

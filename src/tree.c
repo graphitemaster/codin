@@ -68,11 +68,10 @@ ValueExpression *tree_new_value_expression(Tree *tree, Value *value) {
 	return expression;
 }
 
-ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureFlag flags,  ProcedureType *type, ListExpression *where_clauses,BlockStatement *body) {
+ProcedureExpression *tree_new_procedure_expression(Tree *tree,  ProcedureType *type, ListExpression *where_clauses,BlockStatement *body) {
 	Allocator *allocator = tree->context->allocator;
 	ProcedureExpression *expression = CAST(ProcedureExpression*, allocator->allocate(allocator, sizeof *expression));
 	expression->base.kind = EXPRESSION_PROCEDURE;
-	expression->flags = flags;
 	expression->type = type;
 	expression->where_clauses = where_clauses;
 	expression->body = body;
@@ -428,6 +427,14 @@ Bool tree_dump_procedure_type(const ProcedureType *type, Sint32 depth) {
 	const String cc = calling_convention_to_string(type->convention);
 	printf("(cc '%.*s')\n", SFMT(cc));
 	const Uint64 n_params = array_size(type->params);
+	if (type->flags) {
+		Context context;
+		context.allocator = &DEFAULT_ALLOCATOR;
+		const String flags = procedure_flags_to_string(type->flags, &context);
+		pad(depth);
+		printf("(flags '%.*s')", SFMT(flags));
+		printf("\n");
+	}
 	pad(depth);
 	printf("(args");
 	if (n_params != 0) {
@@ -461,14 +468,6 @@ Bool tree_dump_procedure_expression(const ProcedureExpression *expression, Sint3
 		printf("(where\n");
 		tree_dump_list_expression(expression->where_clauses, depth + 2);
 		printf(")");
-	}
-	printf("\n");
-	if (expression->flags) {
-		Context context;
-		context.allocator = &DEFAULT_ALLOCATOR;
-		const String flags = procedure_flags_to_string(expression->flags, &context);
-		pad(depth + 1);
-		printf("(flags '%.*s')", SFMT(flags));
 	}
 	printf("\n");
 	tree_dump_block_statement(expression->body, depth + 1);

@@ -195,7 +195,6 @@ struct ValueExpression {
 
 struct ProcedureExpression {
 	Expression base;
-	ProcedureFlag flags;
 	ProcedureType *type;
 	ListExpression *where_clauses;
 	BlockStatement *body;
@@ -360,7 +359,7 @@ SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand
 CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Expression*) arguments);
 AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Identifier *type);
 ValueExpression *tree_new_value_expression(Tree *tree, Value *value);
-ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureFlag flags, ProcedureType *type, ListExpression *where_clauses, BlockStatement *body);
+ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, ListExpression *where_clauses, BlockStatement *body);
 OrReturnExpression *tree_new_or_return_expression(Tree *tree, Expression *operand);
 
 EmptyStatement *tree_new_empty_statement(Tree *tree);

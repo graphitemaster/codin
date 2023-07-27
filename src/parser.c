@@ -47,7 +47,6 @@ struct Parser {
 	Token this_token; // This token is being processed
 	Token last_token; // Last token processed
 	ProcedureType *this_procedure;
-	BlockFlag this_block_flags;
 	Sint32 trace_depth;
 	Sint32 expression_depth;
 	Uint64 unique_id;
@@ -514,7 +513,7 @@ static ProcedureType *parse_procedure_type(Parser *parser) {
 	return type;
 }
 
-static BlockStatement *parse_body(Parser *parser);
+static BlockStatement *parse_body(Parser *parser, BlockFlag flags);
 static ListExpression *parse_rhs_list_expression(Parser *parser);
 
 static ProcedureExpression *parse_procedure(Parser *parser) {
@@ -541,8 +540,7 @@ static ProcedureExpression *parse_procedure(Parser *parser) {
 	// We start each procedure with the flags of the procedure type.
 	ProcedureFlag flags = type->flags;
 
-	// Then we add optional flags that cannot be provided by the type
-	// and are part of the procedure body.
+	// Then we add or remove optional flags.
 	while (is_kind(parser->this_token, KIND_DIRECTIVE)) {
 		const Token token = expect_kind(parser, KIND_DIRECTIVE);
 		const String name = directive_to_string(token.as_directive);
@@ -558,6 +556,7 @@ static ProcedureExpression *parse_procedure(Parser *parser) {
 			break;
 		case DIRECTIVE_NO_BOUNDS_CHECK:
 			flags &= ~PROC_FLAG_BOUNDS_CHECK;
+			printf("Removing bounds check on flags %d\n", CAST(Sint32, flags));
 			break;
 		case DIRECTIVE_TYPE_ASSERT:
 			flags |= PROC_FLAG_TYPE_ASSERT;
@@ -570,22 +569,21 @@ static ProcedureExpression *parse_procedure(Parser *parser) {
 		}
 	}
 
+	// Update the procedure type flags early.
+	type->flags = flags;
+
 	advance_possible_newline_within(parser);
 
 	if (accepted_kind(parser, KIND_UNDEFINED)) {
 		UNIMPLEMENTED("Undefined procedure literal");
 	} else if (is_kind(parser->this_token, KIND_LBRACE)) {
-		ProcedureType *last_procedure = parser->this_procedure;
-		parser->this_procedure = type;
-		// Convert procedure flags to block flags.
 		BlockFlag block_flags = CAST(BlockFlag, 0);
 		if (flags & PROC_FLAG_BOUNDS_CHECK) block_flags |= BLOCK_FLAG_BOUNDS_CHECK;
 		if (flags & PROC_FLAG_TYPE_ASSERT)  block_flags |= BLOCK_FLAG_TYPE_ASSERT;
-		parser->this_block_flags = block_flags;
-		BlockStatement *body = parse_body(parser);
-		parser->this_procedure = last_procedure;
+		parser->this_procedure = type;
+		BlockStatement *body = parse_body(parser, block_flags);
 		ASSERT(type);
-		ProcedureExpression *expression = tree_new_procedure_expression(parser->tree, flags, type, where_clauses, body);
+		ProcedureExpression *expression = tree_new_procedure_expression(parser->tree, type, where_clauses, body);
 		TRACE_LEAVE();
 		return expression;
 	}
@@ -599,10 +597,10 @@ static ProcedureExpression *parse_procedure(Parser *parser) {
 
 static CallExpression *parse_call_expression(Parser *parser, Expression *operand);
 
-static Statement *parse_statement(Parser *parser);
+static Statement *parse_statement(Parser *parser, BlockFlag block_flags);
 static Expression *parse_unary_expression(Parser *parser, Bool lhs);
 
-static Statement *parse_directive_for_statement(Parser *parser) {
+static Statement *parse_directive_for_statement(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
 
 	Context *context = parser->context;
@@ -611,26 +609,23 @@ static Statement *parse_directive_for_statement(Parser *parser) {
 	Statement *statement = 0;
 	switch (token.as_directive) {
 	case DIRECTIVE_BOUNDS_CHECK:
-		statement = parse_statement(parser);
+		statement = parse_statement(parser, block_flags);
 		break;
 	case DIRECTIVE_NO_BOUNDS_CHECK:
-		statement = parse_statement(parser);
+		statement = parse_statement(parser, block_flags);
 		break;
 	case DIRECTIVE_TYPE_ASSERT:
-		statement = parse_statement(parser);
+		statement = parse_statement(parser, block_flags);
 		break;
 	case DIRECTIVE_NO_TYPE_ASSERT:
-		statement = parse_statement(parser);
+		statement = parse_statement(parser, block_flags);
 		break;
 	case DIRECTIVE_PARTIAL:
-		UNIMPLEMENTED("#partial");
+		statement = parse_statement(parser, block_flags);
+		break;
 	case DIRECTIVE_ASSERT:
-		FALLTHROUGH();
+		break;
 	case DIRECTIVE_PANIC:
-		// statement = tree_new_directive(parser->tree, token.as_directive);
-		// statement = tree_new_expression_statement(parser->tree, parse_call_expression(parser, statement));
-		// expect_semicolon(parser);
-		// break;
 		break;
 	case DIRECTIVE_UNROLL:
 		UNIMPLEMENTED("#unroll");
@@ -691,9 +686,15 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 		}
 		break;
 	case KIND_DIRECTIVE:
-		UNIMPLEMENTED("Directive");
+		{
+			UNIMPLEMENTED("directive");
+			const Token token = expect_kind(parser, KIND_DIRECTIVE);
+			const String directive = directive_to_string(token.as_directive);
+			printf("%.*s\n", SFMT(directive));
+		}
 		TRACE_LEAVE();
-		return expression;
+		// parser->this_directives |= token.as_directive;
+		return 0; // parse_expression(parser, lhs); // expression;
 	case KIND_KEYWORD:
 		switch (token.as_keyword) {
 		case KEYWORD_DISTINCT:
@@ -1108,9 +1109,9 @@ static FORCE_INLINE ListExpression *parse_rhs_list_expression(Parser *parser) {
 	return result;
 }
 
-static Statement *parse_statement(Parser *parser);
+static Statement *parse_statement(Parser *parser, BlockFlag block_flags);
 
-static Array(Statement*) parse_statement_list(Parser *parser) {
+static Array(Statement*) parse_statement_list(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
 
 	Context *context = parser->context;
@@ -1126,7 +1127,7 @@ static Array(Statement*) parse_statement_list(Parser *parser) {
 	       !is_kind(parser->this_token, KIND_RBRACE) &&
 	       !is_kind(parser->this_token, KIND_EOF))
 	{
-		Statement *statement = parse_statement(parser);
+		Statement *statement = parse_statement(parser, block_flags);
 		if (statement && statement->kind != STATEMENT_EMPTY) {
 			array_push(statements, statement);
 		}
@@ -1137,21 +1138,20 @@ static Array(Statement*) parse_statement_list(Parser *parser) {
 	return statements;
 }
 
-static BlockStatement *parse_body(Parser *parser) {
+static BlockStatement *parse_body(Parser *parser, BlockFlag flags) {
 	TRACE_ENTER();
 	const Sint32 depth = parser->expression_depth;
 	parser->expression_depth = 0;
 	expect_kind(parser, KIND_LBRACE);
-	Array(Statement*) statements = parse_statement_list(parser);
+	Array(Statement*) statements = parse_statement_list(parser, flags);
 	expect_kind(parser, KIND_RBRACE);
 	parser->expression_depth = depth;
-	BlockFlag flags = parser->this_block_flags;
 	BlockStatement *statement = tree_new_block_statement(parser->tree, flags, statements);
 	TRACE_LEAVE();
 	return statement;
 }
 
-static BlockStatement *parse_block_statement(Parser *parser, Bool when) {
+static BlockStatement *parse_block_statement(Parser *parser, BlockFlag flags, Bool when) {
 	// The block statement may be part of a compile-time when statement.
 	TRACE_ENTER();
 
@@ -1167,7 +1167,7 @@ static BlockStatement *parse_block_statement(Parser *parser, Bool when) {
 		PARSE_ERROR("Cannot use block statement at file scope");
 	}
 
-	BlockStatement *body = parse_body(parser);
+	BlockStatement *body = parse_body(parser, flags);
 
 	TRACE_LEAVE();
 
@@ -1333,7 +1333,7 @@ static ImportStatement *parse_import_declaration(Parser *parser) {
 	return statement;
 }
 
-static BlockStatement *convert_statement_to_body(Parser *parser, Statement *statement) {
+static BlockStatement *convert_statement_to_body(Parser *parser, BlockFlag flags, Statement *statement) {
 	Context *context = parser->context;
 
 	const StatementKind kind = statement->kind;
@@ -1342,7 +1342,7 @@ static BlockStatement *convert_statement_to_body(Parser *parser, Statement *stat
 	}
 	Array(Statement*) statements = 0;
 	array_push(statements, statement);
-	return tree_new_block_statement(parser->tree, parser->this_block_flags, statements);
+	return tree_new_block_statement(parser->tree, flags, statements);
 }
 
 static Expression *convert_statement_to_expression(Parser *parser, Statement *statement) {
@@ -1356,12 +1356,12 @@ static Expression *convert_statement_to_expression(Parser *parser, Statement *st
 	return RCAST(ExpressionStatement *, statement)->expression;
 }
 
-static BlockStatement *parse_do_body(Parser *parser) {
+static BlockStatement *parse_do_body(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
 	const Sint32 depth = parser->expression_depth;
 	parser->expression_depth = 0;
-	Statement *statement = parse_statement(parser);
-	BlockStatement *body = convert_statement_to_body(parser, statement);
+	Statement *statement = parse_statement(parser, block_flags);
+	BlockStatement *body = convert_statement_to_body(parser, block_flags, statement);
 	parser->expression_depth = depth;
 	TRACE_LEAVE();
 	return body;
@@ -1378,7 +1378,7 @@ static Bool accepted_control_statement_separator(Parser *parser) {
 	return false;
 }
 
-static IfStatement *parse_if_statement(Parser *parser) {
+static IfStatement *parse_if_statement(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
 
 	Context *context = parser->context;
@@ -1405,9 +1405,9 @@ static IfStatement *parse_if_statement(Parser *parser) {
 
 	BlockStatement *body = 0;
 	if (accepted_keyword(parser, KEYWORD_DO)) {
-		body = parse_do_body(parser);
+		body = parse_do_body(parser, block_flags);
 	} else {
-		body = parse_block_statement(parser, false);
+		body = parse_block_statement(parser, block_flags, false);
 	}
 
 	advance_possible_newline(parser);
@@ -1416,15 +1416,15 @@ static IfStatement *parse_if_statement(Parser *parser) {
 	if (is_keyword(parser->this_token, KEYWORD_ELSE)) {
 		expect_keyword(parser, KEYWORD_ELSE);
 		if (is_keyword(parser->this_token, KEYWORD_IF)) {
-			IfStatement *statement = parse_if_statement(parser);
+			IfStatement *statement = parse_if_statement(parser, block_flags);
 			Array(Statement) *statements = 0;
 			array_push(statements, RCAST(Statement *, statement));
-			elif = tree_new_block_statement(parser->tree, parser->this_block_flags, statements);
+			elif = tree_new_block_statement(parser->tree, block_flags, statements);
 		} else if (is_kind(parser->this_token, KIND_LBRACE)) {
-			elif = parse_block_statement(parser, false);
+			elif = parse_block_statement(parser, block_flags, false);
 		} else if (is_keyword(parser->this_token, KEYWORD_DO)) {
 			expect_keyword(parser, KEYWORD_DO);
-			elif = parse_do_body(parser);
+			elif = parse_do_body(parser, block_flags);
 		} else {
 			PARSE_ERROR("Expected block on 'else' statement");
 		}
@@ -1437,7 +1437,7 @@ static IfStatement *parse_if_statement(Parser *parser) {
 	return statement;
 }
 
-static ForStatement *parse_for_statement(Parser *parser) {
+static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
 
 	Context *context = parser->context;
@@ -1461,9 +1461,9 @@ static ForStatement *parse_for_statement(Parser *parser) {
 			expect_operator(parser, OPERATOR_IN);
 			Expression *rhs = parse_expression(parser, false);
 			if (accepted_keyword(parser, KEYWORD_DO)) {
-				body = parse_do_body(parser);
+				body = parse_do_body(parser, block_flags);
 			} else {
-				body = parse_block_statement(parser, false);
+				body = parse_block_statement(parser, block_flags, false);
 			}
 			parser->expression_depth = depth;
 			cond = RCAST(Expression *, tree_new_unary_expression(parser->tree, OPERATOR_IN, rhs));
@@ -1520,10 +1520,10 @@ static ForStatement *parse_for_statement(Parser *parser) {
 
 	if (accepted_keyword(parser, KEYWORD_DO)) {
 		// for [...] do <Statement>
-		body = parse_do_body(parser);
+		body = parse_do_body(parser, block_flags);
 	} else {
 		// for [...] <BlockStatement>
-		body = parse_block_statement(parser, false);
+		body = parse_block_statement(parser, block_flags, false);
 	}
 
 	ForStatement *statement = tree_new_for_statement(parser->tree, init, cond, body, post);
@@ -1533,11 +1533,11 @@ static ForStatement *parse_for_statement(Parser *parser) {
 	return statement;
 }
 
-static DeferStatement *parse_defer_statement(Parser *parser) {
+static DeferStatement *parse_defer_statement(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
 	Context *context = parser->context;
 	expect_keyword(parser, KEYWORD_DEFER);
-	Statement *statement = parse_statement(parser);
+	Statement *statement = parse_statement(parser, block_flags);
 	switch (statement->kind) {
 	case STATEMENT_EMPTY:
 		PARSE_ERROR("Empty statement in defer");
@@ -1588,7 +1588,7 @@ static ReturnStatement *parse_return_statement(Parser *parser) {
 	return statement;
 }
 
-static Statement *parse_statement(Parser *parser) {
+static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
 	Context *context = parser->context;
 	Statement *statement = 0;
@@ -1628,7 +1628,7 @@ static Statement *parse_statement(Parser *parser) {
 		case KEYWORD_FOREIGN:
 			UNIMPLEMENTED("Foreign declaration");
 		case KEYWORD_IF:
-			statement = RCAST(Statement *, parse_if_statement(parser));
+			statement = RCAST(Statement *, parse_if_statement(parser, block_flags));
 			TRACE_LEAVE();
 			return statement;
 		case KEYWORD_WHEN:
@@ -1638,13 +1638,13 @@ static Statement *parse_statement(Parser *parser) {
 			TRACE_LEAVE();
 			return statement;
 		case KEYWORD_FOR:
-			statement = RCAST(Statement *, parse_for_statement(parser));
+			statement = RCAST(Statement *, parse_for_statement(parser, block_flags));
 			TRACE_LEAVE();
 			return statement;
 		case KEYWORD_SWITCH:
 			UNIMPLEMENTED("Switch statement");
 		case KEYWORD_DEFER:
-			statement = RCAST(Statement *, parse_defer_statement(parser));
+			statement = RCAST(Statement *, parse_defer_statement(parser, block_flags));
 			TRACE_LEAVE();
 			return statement;
 		case KEYWORD_RETURN:
@@ -1705,11 +1705,12 @@ static Statement *parse_statement(Parser *parser) {
 	case KIND_ATTRIBUTE:
 		UNIMPLEMENTED("Attribute");
 	case KIND_DIRECTIVE:
-		statement = RCAST(Statement *, parse_directive_for_statement(parser));
+		// Genius..
+		statement = RCAST(Statement *, parse_directive_for_statement(parser, block_flags));
 		TRACE_LEAVE();
 		return statement;
 	case KIND_LBRACE:
-		statement = RCAST(Statement *, parse_block_statement(parser, false));
+		statement = RCAST(Statement *, parse_block_statement(parser, block_flags, false));
 		TRACE_LEAVE();
 		return statement;
 	case KIND_SEMICOLON:
@@ -1781,7 +1782,7 @@ Tree *parse(String filename, Context *context) {
 	tree->package = package.string;
 
 	while (!is_kind(parser->this_token, KIND_EOF)) {
-		Statement *statement = parse_statement(parser);
+		Statement *statement = parse_statement(parser, CAST(BlockFlag, 0));
 		if (statement && statement->kind != STATEMENT_EMPTY) {
 			array_push(tree->statements, statement);
 		}

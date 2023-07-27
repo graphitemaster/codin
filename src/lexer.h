@@ -55,7 +55,10 @@ enum DirectiveKind {
 	#include "lexemes.h"
 	DIRECTIVE_COUNT,
 };
+#undef DIRECTIVE
+
 typedef enum DirectiveKind DirectiveKind;
+
 String directive_to_string(DirectiveKind directive);
 
 struct Source {
