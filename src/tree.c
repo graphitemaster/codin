@@ -213,7 +213,7 @@ Identifier *tree_new_identifier(Tree *tree, String contents) {
 	return identifier;
 }
 
-ProcedureType *tree_new_procedure_type(Tree *tree, void *params, void *results, Uint64 flags, CallingConvention convention) {
+ProcedureType *tree_new_procedure_type(Tree *tree, ProcedureFlag flags, CallingConvention convention) {
 	Allocator *allocator = tree->context->allocator;
 	ProcedureType *type = CAST(ProcedureType*, allocator->allocate(allocator, sizeof *type));
 	type->convention = convention;
@@ -299,6 +299,13 @@ Bool tree_dump_binary_expression(const BinaryExpression *expression, Sint32 dept
 }
 
 Bool tree_dump_cast_expression(const CastExpression *expression, Sint32 depth) {
+	pad(depth);
+	printf("(cast");
+	if (expression->type) {
+		printf(" '%.*s'", SFMT(expression->type->contents));
+	}
+	tree_dump_expression(expression->expression, depth + 1);
+	printf(")");
 	return true;
 }
 
@@ -421,8 +428,11 @@ Bool tree_dump_empty_statement(const EmptyStatement *statement, Sint32 depth) {
 
 Bool tree_dump_block_statement(const BlockStatement *statement, Sint32 depth) {
 	pad(depth);
-	const String flags = block_flags_to_string(statement->flags);
-	printf("(block '%.*s'", SFMT(flags));
+	printf("(block");
+	if (statement->flags) {
+		const String flags = block_flags_to_string(statement->flags);
+		printf(" '%.*s'", SFMT(flags));
+	}
 	const Uint64 n_statements = array_size(statement->statements);
 	if (n_statements != 0) {
 		printf("\n");
@@ -534,6 +544,9 @@ Bool tree_dump_for_statement(const ForStatement *statement, Sint32 depth) {
 
 Bool tree_dump_defer_statement(const DeferStatement *statement, Sint32 depth) {
 	pad(depth);
+	printf("(defer\n");
+	tree_dump_statement(statement->statement, depth + 1);
+	printf(")");
 	return true;
 }
 

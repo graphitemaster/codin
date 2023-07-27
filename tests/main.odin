@@ -16,5 +16,5 @@ main :: proc() #no_bounds_check {
   b, c := 10, 20;
   d := "hello world";
   // x^ = 10;
-  foo();
+  for i in 0..<10 do defer foo();
 }

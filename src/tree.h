@@ -292,7 +292,7 @@ struct Directive {
 };
 
 struct ProcedureType {
-	Uint64 flags;
+	ProcedureFlag flags;
 	CallingConvention convention;
 };
 
@@ -333,6 +333,6 @@ IdentifierValue *tree_new_identifier_value(Tree *tree, Identifier *identifier);
 Identifier *tree_new_identifier(Tree *tree, String contents);
 
 // The first actual type!
-ProcedureType *tree_new_procedure_type(Tree *tree, void *params, void *results, Uint64 flags, CallingConvention convention);
+ProcedureType *tree_new_procedure_type(Tree *tree, ProcedureFlag flags, CallingConvention convention);
 
 #endif // CODIN_TREE_H

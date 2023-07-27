@@ -132,18 +132,6 @@ static Bool accepted_keyword(Parser *parser, KeywordKind keyword) {
 	return false;
 }
 
-static Bool accepted_separator(Parser *parser) {
-	const Token token = parser->this_token;
-	Context *context = parser->context;
-	if (accepted_operator(parser, OPERATOR_COMMA)) {
-		return true;
-	}
-	if (is_kind(token, KIND_SEMICOLON) && !string_compare(token.string, SCLIT("\n"))) {
-		PARSE_ERROR("Expected a comma");
-	}
-	return false;
-}
-
 static Bool ignore_newline(const Parser *parser) {
 	// BUG(dweiler): Determine why this has to be >= and not > in the case of
 	// procedure groups.
@@ -333,67 +321,6 @@ static Identifier *parse_type(Parser *parser) {
 
 static CompoundLiteralValue *parse_compound_literal_value(Parser *parser, Expression *expression);
 
-enum FieldFlag {
-	FIELD_FLAG_INVALID   = 0,
-	FIELD_FLAG_USING     = 1 << 0,
-	FIELD_FLAG_AUTO_CAST = 1 << 1,
-	FIELD_FLAG_NO_ALIAS  = 1 << 2,
-	FIELD_FLAG_C_VARARG  = 1 << 3,
-	FIELD_FLAG_CONST     = 1 << 4,
-	FIELD_FLAG_ANY_INT   = 1 << 5,
-	FIELD_FLAG_SUBTYPE   = 1 << 6,
-	FIELD_FLAG_BY_PTR    = 1 << 7,
-};
-
-typedef enum FieldFlag FieldFlag;
-
-static FieldFlag parse_field_flag(Parser *parser) {
-	const Token token = parser->this_token;
-	Context *context = parser->context;
-	if (is_keyword(token, KEYWORD_USING)) {
-		return FIELD_FLAG_USING;
-	} else if (is_operator(token, OPERATOR_AUTO_CAST)) {
-		return FIELD_FLAG_AUTO_CAST;
-	} else if (is_kind(token, KIND_DIRECTIVE)) {
-		switch (token.as_directive) {
-		case DIRECTIVE_NO_ALIAS:
-			return FIELD_FLAG_NO_ALIAS;
-		case DIRECTIVE_C_VARARG:
-			return FIELD_FLAG_C_VARARG;
-		case DIRECTIVE_CONST:
-			return FIELD_FLAG_CONST;
-		case DIRECTIVE_ANY_INT:
-			return FIELD_FLAG_ANY_INT;
-		case DIRECTIVE_SUBTYPE:
-			return FIELD_FLAG_SUBTYPE;
-		case DIRECTIVE_BY_PTR:
-			return FIELD_FLAG_BY_PTR;
-		default:
-			PARSE_ERROR("Unsupported directive in field");
-		}
-	}
-	return FIELD_FLAG_INVALID;
-}
-
-static FieldFlag parse_field_flags(Parser *parser) {
-	TRACE_ENTER();
-	Context *context = parser->context;
-	FieldFlag flags = FIELD_FLAG_INVALID;
-	for (;;) {
-		const FieldFlag flag = parse_field_flag(parser);
-		if (flag == FIELD_FLAG_INVALID) {
-			break;
-		}
-		if (flags & flag) {
-			PARSE_ERROR("Duplicate in field list");
-		}
-		flags |= flag;
-		advancep(parser);
-	}
-	TRACE_LEAVE();
-	return flags;
-}
-
 static ProcedureType *parse_procedure_type(Parser *parser) {
 	TRACE_ENTER();
 
@@ -413,13 +340,16 @@ static ProcedureType *parse_procedure_type(Parser *parser) {
 	expect_operator(parser, OPERATOR_OPENPAREN);
 	expect_operator(parser, OPERATOR_CLOSEPAREN);
 
-	Uint64 flags = 0;
+	// We start all procedure types with these flags.
+	ProcedureFlag flags = CAST(ProcedureFlag, 0);
+	flags |= PROC_FLAG_BOUNDS_CHECK;
+	flags |= PROC_FLAG_TYPE_ASSERT;
 	Bool diverging = false;
 	if (diverging) {
 		flags |= PROC_FLAG_DIVERGING;
 	}
 
-	ProcedureType *type = tree_new_procedure_type(parser->tree, 0, 0, flags, convention);
+	ProcedureType *type = tree_new_procedure_type(parser->tree, flags, convention);
 
 	TRACE_LEAVE();
 
@@ -441,11 +371,11 @@ static ProcedureExpression *parse_procedure(Parser *parser) {
 		UNIMPLEMENTED("where specialization for procedures");
 	}
 
-	// We start each procedure with these default flags.
-	ProcedureFlag flags = CAST(ProcedureFlag, 0);
-	flags |= PROC_FLAG_BOUNDS_CHECK;
-	flags |= PROC_FLAG_TYPE_ASSERT;
+	// We start each procedure with the flags of the procedure type.
+	ProcedureFlag flags = type->flags;
 
+	// Then we add optional flags that cannot be provided by the type
+	// and are part of the procedure body.
 	while (is_kind(parser->this_token, KIND_DIRECTIVE)) {
 		const Token token = expect_kind(parser, KIND_DIRECTIVE);
 		const String name = directive_to_string(token.as_directive);
@@ -517,7 +447,6 @@ static Statement *parse_directive_for_statement(Parser *parser) {
 		statement = parse_statement(parser);
 		break;
 	case DIRECTIVE_NO_BOUNDS_CHECK:
-		// printf("no_bounds_check");
 		statement = parse_statement(parser);
 		break;
 	case DIRECTIVE_TYPE_ASSERT:
@@ -1131,10 +1060,13 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 				Array(Identifier *) names = 0;
 				for (Uint64 i = 0; i < n_names; i++) {
 					const Expression *expression = lhs->expressions[i];
-					if (expression->kind != EXPRESSION_VALUE || CAST(ValueExpression *, expression)->value->kind != VALUE_IDENTIFIER) {
+					if (expression->kind != EXPRESSION_VALUE) {
 						PARSE_ERROR("Expected identifier");
 					}
 					const Value *value = CAST(ValueExpression *, expression)->value;
+					if (value->kind != VALUE_IDENTIFIER) {
+						PARSE_ERROR("Expected identifier");
+					}
 					array_push(names, CAST(const IdentifierValue *, value)->identifier);
 				}
 				DeclarationStatement *statement = parse_declaration_statement(parser, names);
@@ -1206,7 +1138,7 @@ static BlockStatement *convert_statement_to_body(Parser *parser, Statement *stat
 	}
 	Array(Statement*) statements = 0;
 	array_push(statements, statement);
-	return tree_new_block_statement(parser->tree, CAST(BlockFlag, 0), statements);
+	return tree_new_block_statement(parser->tree, parser->this_block_flags, statements);
 }
 
 static Expression *convert_statement_to_expression(Parser *parser, Statement *statement) {
