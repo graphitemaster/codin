@@ -254,9 +254,9 @@ Bool tree_dump_identifier_value(const IdentifierValue *value, Sint32 depth) {
 
 Bool tree_dump_value(const Value *value, Sint32 depth) {
 	switch (value->kind) {
-	case VALUE_LITERAL:          return tree_dump_literal_value(CAST(const LiteralValue *, value), depth);
-	case VALUE_COMPOUND_LITERAL: return tree_dump_compound_literal_value(CAST(const CompoundLiteralValue *, value), depth);
-	case VALUE_IDENTIFIER:       return tree_dump_identifier_value(CAST( IdentifierValue *, value), depth);
+	case VALUE_LITERAL:          return tree_dump_literal_value(RCAST(const LiteralValue *, value), depth);
+	case VALUE_COMPOUND_LITERAL: return tree_dump_compound_literal_value(RCAST(const CompoundLiteralValue *, value), depth);
+	case VALUE_IDENTIFIER:       return tree_dump_identifier_value(RCAST(const IdentifierValue *, value), depth);
 	}
 	return false;
 }
@@ -405,15 +405,15 @@ Bool tree_dump_procedure_expression(const ProcedureExpression *expression, Sint3
 
 Bool tree_dump_expression(const Expression *expression, Sint32 depth) {
 	switch (expression->kind) {
-	case EXPRESSION_LIST:        return tree_dump_list_expression(CAST(const ListExpression *, expression), depth);
-	case EXPRESSION_UNARY:       return tree_dump_unary_expression(CAST(const UnaryExpression *, expression), depth);
-	case EXPRESSION_BINARY:      return tree_dump_binary_expression(CAST(const BinaryExpression *, expression), depth);
-	case EXPRESSION_CAST:        return tree_dump_cast_expression(CAST(const CastExpression *, expression), depth);
-	case EXPRESSION_SELECTOR:    return tree_dump_selector_expression(CAST(const SelectorExpression *, expression), depth);
-	case EXPRESSION_CALL:        return tree_dump_call_expression(CAST(const CallExpression *, expression), depth);
-	case EXPRESSION_ASSERTION:   return tree_dump_assertion_expression(CAST(const AssertionExpression *, expression), depth);
-	case EXPRESSION_VALUE:       return tree_dump_value_expression(CAST(const ValueExpression *, expression), depth);
-	case EXPRESSION_PROCEDURE:   return tree_dump_procedure_expression(CAST(const ProcedureExpression *, expression), depth);
+	case EXPRESSION_LIST:        return tree_dump_list_expression(RCAST(const ListExpression *, expression), depth);
+	case EXPRESSION_UNARY:       return tree_dump_unary_expression(RCAST(const UnaryExpression *, expression), depth);
+	case EXPRESSION_BINARY:      return tree_dump_binary_expression(RCAST(const BinaryExpression *, expression), depth);
+	case EXPRESSION_CAST:        return tree_dump_cast_expression(RCAST(const CastExpression *, expression), depth);
+	case EXPRESSION_SELECTOR:    return tree_dump_selector_expression(RCAST(const SelectorExpression *, expression), depth);
+	case EXPRESSION_CALL:        return tree_dump_call_expression(RCAST(const CallExpression *, expression), depth);
+	case EXPRESSION_ASSERTION:   return tree_dump_assertion_expression(RCAST(const AssertionExpression *, expression), depth);
+	case EXPRESSION_VALUE:       return tree_dump_value_expression(RCAST(const ValueExpression *, expression), depth);
+	case EXPRESSION_PROCEDURE:   return tree_dump_procedure_expression(RCAST(const ProcedureExpression *, expression), depth);
 	}
 	return false;
 }
@@ -557,17 +557,17 @@ Bool tree_dump_break_statement(const BreakStatement *statement, Sint32 depth) {
 
 Bool tree_dump_statement(const Statement *statement, Sint32 depth) {
 	switch (statement->kind) {
-	case STATEMENT_EMPTY:       return tree_dump_empty_statement(CAST(const EmptyStatement *, statement), depth);
-	case STATEMENT_BLOCK:       return tree_dump_block_statement(CAST(const BlockStatement *, statement), depth);
-	case STATEMENT_IMPORT:      return tree_dump_import_statement(CAST(const ImportStatement *, statement), depth);
-	case STATEMENT_EXPRESSION:  return tree_dump_expression_statement(CAST(const ExpressionStatement *, statement), depth);
-	case STATEMENT_ASSIGNMENT:  return tree_dump_assignment_statement(CAST(const AssignmentStatement *, statement), depth);
-	case STATEMENT_DECLARATION: return tree_dump_declaration_statement(CAST(const DeclarationStatement *, statement), depth);
-	case STATEMENT_IF:          return tree_dump_if_statement(CAST(const IfStatement *, statement), depth);
-	case STATEMENT_RETURN:      return tree_dump_return_statement(CAST(const ReturnStatement *, statement), depth);
-	case STATEMENT_FOR:         return tree_dump_for_statement(CAST(const ForStatement *, statement), depth);
-	case STATEMENT_DEFER:       return tree_dump_defer_statement(CAST(const DeferStatement *, statement), depth);
-	case STATEMENT_BREAK:       return tree_dump_break_statement(CAST(const BreakStatement *, statement), depth);
+	case STATEMENT_EMPTY:       return tree_dump_empty_statement(RCAST(const EmptyStatement *, statement), depth);
+	case STATEMENT_BLOCK:       return tree_dump_block_statement(RCAST(const BlockStatement *, statement), depth);
+	case STATEMENT_IMPORT:      return tree_dump_import_statement(RCAST(const ImportStatement *, statement), depth);
+	case STATEMENT_EXPRESSION:  return tree_dump_expression_statement(RCAST(const ExpressionStatement *, statement), depth);
+	case STATEMENT_ASSIGNMENT:  return tree_dump_assignment_statement(RCAST(const AssignmentStatement *, statement), depth);
+	case STATEMENT_DECLARATION: return tree_dump_declaration_statement(RCAST(const DeclarationStatement *, statement), depth);
+	case STATEMENT_IF:          return tree_dump_if_statement(RCAST(const IfStatement *, statement), depth);
+	case STATEMENT_RETURN:      return tree_dump_return_statement(RCAST(const ReturnStatement *, statement), depth);
+	case STATEMENT_FOR:         return tree_dump_for_statement(RCAST(const ForStatement *, statement), depth);
+	case STATEMENT_DEFER:       return tree_dump_defer_statement(RCAST(const DeferStatement *, statement), depth);
+	case STATEMENT_BREAK:       return tree_dump_break_statement(RCAST(const BreakStatement *, statement), depth);
 	}
 	return false;
 }

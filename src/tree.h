@@ -92,7 +92,6 @@ enum ProcedureFlag {
 typedef enum ExpressionKind ExpressionKind;
 typedef enum StatementKind StatementKind;
 typedef enum ValueKind ValueKind;
-typedef enum TypeKind TypeKind;
 
 typedef enum BlockFlag BlockFlag;
 typedef enum ProcedureFlag ProcedureFlag;

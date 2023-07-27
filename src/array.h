@@ -15,12 +15,12 @@ struct ALIGN(16) Array {
 #define Array(T) T*
 
 #define array_meta(array) \
-	(&((Array*)(array))[-1])
+	(&RCAST(Array*, (array))[-1])
 
 #define array_try_grow(array, size_) \
 	(((array) && array_meta(array)->size + (size_) < array_meta(array)->capacity) \
 		? true \
-		: array_grow(context, (void **)&(array), (size_), sizeof *(array)))
+		: array_grow(context, RCAST(void **, &(array)), (size_), sizeof *(array)))
 
 #define array_size(array) \
 	((array) ? array_meta(array)->size : 0)
@@ -48,7 +48,7 @@ struct ALIGN(16) Array {
 		? (array_meta(array)->size >= (size_) \
 			? (array_meta(array)->size = (size_), true) \
 			: array_expand((array), (size_) - array_meta(array)->size)) \
-		: (array_grow(context, (void **)&(array), (size_), sizeof *(array)) \
+		: (array_grow(context, RCAST(void **, &(array)), (size_), sizeof *(array)) \
 			? (array_meta(array)->size = (size_), true) \
 			: false))
 

@@ -21,9 +21,9 @@ Bool array_grow(Context *context, void **const array, Size elements, Size type_s
 		if (!data) {
 			return false;
 		}
-		((Array *)data)->size = 0;
+		CAST(Array *, data)->size = 0;
 	}
-	Array *meta = (Array *)data;
+	Array *meta = CAST(Array *, data);
 	meta->capacity = count;
 	*array = meta + 1;
 	return true;
