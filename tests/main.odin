@@ -14,3 +14,6 @@ package main
 // ternary if / when
 // using statement
 
+foo :: proc() -> int {
+
+}

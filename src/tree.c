@@ -542,16 +542,16 @@ Bool tree_dump_procedure_type(const ProcedureType *type, Sint32 depth) {
 		const String flags = procedure_flags_to_string(type->flags, &context);
 		pad(depth);
 		printf("(flags %.*s)", SFMT(flags));
-		printf("\n");
 	}
 	if (type->params) {
+		printf("\n");
 		pad(depth);
 		printf("(args\n");
 		tree_dump_fields(type->params, depth + 1);
 		printf(")");
-		printf("\n");
 	}
 	if (type->results) {
+		printf("\n");
 		pad(depth);
 		printf("(results\n");
 		tree_dump_fields(type->results, depth + 1);
@@ -627,14 +627,14 @@ Bool tree_dump_procedure_expression(const ProcedureExpression *expression, Sint3
 	pad(depth);
 	printf("(proc\n");
 	tree_dump_procedure_type(expression->type, depth + 1);
+	printf("\n");
 	if (expression->where_clauses) {
-		printf("\n");
 		pad(depth + 1);
 		printf("(where\n");
 		tree_dump_list_expression(expression->where_clauses, depth + 2);
 		printf(")");
+		printf("\n");
 	}
-	printf("\n");
 	tree_dump_block_statement(expression->body, depth + 1);
 	printf(")");
 	return true;

@@ -412,7 +412,7 @@ static Array(Field*) parse_field_list(Parser *parser) {
 			if (name->kind != TYPE_IDENTIFIER) {
 				PARSE_ERROR("Expected identifier");
 			}
-			Identifier *identifier = RCAST(IdentifierType *, name)->identifier;
+			Identifier *identifier = RCAST(const IdentifierType *, name)->identifier;
 			array_push(fields, tree_new_field(parser->tree, type, identifier, value));
 		}
 	} else {
@@ -843,7 +843,7 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 					MultiPointerType *type = tree_new_multi_pointer_type(parser->tree, parse_type(parser));
 					TypeExpression *operand = tree_new_type_expression(parser->tree, RCAST(Type *, type));
 					TRACE_LEAVE();
-					return CAST(Expression *, operand);
+					return RCAST(Expression *, operand);
 				} else if (is_operator(parser->this_token, OPERATOR_QUESTION)) {
 					// [?]T
 					expect_operator(parser, OPERATOR_QUESTION);
