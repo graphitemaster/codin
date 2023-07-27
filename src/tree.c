@@ -68,14 +68,6 @@ ValueExpression *tree_new_value_expression(Tree *tree, Value *value) {
 	return expression;
 }
 
-IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier) {
-	Allocator *allocator = tree->context->allocator;
-	IdentifierExpression *expression = CAST(IdentifierExpression *, allocator->allocate(allocator, sizeof *expression));
-	expression->base.kind = EXPRESSION_IDENTIFIER;
-	expression->identifier = identifier;
-	return expression;
-}
-
 ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureFlag flags, ProcedureType *type, BlockStatement *body) {
 	Allocator *allocator = tree->context->allocator;
 	ProcedureExpression *procedure = CAST(ProcedureExpression*, allocator->allocate(allocator, sizeof *type));
@@ -205,6 +197,14 @@ CompoundLiteralValue *tree_new_compound_literal_value(Tree *tree, Expression *ex
 	return value;
 }
 
+IdentifierValue *tree_new_identifier_value(Tree *tree, Identifier *identifier) {
+	Allocator *allocator = tree->context->allocator;
+	IdentifierValue *value = CAST(IdentifierValue *, allocator->allocate(allocator, sizeof *value));
+	value->base.kind = VALUE_IDENTIFIER;
+	value->identifier = identifier;
+	return value;
+}
+
 Identifier *tree_new_identifier(Tree *tree, String contents) {
 	Context *context = tree->context;
 	Allocator *allocator = context->allocator;
@@ -246,10 +246,17 @@ Bool tree_dump_compound_literal_value(const CompoundLiteralValue *value, Sint32 
 	return false;
 }
 
+Bool tree_dump_identifier_value(const IdentifierValue *value, Sint32 depth) {
+	pad(depth);
+	printf("'%.*s'", SFMT(value->identifier->contents));
+	return true;
+}
+
 Bool tree_dump_value(const Value *value, Sint32 depth) {
 	switch (value->kind) {
 	case VALUE_LITERAL:          return tree_dump_literal_value(CAST(const LiteralValue *, value), depth);
 	case VALUE_COMPOUND_LITERAL: return tree_dump_compound_literal_value(CAST(const CompoundLiteralValue *, value), depth);
+	case VALUE_IDENTIFIER:       return tree_dump_identifier_value(CAST( IdentifierValue *, value), depth);
 	}
 	return false;
 }
@@ -333,12 +340,6 @@ Bool tree_dump_value_expression(const ValueExpression *expression, Sint32 depth)
 	return tree_dump_value(expression->value, depth);
 }
 
-Bool tree_dump_identifier_expression(const IdentifierExpression *expression, Sint32 depth) {
-	pad(depth);
-	printf("'%.*s'", SFMT(expression->identifier->contents));
-	return true;
-}
-
 Bool tree_dump_block_statement(const BlockStatement *statement, Sint32 depth);
 
 String procedure_flags_to_string(ProcedureFlag flags, Context *context) {
@@ -408,7 +409,6 @@ Bool tree_dump_expression(const Expression *expression, Sint32 depth) {
 	case EXPRESSION_CALL:        return tree_dump_call_expression(CAST(const CallExpression *, expression), depth);
 	case EXPRESSION_ASSERTION:   return tree_dump_assertion_expression(CAST(const AssertionExpression *, expression), depth);
 	case EXPRESSION_VALUE:       return tree_dump_value_expression(CAST(const ValueExpression *, expression), depth);
-	case EXPRESSION_IDENTIFIER:  return tree_dump_identifier_expression(CAST(const IdentifierExpression *, expression), depth);
 	case EXPRESSION_PROCEDURE:   return tree_dump_procedure_expression(CAST(const ProcedureExpression *, expression), depth);
 	}
 	return false;

@@ -17,7 +17,6 @@ typedef struct SelectorExpression SelectorExpression;
 typedef struct CallExpression CallExpression;
 typedef struct AssertionExpression AssertionExpression;
 typedef struct ValueExpression ValueExpression;
-typedef struct IdentifierExpression IdentifierExpression;
 typedef struct ProcedureExpression ProcedureExpression;
 
 // Statements.
@@ -38,6 +37,7 @@ typedef struct BreakStatement BreakStatement;
 typedef struct Value Value;
 typedef struct LiteralValue LiteralValue;
 typedef struct CompoundLiteralValue CompoundLiteralValue;
+typedef struct IdentifierValue IdentifierValue;
 
 // Cleanup.
 typedef struct Identifier Identifier;
@@ -52,7 +52,6 @@ enum ExpressionKind {
 	EXPRESSION_CALL,
 	EXPRESSION_ASSERTION,
 	EXPRESSION_VALUE,
-	EXPRESSION_IDENTIFIER,
 	EXPRESSION_PROCEDURE,
 };
 
@@ -73,6 +72,7 @@ enum StatementKind {
 enum ValueKind {
 	VALUE_LITERAL,
 	VALUE_COMPOUND_LITERAL,
+	VALUE_IDENTIFIER,
 };
 
 enum BlockFlag {
@@ -162,11 +162,6 @@ struct AssertionExpression {
 struct ValueExpression {
 	Expression base;
 	Value *value;
-};
-
-struct IdentifierExpression {
-	Expression base;
-	Identifier *identifier;
 };
 
 struct ProcedureExpression {
@@ -263,6 +258,11 @@ struct CompoundLiteralValue {
 	Array(Expression*) expressions;
 };
 
+struct IdentifierValue {
+	Value base;
+	Identifier *identifier;
+};
+
 // Identifier
 struct Identifier {
 	String contents;
@@ -312,7 +312,6 @@ SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand
 CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Expression*) arguments);
 AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Identifier *type);
 ValueExpression *tree_new_value_expression(Tree *tree, Value *value);
-IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier);
 ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureFlag flags, ProcedureType *type, BlockStatement *body);
 
 EmptyStatement *tree_new_empty_statement(Tree *tree);
@@ -329,6 +328,7 @@ DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
 
 LiteralValue *tree_new_literal_value(Tree *tree, LiteralKind kind, String value);
 CompoundLiteralValue *tree_new_compound_literal_value(Tree *tree, Expression *expression, Array(Expression*) expressions);
+IdentifierValue *tree_new_identifier_value(Tree *tree, Identifier *identifier);
 
 Identifier *tree_new_identifier(Tree *tree, String contents);
 

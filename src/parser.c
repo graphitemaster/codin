@@ -308,11 +308,12 @@ static Identifier *parse_type_or_identifier(Parser *parser) {
 	Expression *type = parse_atom_expression(parser, operand, true);
 	parser->expression_depth = depth;
 	if (type) {
-		ASSERT(type->kind == EXPRESSION_IDENTIFIER);
+		ASSERT(type->kind == EXPRESSION_VALUE);
+		Value *value = CAST(ValueExpression *, type)->value;
+		ASSERT(value->kind == VALUE_IDENTIFIER);
+		Identifier *identifier = CAST(IdentifierValue *, value)->identifier;
 		TRACE_LEAVE();
-		return CAST(IdentifierExpression *, type)->identifier;
-	} else if (type) {
-		printf("Got a %d instead\n", type->kind);
+		return identifier;
 	}
 	TRACE_LEAVE();
 	return 0;
@@ -556,9 +557,13 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 	Expression *expression = 0;
 	switch (token.kind) {
 	case KIND_IDENTIFIER:
-		expression = CAST(Expression *, tree_new_identifier_expression(parser->tree, parse_identifier(parser)));
-		TRACE_LEAVE();
-		return expression;
+		{
+			Identifier *identifier = parse_identifier(parser);
+			IdentifierValue *value = tree_new_identifier_value(parser->tree, identifier);
+			expression = CAST(Expression *, tree_new_value_expression(parser->tree, CAST(Value *, value)));
+			TRACE_LEAVE();
+			return expression;
+		}
 	case KIND_LITERAL:
 		switch (token.as_literal) {
 		case LITERAL_INTEGER:
@@ -1121,15 +1126,16 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 		case OPERATOR_COLON:
 			{
 				expect_operator(parser, OPERATOR_COLON);
-				// Everything inside 'lhs' should be an IdentifierExpression
+				// Everything inside 'lhs' should be an ValueExpression of type IdentifierValue
 				const Uint64 n_names = array_size(lhs->expressions);
 				Array(Identifier *) names = 0;
 				for (Uint64 i = 0; i < n_names; i++) {
 					const Expression *expression = lhs->expressions[i];
-					if (expression->kind != EXPRESSION_IDENTIFIER) {
+					if (expression->kind != EXPRESSION_VALUE || CAST(ValueExpression *, expression)->value->kind != VALUE_IDENTIFIER) {
 						PARSE_ERROR("Expected identifier");
 					}
-					array_push(names, CAST(const IdentifierExpression *, expression)->identifier);
+					const Value *value = CAST(ValueExpression *, expression)->value;
+					array_push(names, CAST(const IdentifierValue *, value)->identifier);
 				}
 				DeclarationStatement *statement = parse_declaration_statement(parser, names);
 				TRACE_LEAVE();
