@@ -1,7 +1,16 @@
 package main
 
-import "core:fmt"
+// distinct
+// struct
+// union
+// enum
+// attributes
+// switch
+// expression directives (partial, assert, panic, unroll)
+// procedure groups
+// [] indexing
+// foreign declarations
+// implicit selector expressions
+// ternary if / when
+// using statement
 
-foo :: proc(x, y: int, z: f32) {
-  fmt.println(x, y, z);
-}

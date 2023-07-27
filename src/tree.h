@@ -18,7 +18,7 @@ typedef struct CallExpression CallExpression;
 typedef struct AssertionExpression AssertionExpression;
 typedef struct ValueExpression ValueExpression;
 typedef struct ProcedureExpression ProcedureExpression;
-typedef struct OrReturnExpression OrReturnExpression;
+typedef struct TypeExpression TypeExpression;
 
 // Statements.
 typedef struct Statement Statement;
@@ -42,9 +42,16 @@ typedef struct IdentifierValue IdentifierValue;
 
 // Types.
 typedef struct Type Type;
+typedef struct IdentifierType IdentifierType;
 typedef struct ProcedureType ProcedureType;
 typedef struct ConcreteProcedureType ConcreteProcedureType;
 typedef struct GenericProcedureType GenericProcedureType;
+typedef struct PointerType PointerType;
+typedef struct MultiPointerType MultiPointerType;
+typedef struct SliceType SliceType;
+typedef struct ArrayType ArrayType;
+typedef struct DynamicArrayType DynamicArrayType;
+typedef struct BitSetType BitSetType;
 
 // Misc.
 typedef struct Identifier Identifier;
@@ -61,7 +68,7 @@ enum ExpressionKind {
 	EXPRESSION_ASSERTION,
 	EXPRESSION_VALUE,
 	EXPRESSION_PROCEDURE,
-	EXPRESSION_OR_RETURN,
+	EXPRESSION_TYPE,
 };
 
 enum StatementKind {
@@ -90,7 +97,14 @@ enum ProcedureKind {
 };
 
 enum TypeKind {
-	TYPE_PROCEDURE,
+	TYPE_IDENTIFIER,    // Unresolved type identifier.
+	TYPE_PROCEDURE,     // proc
+	TYPE_POINTER,       // ^T
+	TYPE_MULTI_POINTER, // [^]T
+	TYPE_SLICE,         // []T
+	TYPE_ARRAY,         // [N]T or [?]T
+	TYPE_DYNAMIC_ARRAY, // [dynamic]T
+	TYPE_BIT_SET,       // bit_set[T] or bit_set[T; U]
 };
 
 enum BlockFlag {
@@ -185,7 +199,7 @@ struct CallExpression {
 struct AssertionExpression {
 	Expression base;
 	Expression *operand;
-	Identifier *type;
+	Type *type;
 };
 
 struct ValueExpression {
@@ -200,11 +214,10 @@ struct ProcedureExpression {
 	BlockStatement *body;
 };
 
-struct OrReturnExpression {
+struct TypeExpression {
 	Expression base;
-	Expression *operand;
+	Type *type;
 };
-
 
 // Statements.
 struct Statement {
@@ -241,7 +254,7 @@ struct AssignmentStatement {
 
 struct DeclarationStatement {
 	Statement base;
-	Identifier *type;
+	Type *type;
 	Array(Identifier*) names;
 	ListExpression *values;
 };
@@ -303,6 +316,12 @@ struct IdentifierValue {
 // Types.
 struct Type {
 	TypeKind kind;
+	Bool poly;
+};
+
+struct IdentifierType {
+	Type base;
+	Identifier *identifier;
 };
 
 struct ProcedureType {
@@ -311,6 +330,7 @@ struct ProcedureType {
 	ProcedureFlag flags;
 	CallingConvention convention;
 	Array(Field*) params;
+	Array(Field*) results;
 };
 
 struct ConcreteProcedureType {
@@ -321,6 +341,38 @@ struct GenericProcedureType {
 	ProcedureType base;
 };
 
+struct PointerType {
+	Type base;
+	Type *type;
+};
+
+struct MultiPointerType {
+	Type base;
+	Type *type;
+};
+
+struct SliceType {
+	Type base;
+	Type *type;
+};
+
+struct ArrayType {
+	Type base;
+	Type *type;
+	Expression *count;
+};
+
+struct DynamicArrayType {
+	Type base;
+	Type *type;
+};
+
+struct BitSetType {
+	Type base;
+	Expression *expression;
+	Type *underlying;
+};
+
 // Misc.
 struct Identifier {
 	String contents;
@@ -329,7 +381,7 @@ struct Identifier {
 
 struct Field {
 	Identifier *name; // Always present
-	Identifier *type; // Optional.
+	Type *type; // Optional.
 	Expression *value;
 };
 
@@ -357,17 +409,17 @@ UnaryExpression *tree_new_unary_expression(Tree *tree, OperatorKind operation, E
 BinaryExpression *tree_new_binary_expression(Tree *tree, OperatorKind operation, Expression *lhs, Expression *rhs);
 SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand, Identifier *identifier);
 CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Expression*) arguments);
-AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Identifier *type);
+AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Type *type);
 ValueExpression *tree_new_value_expression(Tree *tree, Value *value);
 ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, ListExpression *where_clauses, BlockStatement *body);
-OrReturnExpression *tree_new_or_return_expression(Tree *tree, Expression *operand);
+TypeExpression *tree_new_type_expression(Tree *tree, Type *type);
 
 EmptyStatement *tree_new_empty_statement(Tree *tree);
 ImportStatement *tree_new_import_statement(Tree *tree, String name, String package);
 ExpressionStatement *tree_new_expression_statement(Tree *tree, Expression *expression);
 BlockStatement *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Statement*) statements);
 AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, ListExpression *lhs, ListExpression *rhs);
-DeclarationStatement *tree_new_declaration_statement(Tree *tree, Identifier *type, Array(Identifier*) names, ListExpression *values);
+DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values);
 IfStatement *tree_new_if_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, BlockStatement *elif);
 ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, Statement *post);
 ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) results);
@@ -381,10 +433,16 @@ IdentifierValue *tree_new_identifier_value(Tree *tree, Identifier *identifier);
 
 Identifier *tree_new_identifier(Tree *tree, String contents);
 
-// The first actual type!
-ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, ProcedureFlag flags, CallingConvention convention);
-GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) params, ProcedureFlag flags, CallingConvention convention);
+IdentifierType *tree_new_identifier_type(Tree *tree, Identifier *identifier);
+ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);
+GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);
+PointerType *tree_new_pointer_type(Tree *Tree, Type *type);
+MultiPointerType *tree_new_multi_pointer_type(Tree *Tree, Type *type);
+SliceType *tree_new_slice_type(Tree *tree, Type *type);
+ArrayType *tree_new_array_type(Tree *Tree, Type *type, Expression *count);
+DynamicArrayType *tree_new_dynamic_array_type(Tree *tree, Type *type);
+BitSetType *tree_new_bit_set_type(Tree *tree, Expression *expression, Type *underlying);
 
-Field *tree_new_field(Tree *tree, Identifier *type, Identifier *name, Expression *value);
+Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value);
 
 #endif // CODIN_TREE_H

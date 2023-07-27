@@ -51,7 +51,7 @@ CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(
 	return expression;
 }
 
-AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Identifier *type) {
+AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Type *type) {
 	Allocator *allocator = tree->context->allocator;
 	AssertionExpression *expression = CAST(AssertionExpression*, allocator->allocate(allocator, sizeof *expression));
 	expression->base.kind = EXPRESSION_ASSERTION;
@@ -68,7 +68,7 @@ ValueExpression *tree_new_value_expression(Tree *tree, Value *value) {
 	return expression;
 }
 
-ProcedureExpression *tree_new_procedure_expression(Tree *tree,  ProcedureType *type, ListExpression *where_clauses,BlockStatement *body) {
+ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, ListExpression *where_clauses,BlockStatement *body) {
 	Allocator *allocator = tree->context->allocator;
 	ProcedureExpression *expression = CAST(ProcedureExpression*, allocator->allocate(allocator, sizeof *expression));
 	expression->base.kind = EXPRESSION_PROCEDURE;
@@ -78,11 +78,11 @@ ProcedureExpression *tree_new_procedure_expression(Tree *tree,  ProcedureType *t
 	return expression;
 }
 
-OrReturnExpression *tree_new_or_return_expression(Tree *tree, Expression *operand) {
+TypeExpression *tree_new_type_expression(Tree *tree, Type *type) {
 	Allocator *allocator = tree->context->allocator;
-	OrReturnExpression *expression = CAST(OrReturnExpression*, allocator->allocate(allocator, sizeof *expression));
-	expression->base.kind = EXPRESSION_OR_RETURN;
-	expression->operand = operand;
+	TypeExpression *expression = CAST(TypeExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_TYPE;
+	expression->type = type;
 	return expression;
 }
 
@@ -131,7 +131,7 @@ AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind as
 	return statement;
 }
 
-DeclarationStatement *tree_new_declaration_statement(Tree *tree, Identifier *type, Array(Identifier*) names, ListExpression *values) {
+DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values) {
 	Allocator *allocator = tree->context->allocator;
 	DeclarationStatement *statement = CAST(DeclarationStatement *, allocator->allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_DECLARATION;
@@ -223,29 +223,98 @@ Identifier *tree_new_identifier(Tree *tree, String contents) {
 	return identifier;
 }
 
-ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, ProcedureFlag flags, CallingConvention convention) {
+// Types
+IdentifierType *tree_new_identifier_type(Tree *tree, Identifier *identifier) {
 	Allocator *allocator = tree->context->allocator;
-	ConcreteProcedureType *type = CAST(ConcreteProcedureType*, allocator->allocate(allocator, sizeof *type));
+	IdentifierType *type = CAST(IdentifierType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_IDENTIFIER;
+	type->identifier = identifier;
+	return type;
+}
+
+// ^T
+PointerType *tree_new_pointer_type(Tree *tree, Type *value_type) {
+	Allocator *allocator = tree->context->allocator;
+	PointerType *type = CAST(PointerType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_POINTER;
+	type->type = value_type;
+	return type;
+}
+
+// [^]T
+MultiPointerType *tree_new_multi_pointer_type(Tree *tree, Type *value_type) {
+	Allocator *allocator = tree->context->allocator;
+	MultiPointerType *type = CAST(MultiPointerType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_MULTI_POINTER;
+	type->type = value_type;
+	return type;
+}
+
+// []T
+SliceType *tree_new_slice_type(Tree *tree, Type *value_type) {
+	Allocator *allocator = tree->context->allocator;
+	SliceType *type = CAST(SliceType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_SLICE;
+	type->type = value_type;
+	return type;
+}
+
+// [N]T
+// [?]T
+ArrayType *tree_new_array_type(Tree *tree, Type *value_type, Expression *count) {
+	Allocator *allocator = tree->context->allocator;
+	ArrayType *type = CAST(ArrayType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_ARRAY;
+	type->type = value_type;
+	type->count = count;
+	return type;
+}
+
+// [dynamic]T
+DynamicArrayType *tree_new_dynamic_array_type(Tree *tree, Type *value_type) {
+	Allocator *allocator = tree->context->allocator;
+	DynamicArrayType *type = CAST(DynamicArrayType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_DYNAMIC_ARRAY;
+	type->type = value_type;
+	return type;
+}
+
+// bit_set[T]
+// bit_set[T; U]
+BitSetType *tree_new_bit_set_type(Tree *tree, Expression *expression, Type *underlying) {
+	Allocator *allocator = tree->context->allocator;
+	BitSetType *type = CAST(BitSetType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_BIT_SET;
+	type->expression = expression;
+	type->underlying = underlying;
+	return type;
+}
+
+ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention) {
+	Allocator *allocator = tree->context->allocator;
+	ConcreteProcedureType *type = CAST(ConcreteProcedureType *, allocator->allocate(allocator, sizeof *type));
 	type->base.base.kind = TYPE_PROCEDURE;
 	type->base.kind = PROCEDURE_CONCRETE;
 	type->base.convention = convention;
 	type->base.params = params;
+	type->base.results = results;
 	type->base.flags = flags;
 	return type;
 }
 
-GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) params, ProcedureFlag flags, CallingConvention convention) {
+GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention) {
 	Allocator *allocator = tree->context->allocator;
 	GenericProcedureType *type = CAST(GenericProcedureType*, allocator->allocate(allocator, sizeof *type));
 	type->base.base.kind = TYPE_PROCEDURE;
 	type->base.kind = PROCEDURE_GENERIC;
 	type->base.convention = convention;
 	type->base.params = params;
+	type->base.results = results;
 	type->base.flags = flags;
 	return type;
 }
 
-Field *tree_new_field(Tree *tree, Identifier *type, Identifier *name, Expression *value) {
+Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value) {
 	Allocator *allocator = tree->context->allocator;
 	Field *field = CAST(Field*, allocator->allocate(allocator, sizeof *field));
 	field->type = type;
@@ -375,9 +444,14 @@ Bool tree_dump_call_expression(const CallExpression *expression, Sint32 depth) {
 	return true;
 }
 
+Bool tree_dump_type(const Type *type, Sint32 depth);
 Bool tree_dump_assertion_expression(const AssertionExpression *expression, Sint32 depth) {
 	pad(depth);
-	(void)expression;
+	printf("(assert-type\n");
+	tree_dump_type(expression->type, depth + 1);
+	printf("\n");
+	tree_dump_expression(expression->operand, depth + 1);
+	printf(")");
 	return true;
 }
 
@@ -424,35 +498,124 @@ String procedure_flags_to_string(ProcedureFlag flags, Context *context) {
 	return strbuf_result(&buf);
 }
 
+
+Bool tree_dump_type(const Type *type, Sint32 depth);
+
+Bool tree_dump_identifier_type(const IdentifierType *type, Sint32 depth) {
+	pad(depth);
+	printf("(ident '%.*s')", SFMT(type->identifier->contents));
+	return true;
+}
+
+Bool tree_dump_fields(Array(Field*) const fields, Sint32 depth) {
+	pad(depth);
+	const Uint64 n_fields = array_size(fields);
+	for (Uint64 i = 0; i < n_fields; i++) {
+		const Field *field = fields[i];
+		printf("(field\n");
+		pad(depth + 1);
+		printf("'%.*s'", SFMT(field->name->contents));
+		if (field->type) {
+			printf("\n");
+			tree_dump_type(field->type, depth + 1);
+		}
+		if (field->value) {
+			printf("\n");
+			tree_dump_expression(field->value, depth + 1);
+		}
+		printf(")");
+		if (i != n_fields - 1) {
+			printf("\n");
+			pad(depth);
+		}
+	}
+	return true;
+}
+
 Bool tree_dump_procedure_type(const ProcedureType *type, Sint32 depth) {
 	pad(depth);
 	const String cc = calling_convention_to_string(type->convention);
 	printf("(cc '%.*s')\n", SFMT(cc));
-	const Uint64 n_params = array_size(type->params);
 	if (type->flags) {
 		Context context;
 		context.allocator = &DEFAULT_ALLOCATOR;
 		const String flags = procedure_flags_to_string(type->flags, &context);
 		pad(depth);
-		printf("(flags '%.*s')", SFMT(flags));
+		printf("(flags %.*s)", SFMT(flags));
 		printf("\n");
 	}
+	if (type->params) {
+		pad(depth);
+		printf("(args\n");
+		tree_dump_fields(type->params, depth + 1);
+		printf(")");
+		printf("\n");
+	}
+	if (type->results) {
+		pad(depth);
+		printf("(results\n");
+		tree_dump_fields(type->results, depth + 1);
+		printf(")");
+	}
+	return true;
+}
+
+Bool tree_dump_pointer_type(const PointerType *type, Sint32 depth) {
 	pad(depth);
-	printf("(args");
-	if (n_params != 0) {
-		printf("\n");
-	}
-	for (Uint64 i = 0; i < n_params; i++) {
-		const Field *field = type->params[i];
+	printf("(pointer\n");
+	tree_dump_type(type->type, depth + 1);
+	printf(")");
+	return true;
+}
+
+Bool tree_dump_multi_pointer_type(const MultiPointerType *type, Sint32 depth) {
+	pad(depth);
+	printf("(multi-pointer\n");
+	tree_dump_type(type->type, depth + 1);
+	printf(")");
+	return true;
+}
+
+Bool tree_dump_slice_type(const SliceType *type, Sint32 depth) {
+	pad(depth);
+	printf("(slice\n");
+	tree_dump_type(type->type, depth + 1);
+	printf(")");
+	return true;
+}
+
+Bool tree_dump_array_type(const ArrayType *type, Sint32 depth) {
+	pad(depth);
+	printf("(array\n");
+	if (type->count) {
 		pad(depth + 1);
-		printf("('%.*s'", SFMT(field->name->contents));
-		if (field->type) {
-			printf(" '%.*s'", SFMT(field->type->contents));
+		printf("(count\n");
+		if (type->count) {
+			tree_dump_expression(type->count, depth + 2);
 		}
 		printf(")");
-		if (i != n_params - 1) {
-			printf("\n");
-		}
+		printf("\n");
+	}
+	tree_dump_type(type->type, depth + 1);
+	printf(")");
+	return true;
+}
+
+Bool tree_dump_dynamic_array_type(const ArrayType *type, Sint32 depth) {
+	pad(depth);
+	printf("(dynamic-array\n");
+	tree_dump_type(type->type, depth + 1);
+	printf(")");
+	return true;
+}
+
+Bool tree_dump_bit_set_type(const BitSetType *type, Sint32 depth) {
+	pad(depth);
+	printf("(bit-set\n");
+	tree_dump_expression(type->expression, depth + 1);
+	if (type->underlying) {
+		printf("\n");
+		tree_dump_type(type->underlying, depth + 1);
 	}
 	printf(")");
 	return true;
@@ -477,10 +640,24 @@ Bool tree_dump_procedure_expression(const ProcedureExpression *expression, Sint3
 	return true;
 }
 
-Bool tree_dump_or_return_expression(const OrReturnExpression *expression, Sint32 depth) {
+Bool tree_dump_type(const Type *type, Sint32 depth) {
+	switch (type->kind) {
+	case TYPE_IDENTIFIER:    return tree_dump_identifier_type(RCAST(const IdentifierType *, type), depth);
+	case TYPE_PROCEDURE:     return tree_dump_procedure_type(RCAST(const ProcedureType *, type), depth);
+	case TYPE_POINTER:       return tree_dump_pointer_type(RCAST(const PointerType *, type), depth);
+	case TYPE_MULTI_POINTER: return tree_dump_multi_pointer_type(RCAST(const MultiPointerType *, type), depth);
+	case TYPE_SLICE:         return tree_dump_slice_type(RCAST(const SliceType *, type), depth);
+	case TYPE_ARRAY:         return tree_dump_array_type(RCAST(const ArrayType *, type), depth);
+	case TYPE_DYNAMIC_ARRAY: return tree_dump_dynamic_array_type(RCAST(const ArrayType *, type), depth);
+	case TYPE_BIT_SET:       return tree_dump_bit_set_type(RCAST(const BitSetType *, type), depth);
+	}
+	return false;
+}
+
+Bool tree_dump_type_expression(const TypeExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(or_return\n");
-	tree_dump_expression(expression->operand, depth + 1);
+	printf("(type\n");
+	tree_dump_type(expression->type, depth + 1);
 	printf(")");
 	return true;
 }
@@ -496,7 +673,7 @@ Bool tree_dump_expression(const Expression *expression, Sint32 depth) {
 	case EXPRESSION_ASSERTION: return tree_dump_assertion_expression(RCAST(const AssertionExpression *, expression), depth);
 	case EXPRESSION_VALUE:     return tree_dump_value_expression(RCAST(const ValueExpression *, expression), depth);
 	case EXPRESSION_PROCEDURE: return tree_dump_procedure_expression(RCAST(const ProcedureExpression *, expression), depth);
-	case EXPRESSION_OR_RETURN: return tree_dump_or_return_expression(RCAST(const OrReturnExpression *, expression), depth);
+	case EXPRESSION_TYPE:      return tree_dump_type_expression(RCAST(const TypeExpression *, expression), depth);
 	}
 	return false;
 }
