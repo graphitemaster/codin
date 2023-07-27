@@ -232,15 +232,12 @@ ATTRIBUTE(OBJC_CLASS,               "objc_class",             ATTRIBUTE_TYPE)
 CCONVENTION("odin",        ODIN)
 CCONVENTION("contextless", CONTEXTLESS)
 CCONVENTION("cdecl",       CDECL)
-CCONVENTION("c",           CDECL)
 CCONVENTION("stdcall",     STDCALL)
-CCONVENTION("std",         STDCALL)
 CCONVENTION("fastcall",    FASTCALL)
-CCONVENTION("fast",        FASTCALL)
 CCONVENTION("none",        NONE)
 CCONVENTION("naked",       NAKED)
-CCONVENTION("win64",       STDCALL)
-CCONVENTION("sysv",        CDECL)
+CCONVENTION("win64",       WIN64)
+CCONVENTION("sysv",        SYSV)
 
 // NOTE(dweiler): Actual types are not keywords because in Odin a type can be
 // replaced within a package. This makes types regular identifiers.

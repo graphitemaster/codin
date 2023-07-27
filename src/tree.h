@@ -113,6 +113,8 @@ inline String block_flags_to_string(BlockFlag flags) {
 	UNREACHABLE();
 }
 
+String procedure_flags_to_string(ProcedureFlag flags, Context *context);
+
 struct Expression {
 	ExpressionKind kind;
 };
@@ -273,18 +275,24 @@ struct Identifier {
 	String contents;
 };
 
+#define CCONVENTION(name, enumerator) CCONV_ ## enumerator,
 enum CallingConvention {
 	CCONV_INVALID,
-	CCONV_ODIN,
-	CCONV_CONTEXTLESS,
-	CCONV_CDECL,
-	CCONV_STDCALL,
-	CCONV_FASTCALL,
-	CCONV_NAKED,
-	CCONV_NONE,
+	#include "lexemes.h"
 };
+#undef CCONVENTION
 
 typedef enum CallingConvention CallingConvention;
+
+inline String calling_convention_to_string(CallingConvention cc) {
+	#define CCONVENTION(name, ...) SLIT(name),
+	static const String TABLE[] = {
+		SLIT("invalid"),
+		#include "lexemes.h"
+	};
+	#undef CCONVENTION
+	return TABLE[cc];
+}
 
 struct Directive {
 	DirectiveKind kind;

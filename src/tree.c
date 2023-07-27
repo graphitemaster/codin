@@ -4,6 +4,7 @@
 
 #include "tree.h"
 #include "context.h"
+#include "strbuf.h"
 
 ListExpression *tree_new_list_expression(Tree *tree, Array(Expression*) expressions) {
 	Allocator *allocator = tree->context->allocator;
@@ -349,13 +350,58 @@ Bool tree_dump_identifier_expression(const IdentifierExpression *expression, Sin
 
 Bool tree_dump_block_statement(const BlockStatement *statement, Sint32 depth);
 
+String procedure_flags_to_string(ProcedureFlag flags, Context *context) {
+	StrBuf buf;
+	strbuf_init(&buf, context);
+	Sint32 i = 0;
+	if (flags & PROC_FLAG_DIVERGING) {
+		if (i) strbuf_put_string(&buf, SCLIT(", "));
+		strbuf_put_string(&buf, SCLIT("#diverging"));
+		i++;
+	}
+	if (flags & PROC_FLAG_OPTIONAL_OK) {
+		if (i) strbuf_put_string(&buf, SCLIT(", "));
+		strbuf_put_string(&buf, SCLIT("#optional_ok"));
+		i++;
+	}
+	if (flags & PROC_FLAG_OPTIONAL_ALLOCATION_ERROR) {
+		if (i) strbuf_put_string(&buf, SCLIT(", "));
+		strbuf_put_string(&buf, SCLIT("#optional_allocation_error"));
+		i++;
+	}
+	if (flags & PROC_FLAG_BOUNDS_CHECK) {
+		if (i) strbuf_put_string(&buf, SCLIT(", "));
+		strbuf_put_string(&buf, SCLIT("#bounds_check"));
+		i++;
+	}
+	if (flags & PROC_FLAG_TYPE_ASSERT) {
+		if (i) strbuf_put_string(&buf, SCLIT(", "));
+		strbuf_put_string(&buf, SCLIT("#type_assert"));
+		i++;
+	}
+	if (flags & PROC_FLAG_FORCE_INLINE) {
+		if (i) strbuf_put_string(&buf, SCLIT(", "));
+		strbuf_put_string(&buf, SCLIT("#force_inline"));
+		i++;
+	}
+	return strbuf_result(&buf);
+}
+
 Bool tree_dump_procedure_expression(const ProcedureExpression *expression, Sint32 depth) {
 	// ProcedureFlag flags;
 	// ProcedureType *type;
 	// BlockStatement *body;
-	// const String flags = procedure_flags_to_string(expression->flags)
 	pad(depth);
-	printf("(proc\n");
+	printf("(proc");
+	const String cc = calling_convention_to_string(expression->type->convention);
+	printf(" '%.*s'", SFMT(cc));
+	if (expression->flags) {
+		Context context;
+		context.allocator = &DEFAULT_ALLOCATOR;
+		const String flags = procedure_flags_to_string(expression->flags, &context);
+		printf(" '%.*s'", SFMT(flags));
+	}
+	printf("\n");
 	tree_dump_block_statement(expression->body, depth + 1);
 	printf(")");
 	return true;

@@ -270,10 +270,14 @@ static void expect_semicolon(Parser *parser) {
 }
 
 static CallingConvention string_to_calling_convention(String input) {
-	#define CCONVENTION(string, enumerator) \
-		if (string_compare(input, SCLIT(string))) return CCONV_ ## enumerator;
+	if (0) {}
+	#define CCONVENTION(string, enum) \
+		else if (string_compare(input, SCLIT(string))) return CCONV_ ## enum;
 	#include "lexemes.h"
 	#undef CCONVENTION
+	else if (string_compare(input, SCLIT("c")))    return CCONV_CDECL;
+	else if (string_compare(input, SCLIT("std")))  return CCONV_STDCALL;
+	else if (string_compare(input, SCLIT("fast"))) return CCONV_FASTCALL;
 	return CCONV_INVALID;
 }
 
@@ -395,7 +399,7 @@ static ProcedureType *parse_procedure_type(Parser *parser) {
 	TRACE_ENTER();
 
 	Context *context = parser->context;
-	CallingConvention convention = CCONV_INVALID;
+	CallingConvention convention = CCONV_ODIN;
 	if (is_literal(parser->this_token, LITERAL_STRING)) {
 		const Token token = expect_literal(parser, LITERAL_STRING);
 		const String string = token.string;
@@ -405,8 +409,6 @@ static ProcedureType *parse_procedure_type(Parser *parser) {
 			TRACE_LEAVE();
 			return 0;
 		}
-	} else {
-		convention = CCONV_CDECL;
 	}
 
 	expect_operator(parser, OPERATOR_OPENPAREN);
