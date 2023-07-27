@@ -307,8 +307,6 @@ static Identifier *parse_type_or_identifier(Parser *parser) {
 	Expression *operand = parse_operand(parser, true);
 	Expression *type = parse_atom_expression(parser, operand, true);
 	parser->expression_depth = depth;
-	// ASSERT(type->kind == EXPRESSION_IDENTIFIER);
-	// return CAST(IdentifierExpression *, type)->identifier;
 	if (type) {
 		ASSERT(type->kind == EXPRESSION_IDENTIFIER);
 		TRACE_LEAVE();

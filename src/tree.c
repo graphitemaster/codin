@@ -205,14 +205,6 @@ CompoundLiteralValue *tree_new_compound_literal_value(Tree *tree, Expression *ex
 	return value;
 }
 
-ExpressionValue *tree_new_expression_value(Tree *tree, Expression *expression) {
-	Allocator *allocator = tree->context->allocator;
-	ExpressionValue *value = CAST(ExpressionValue *, allocator->allocate(allocator, sizeof *value));
-	value->base.kind = VALUE_EXPRESSION;
-	value->expression = expression;
-	return value;
-}
-
 Identifier *tree_new_identifier(Tree *tree, String contents) {
 	Context *context = tree->context;
 	Allocator *allocator = context->allocator;
@@ -256,9 +248,8 @@ Bool tree_dump_compound_literal_value(const CompoundLiteralValue *value, Sint32 
 
 Bool tree_dump_value(const Value *value, Sint32 depth) {
 	switch (value->kind) {
-	case VALUE_LITERAL:           return tree_dump_literal_value(CAST(const LiteralValue *, value), depth);
-	case VALUE_COMPOUND_LITERAL:  return tree_dump_compound_literal_value(CAST(const CompoundLiteralValue *, value), depth);
-	case VALUE_EXPRESSION:        break; // return tree_dump_literal_value()
+	case VALUE_LITERAL:          return tree_dump_literal_value(CAST(const LiteralValue *, value), depth);
+	case VALUE_COMPOUND_LITERAL: return tree_dump_compound_literal_value(CAST(const CompoundLiteralValue *, value), depth);
 	}
 	return false;
 }

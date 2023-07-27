@@ -38,7 +38,6 @@ typedef struct BreakStatement BreakStatement;
 typedef struct Value Value;
 typedef struct LiteralValue LiteralValue;
 typedef struct CompoundLiteralValue CompoundLiteralValue;
-typedef struct ExpressionValue ExpressionValue;
 
 // Cleanup.
 typedef struct Identifier Identifier;
@@ -74,7 +73,6 @@ enum StatementKind {
 enum ValueKind {
 	VALUE_LITERAL,
 	VALUE_COMPOUND_LITERAL,
-	VALUE_EXPRESSION, // TODO(dweiler): Remove?
 };
 
 enum BlockFlag {
@@ -265,11 +263,6 @@ struct CompoundLiteralValue {
 	Array(Expression*) expressions;
 };
 
-struct ExpressionValue {
-	Value base;
-	Expression *expression;
-};
-
 // Identifier
 struct Identifier {
 	String contents;
@@ -336,7 +329,6 @@ DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
 
 LiteralValue *tree_new_literal_value(Tree *tree, LiteralKind kind, String value);
 CompoundLiteralValue *tree_new_compound_literal_value(Tree *tree, Expression *expression, Array(Expression*) expressions);
-ExpressionValue *tree_new_expression_value(Tree *tree, Expression *expression);
 
 Identifier *tree_new_identifier(Tree *tree, String contents);
 
