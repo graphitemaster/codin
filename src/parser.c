@@ -1001,7 +1001,7 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, Array(I
 		}
 	}
 
-	if (constant && array_size(values) == 0) {
+	if (constant && array_size(values->expressions) == 0) {
 		PARSE_ERROR("Expected constant initializer");
 	}
 

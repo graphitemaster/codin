@@ -6,7 +6,7 @@ foo :: proc() {
   fmt.printf("Hello world\n");
 }
 
-main :: proc() #no_bounds_check {
+main :: proc() {
   for {}
   for i in 0..<10 {}
   for in 0..<10 {}

@@ -70,7 +70,7 @@ ValueExpression *tree_new_value_expression(Tree *tree, Value *value) {
 
 ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureFlag flags, ProcedureType *type, BlockStatement *body) {
 	Allocator *allocator = tree->context->allocator;
-	ProcedureExpression *procedure = CAST(ProcedureExpression*, allocator->allocate(allocator, sizeof *type));
+	ProcedureExpression *procedure = CAST(ProcedureExpression*, allocator->allocate(allocator, sizeof *procedure));
 	procedure->base.kind = EXPRESSION_PROCEDURE;
 	procedure->body = body;
 	procedure->flags = flags;
