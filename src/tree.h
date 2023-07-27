@@ -12,6 +12,7 @@ typedef struct Expression Expression;
 typedef struct ListExpression ListExpression;
 typedef struct UnaryExpression UnaryExpression;
 typedef struct BinaryExpression BinaryExpression;
+typedef struct TernaryExpression TernaryExpression;
 typedef struct CastExpression CastExpression;
 typedef struct SelectorExpression SelectorExpression;
 typedef struct CallExpression CallExpression;
@@ -52,6 +53,7 @@ typedef struct SliceType SliceType;
 typedef struct ArrayType ArrayType;
 typedef struct DynamicArrayType DynamicArrayType;
 typedef struct BitSetType BitSetType;
+typedef struct TypeidType TypeidType;
 
 // Misc.
 typedef struct Identifier Identifier;
@@ -62,6 +64,7 @@ enum ExpressionKind {
 	EXPRESSION_LIST,
 	EXPRESSION_UNARY,
 	EXPRESSION_BINARY,
+	EXPRESSION_TERNARY,
 	EXPRESSION_CAST,
 	EXPRESSION_SELECTOR,
 	EXPRESSION_CALL,
@@ -105,6 +108,7 @@ enum TypeKind {
 	TYPE_ARRAY,         // [N]T or [?]T
 	TYPE_DYNAMIC_ARRAY, // [dynamic]T
 	TYPE_BIT_SET,       // bit_set[T] or bit_set[T; U]
+	TYPE_TYPEID,        // typeid
 };
 
 enum BlockFlag {
@@ -165,17 +169,28 @@ struct ListExpression {
 	Array(Expression*) expressions;
 };
 
+// <operation> <operand>
 struct UnaryExpression {
 	Expression base;
 	OperatorKind operation;
 	Expression *operand;
 };
 
+// <lhs> <operation> <rhs>
 struct BinaryExpression {
 	Expression base;
 	OperatorKind operation;
 	Expression *lhs;
 	Expression *rhs;
+};
+
+// <on_true> <operation> <cond> <on_false>
+struct TernaryExpression {
+	Expression base;
+	KeywordKind operation; // KEYWORD_IF, KEYWORD_WHEN
+	Expression *on_true;
+	Expression *cond;
+	Expression *on_false;
 };
 
 struct CastExpression {
@@ -373,6 +388,11 @@ struct BitSetType {
 	Type *underlying;
 };
 
+struct TypeidType {
+	Type base;
+	Type *specialization;
+};
+
 // Misc.
 struct Identifier {
 	String contents;
@@ -407,6 +427,7 @@ void tree_dump(Tree *tree);
 ListExpression *tree_new_list_expression(Tree *tree, Array(Expression*) expressions);
 UnaryExpression *tree_new_unary_expression(Tree *tree, OperatorKind operation, Expression *operand);
 BinaryExpression *tree_new_binary_expression(Tree *tree, OperatorKind operation, Expression *lhs, Expression *rhs);
+TernaryExpression *tree_new_ternary_expression(Tree *tree, Expression *on_true, KeywordKind operation, Expression *cond, Expression *on_false);
 SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand, Identifier *identifier);
 CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Expression*) arguments);
 AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Type *type);
@@ -442,6 +463,7 @@ SliceType *tree_new_slice_type(Tree *tree, Type *type);
 ArrayType *tree_new_array_type(Tree *Tree, Type *type, Expression *count);
 DynamicArrayType *tree_new_dynamic_array_type(Tree *tree, Type *type);
 BitSetType *tree_new_bit_set_type(Tree *tree, Expression *expression, Type *underlying);
+TypeidType *tree_new_typeid_type(Tree *tree, Type *specialization);
 
 Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value);
 

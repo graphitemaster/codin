@@ -16,7 +16,6 @@
 	do { \
 		report_error(&parser->source, &parser->lexer.location, __VA_ARGS__); \
 		THROW(1); \
-		exit(1); \
 	} while (0)
 
 #define ICE(...) \
@@ -286,7 +285,7 @@ static Identifier *parse_identifier(Parser *parser) {
 		advancep(parser);
 	} else {
 		const String got = token_to_string(token);
-		PARSE_ERROR("Expected identifier or 'typeid', got '%.*s'", SFMT(got));
+		PARSE_ERROR("Expected identifier, got '%.*s'", SFMT(got));
 	}
 	Identifier *identifier = tree_new_identifier(parser->tree, token.string);
 	TRACE_LEAVE();
@@ -352,14 +351,11 @@ static Type *parse_variable_name_or_type(Parser *parser) {
 		expect_keyword(parser, KEYWORD_TYPEID);
 		Type *specialization = 0;
 		if (accepted_operator(parser, OPERATOR_QUO)) {
-			// Specialization
 			specialization = parse_type(parser);
 		}
-		(void)specialization;
-		// TODO(dweiler): Tag type with specialization 'specialization'.
+		TypeidType *type = tree_new_typeid_type(parser->tree, specialization);
 		TRACE_LEAVE();
-		// TODO(dweiler): Return a type.
-		return 0;
+		return CAST(Type *, type);
 	}
 	Type *type = parse_type(parser);
 	TRACE_LEAVE();
@@ -780,13 +776,14 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 		
 				return expression;
 			}
-
-		/*
 		case KEYWORD_TYPEID:
-			expect_keyword(parser, KEYWORD_TYPEID);
-			expression = tree_new_typeid_type(parser->tree);
-			TRACE_LEAVE();
-			return expression;
+			{
+				expect_keyword(parser, KEYWORD_TYPEID);
+				expression = RCAST(Expression *, tree_new_type_expression(parser->tree, RCAST(Type *, tree_new_typeid_type(parser->tree, 0))));
+				TRACE_LEAVE();
+				return expression;
+			}
+		/*
 		case KEYWORD_MAP:
 			UNIMPLEMENTED("map");
 		case KEYWORD_MATRIX:
@@ -803,8 +800,10 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 			UNIMPLEMENTED("context");
 		*/
 		default:
-			ICE("Unexpected keyword in operand");
+			break;
+			// ICE("Unexpected keyword in operand");
 		}
+		break;
 	case KIND_OPERATOR:
 		switch (token.as_operator) {
 		case OPERATOR_LPAREN:
@@ -1156,34 +1155,51 @@ static Expression *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec
 
 	for (;;) {
 		const Token token = parser->this_token;
+		const Token last = parser->last_token;
 		Sint32 op_prec = 0;
 		if (is_kind(token, KIND_OPERATOR)) {
-			if ((op_prec = PRECEDENCE[token.as_operator]) < prec) {
-				break;
-			}
-		} 
-		const Token last = parser->last_token;
+			op_prec = PRECEDENCE[token.as_operator];
+		} else if (is_keyword(token, KEYWORD_IF) || is_keyword(token, KEYWORD_WHEN)) {
+			// The 'if' and 'when' keywords become ternary operators with highest precedence.
+			op_prec = 1;
+		}
+		if (op_prec < prec) {
+			break;
+		}
+
+		// Needs to be on the same line to be a ternary usage.
 		if (is_keyword(token, KEYWORD_IF) || is_keyword(token, KEYWORD_WHEN)) {
-			// Needs to be on the same line to be a ternary usage.
 			if (last.location.line < token.location.line) {
+				TRACE_LEAVE();
 				return expr;
 			}
-			PARSE_ERROR("Unimplemented ternary if or when expression");
-			break;
-		} else if (!is_kind(token, KIND_OPERATOR)) {
-			break;
 		}
-
+		
+		// TODO(dweiler): More robust.
+		// expect_kind(parser, KIND_OPERATOR);
 		advancep(parser);
 
-		// Expect operator or if/when keywords.
-		Expression *rhs = parse_binary_expression(parser, false, op_prec + 1);
-		if (!rhs) {
-			PARSE_ERROR("Expected expression on the right-hand side");
+		if (is_operator(token, OPERATOR_QUESTION)) {
+			Expression *cond = expr;
+			Expression *on_true = parse_expression(parser, lhs);
+			expect_operator(parser, OPERATOR_COLON);
+			Expression *on_false = parse_expression(parser, lhs);
+			TernaryExpression *ternary = tree_new_ternary_expression(parser->tree, on_true, KEYWORD_IF, cond, on_false);
+			expr = RCAST(Expression *, ternary);
+		} else if (is_keyword(token, KEYWORD_IF) || is_keyword(token, KEYWORD_WHEN)) {
+			Expression *on_true = expr;
+			Expression *cond = parse_expression(parser, lhs);
+			expect_keyword(parser, KEYWORD_ELSE);
+			Expression *on_false = parse_expression(parser, lhs);
+			TernaryExpression *ternary = tree_new_ternary_expression(parser->tree, on_true, token.as_keyword, cond, on_false);
+			expr = RCAST(Expression *, ternary);
+		} else {
+			Expression *rhs = parse_binary_expression(parser, false, op_prec + 1);
+			if (!rhs) {
+				PARSE_ERROR("Expected expression on the right-hand side");
+			}
+			expr = RCAST(Expression *, tree_new_binary_expression(parser->tree, token.as_operator, expr, rhs));
 		}
-
-		expr = RCAST(Expression *, tree_new_binary_expression(parser->tree, token.as_operator, expr, rhs));
-
 		lhs = false;
 	}
 
@@ -1210,7 +1226,9 @@ static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
 		if (expr) {
 			array_push(expressions, expr);
 		}
-		if (!is_operator(parser->this_token, OPERATOR_COMMA) || is_kind(parser->this_token, KIND_EOF)) {
+		if (!is_operator(parser->this_token, OPERATOR_COMMA) ||
+		     is_kind(parser->this_token, KIND_EOF))
+		{
 			break;
 		}
 		advancep(parser);
@@ -1280,7 +1298,6 @@ static BlockStatement *parse_body(Parser *parser, BlockFlag flags) {
 }
 
 static BlockStatement *parse_block_statement(Parser *parser, BlockFlag flags, Bool when) {
-	// The block statement may be part of a compile-time when statement.
 	TRACE_ENTER();
 
 	Context *context = parser->context;
@@ -1459,7 +1476,6 @@ static ImportStatement *parse_import_declaration(Parser *parser) {
 
 static BlockStatement *convert_statement_to_body(Parser *parser, BlockFlag flags, Statement *statement) {
 	Context *context = parser->context;
-
 	const StatementKind kind = statement->kind;
 	if (kind == STATEMENT_BLOCK || kind == STATEMENT_EMPTY) {
 		PARSE_ERROR("Expected a regular statement");
@@ -1756,7 +1772,7 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 			TRACE_LEAVE();
 			return statement;
 		case KEYWORD_WHEN:
-			UNIMPLEMENTED("when statement");
+			UNIMPLEMENTED("when");
 		case KEYWORD_IMPORT:
 			statement = RCAST(Statement *, parse_import_declaration(parser));
 			TRACE_LEAVE();

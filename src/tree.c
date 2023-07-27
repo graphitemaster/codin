@@ -33,6 +33,17 @@ BinaryExpression *tree_new_binary_expression(Tree *tree, OperatorKind operation,
 	return expression;
 }
 
+TernaryExpression *tree_new_ternary_expression(Tree *tree, Expression *on_true, KeywordKind operation, Expression *cond, Expression *on_false) {
+	Allocator *allocator = tree->context->allocator;
+	TernaryExpression *expression = CAST(TernaryExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_TERNARY;
+	expression->on_true = on_true;
+	expression->operation = operation;
+	expression->cond = cond;
+	expression->on_false = on_false;
+	return expression;
+}
+
 SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand, Identifier *identifier) {
 	Allocator *allocator = tree->context->allocator;
 	SelectorExpression *expression = CAST(SelectorExpression*, allocator->allocate(allocator, sizeof *expression));
@@ -290,6 +301,15 @@ BitSetType *tree_new_bit_set_type(Tree *tree, Expression *expression, Type *unde
 	return type;
 }
 
+// typeid
+TypeidType *tree_new_typeid_type(Tree *tree, Type *specialization) {
+	Allocator *allocator = tree->context->allocator;
+	TypeidType *type = CAST(TypeidType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_TYPEID;
+	type->specialization = specialization;
+	return type;
+}
+
 ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention) {
 	Allocator *allocator = tree->context->allocator;
 	ConcreteProcedureType *type = CAST(ConcreteProcedureType *, allocator->allocate(allocator, sizeof *type));
@@ -399,6 +419,18 @@ Bool tree_dump_binary_expression(const BinaryExpression *expression, Sint32 dept
 	printf("\n");
 	tree_dump_expression(expression->rhs, depth + 1);
 	printf(")");
+	return true;
+}
+
+Bool tree_dump_ternary_expression(const TernaryExpression *expression, Sint32 depth) {
+	const String keyword = keyword_to_string(expression->operation);
+	pad(depth);
+	printf("(top '%.*s'\n", SFMT(keyword));
+	tree_dump_expression(expression->cond, depth + 1);
+	printf("\n");
+	tree_dump_expression(expression->on_true, depth + 1);
+	printf("\n");
+	tree_dump_expression(expression->on_false, depth + 1);
 	return true;
 }
 
@@ -621,6 +653,12 @@ Bool tree_dump_bit_set_type(const BitSetType *type, Sint32 depth) {
 	return true;
 }
 
+Bool tree_dump_typeid_type(const TypeidType *type, Sint32 depth) {
+	pad(depth);
+	printf("(typeid)");
+	return true;
+}
+
 Bool tree_dump_list_expression(const ListExpression *expression, Sint32 depth);
 
 Bool tree_dump_procedure_expression(const ProcedureExpression *expression, Sint32 depth) {
@@ -650,6 +688,7 @@ Bool tree_dump_type(const Type *type, Sint32 depth) {
 	case TYPE_ARRAY:         return tree_dump_array_type(RCAST(const ArrayType *, type), depth);
 	case TYPE_DYNAMIC_ARRAY: return tree_dump_dynamic_array_type(RCAST(const ArrayType *, type), depth);
 	case TYPE_BIT_SET:       return tree_dump_bit_set_type(RCAST(const BitSetType *, type), depth);
+	case TYPE_TYPEID:        return tree_dump_typeid_type(RCAST(TypeidType *, type), depth);
 	}
 	return false;
 }
@@ -667,6 +706,7 @@ Bool tree_dump_expression(const Expression *expression, Sint32 depth) {
 	case EXPRESSION_LIST:      return tree_dump_list_expression(RCAST(const ListExpression *, expression), depth);
 	case EXPRESSION_UNARY:     return tree_dump_unary_expression(RCAST(const UnaryExpression *, expression), depth);
 	case EXPRESSION_BINARY:    return tree_dump_binary_expression(RCAST(const BinaryExpression *, expression), depth);
+	case EXPRESSION_TERNARY:   return tree_dump_ternary_expression(RCAST(const TernaryExpression *, expression), depth);
 	case EXPRESSION_CAST:      return tree_dump_cast_expression(RCAST(const CastExpression *, expression), depth);
 	case EXPRESSION_SELECTOR:  return tree_dump_selector_expression(RCAST(const SelectorExpression *, expression), depth);
 	case EXPRESSION_CALL:      return tree_dump_call_expression(RCAST(const CallExpression *, expression), depth);

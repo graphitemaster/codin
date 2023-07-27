@@ -11,9 +11,8 @@ package main
 // [] indexing
 // foreign declarations
 // implicit selector expressions
-// ternary if / when
 // using statement
 
 foo :: proc() -> int {
-  return 10;
+  return 0;
 }
