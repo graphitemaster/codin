@@ -14,8 +14,7 @@ package main
 // using statement
 
 foo :: proc() -> int {
-  x :: true when true else false;
- // x += 20;
-  // return x;
+  x: map[string]map[[2]int]matrix[4, 4]f32 = {};
+  _ = x;
   return 0;
 }

@@ -311,6 +311,27 @@ TypeidType *tree_new_typeid_type(Tree *tree, Type *specialization) {
 	return type;
 }
 
+// map[K]V
+MapType *tree_new_map_type(Tree *tree, Type *key, Type *value) {
+	Allocator *allocator = tree->context->allocator;
+	MapType *type = CAST(MapType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_MAP;
+	type->key = key;
+	type->value = value;
+	return type;
+}
+
+// matrix[R,C]T
+MatrixType *tree_new_matrix_type(Tree *tree, Expression *rows, Expression *columns, Type *base_type) {
+	Allocator *allocator = tree->context->allocator;
+	MatrixType *type = CAST(MatrixType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_MATRIX;
+	type->rows = rows;
+	type->columns = columns;
+	type->type = base_type;
+	return type;
+}
+
 ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention) {
 	Allocator *allocator = tree->context->allocator;
 	ConcreteProcedureType *type = CAST(ConcreteProcedureType *, allocator->allocate(allocator, sizeof *type));
@@ -661,6 +682,28 @@ Bool tree_dump_typeid_type(const TypeidType *type, Sint32 depth) {
 	return true;
 }
 
+Bool tree_dump_map_type(const MapType *type, Sint32 depth) {
+	pad(depth);
+	printf("(map\n");
+	tree_dump_type(type->key, depth + 1);
+	printf("\n");
+	tree_dump_type(type->value, depth + 1);
+	printf(")");
+	return true;
+}
+
+Bool tree_dump_matrix_type(const MatrixType *type, Sint32 depth) {
+	pad(depth);
+	printf("(matrix\n");
+	tree_dump_type(type->type, depth + 1);
+	printf("\n");
+	tree_dump_expression(type->rows, depth + 1);
+	printf("\n");
+	tree_dump_expression(type->columns, depth + 1);
+	printf(")");
+	return true;
+}
+
 Bool tree_dump_list_expression(const ListExpression *expression, Sint32 depth);
 
 Bool tree_dump_procedure_expression(const ProcedureExpression *expression, Sint32 depth) {
@@ -691,6 +734,8 @@ Bool tree_dump_type(const Type *type, Sint32 depth) {
 	case TYPE_DYNAMIC_ARRAY: return tree_dump_dynamic_array_type(RCAST(const ArrayType *, type), depth);
 	case TYPE_BIT_SET:       return tree_dump_bit_set_type(RCAST(const BitSetType *, type), depth);
 	case TYPE_TYPEID:        return tree_dump_typeid_type(RCAST(TypeidType *, type), depth);
+	case TYPE_MAP:           return tree_dump_map_type(RCAST(MapType *, type), depth);
+	case TYPE_MATRIX:        return tree_dump_matrix_type(RCAST(MatrixType *, type), depth);
 	}
 	return false;
 }
@@ -767,15 +812,23 @@ Bool tree_dump_assignment_statement(const AssignmentStatement *statement, Sint32
 }
 
 Bool tree_dump_declaration_statement(const DeclarationStatement *statement, Sint32 depth) {
-	const Uint64 n_values = array_size(statement->values->expressions);
-	for (Uint64 i = 0; i < n_values; i++) {
-		const Expression *value = statement->values->expressions[i];
+	const Uint64 n_names = array_size(statement->names);
+ 	Array(Expression*) const values = statement->values ? statement->values->expressions : 0;
+	for (Uint64 i = 0; i < n_names; i++) {
 		const Identifier *name = statement->names[i];
 		pad(depth);
-		printf("(decl '%.*s'\n", SFMT(name->contents));
-		tree_dump_expression(value, depth + 1);
+		printf("(decl '%.*s'", SFMT(name->contents));
+		if (statement->type) {
+			printf("\n");
+			tree_dump_type(statement->type, depth + 1);
+		}
+		if (i < array_size(values)) {
+			const Expression *value = values[i];
+			printf("\n");
+			tree_dump_expression(value, depth + 1);
+		}
 		printf(")");
-		if (i != n_values - 1) {
+		if (i != n_names - 1) {
 			printf("\n");
 		}
 	}

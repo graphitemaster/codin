@@ -306,17 +306,20 @@ static Type *parse_type_or_identifier(Parser *parser) {
 	Expression *expression = parse_atom_expression(parser, operand, true);
 	parser->expression_depth = depth;
 	if (expression) {
-		if (expression->kind == EXPRESSION_VALUE) {
-			Value *value = RCAST(ValueExpression *, expression)->value;
-			ASSERT(value->kind == VALUE_IDENTIFIER);
-			Identifier *identifier = RCAST(IdentifierValue *, value)->identifier;
-			IdentifierType *type = tree_new_identifier_type(parser->tree, identifier);
-			TRACE_LEAVE();
-			return RCAST(Type *, type);
-		} else if (expression->kind == EXPRESSION_TYPE) {
+		switch (expression->kind) {
+		case EXPRESSION_VALUE:
+			{
+				Value *value = RCAST(ValueExpression *, expression)->value;
+				ASSERT(value->kind == VALUE_IDENTIFIER);
+				Identifier *identifier = RCAST(IdentifierValue *, value)->identifier;
+				IdentifierType *type = tree_new_identifier_type(parser->tree, identifier);
+				TRACE_LEAVE();
+				return RCAST(Type *, type);
+			}
+		case EXPRESSION_TYPE:
 			TRACE_LEAVE();
 			return RCAST(TypeExpression *, expression)->type;
-		} else {
+		default:
 			PARSE_ERROR("Unexpected expression");
 		}
 	}
@@ -753,6 +756,68 @@ static TypeExpression *parse_operand_typeid_type(Parser *parser) {
 	return expression;
 }
 
+// map[K]V
+static TypeExpression *parse_operand_map_type(Parser *parser) {
+	TRACE_ENTER();
+
+	Context *context = parser->context;
+
+	expect_keyword(parser, KEYWORD_MAP);
+
+	expect_operator(parser, OPERATOR_LBRACKET);
+	Expression *key_expression = parse_expression(parser, true);
+	expect_operator(parser, OPERATOR_RBRACKET);
+	Type *value = parse_type(parser);
+
+	Type *key = 0;
+	switch (key_expression->kind) {
+	case EXPRESSION_VALUE:
+		{
+			Value *value = RCAST(ValueExpression *, key_expression)->value;
+			ASSERT(value->kind == VALUE_IDENTIFIER);
+			Identifier *identifier = RCAST(IdentifierValue *, value)->identifier;
+			IdentifierType *type = tree_new_identifier_type(parser->tree, identifier);
+			key = RCAST(Type *, type);
+			break;
+		}
+	case EXPRESSION_TYPE:
+		key = CAST(TypeExpression *, key_expression)->type;
+		break;
+	default:
+		// The type could be an expression itself.
+		PARSE_ERROR("Unexpected expression");
+	}
+
+	MapType *type = tree_new_map_type(parser->tree, key, value);
+	TypeExpression *expression = tree_new_type_expression(parser->tree, RCAST(Type *, type));
+
+	TRACE_LEAVE();
+
+	return expression;
+}
+
+// matrix[R,C]T
+static TypeExpression *parse_operand_matrix_type(Parser *parser) {
+	TRACE_ENTER();
+
+	expect_keyword(parser, KEYWORD_MATRIX);
+
+	expect_operator(parser, OPERATOR_LBRACKET);
+	Expression *rows = parse_expression(parser, true);
+	expect_operator(parser, OPERATOR_COMMA);
+	Expression *columns = parse_expression(parser, true);
+	expect_operator(parser, OPERATOR_RBRACKET);
+
+	Type *base_type = parse_type(parser);
+
+	MatrixType *type = tree_new_matrix_type(parser->tree, rows, columns, base_type);
+	TypeExpression *expression = tree_new_type_expression(parser->tree, RCAST(Type *, type));
+
+	TRACE_LEAVE();
+
+	return expression;
+}
+
 // ^T
 static TypeExpression *parse_operand_pointer_type(Parser *parser) {
 	TRACE_ENTER();
@@ -911,9 +976,17 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 				return RCAST(Expression *, expression);
 			}
 		case KEYWORD_MAP:
-			UNIMPLEMENTED("map");
+			{
+				TypeExpression *expression = parse_operand_map_type(parser);
+				TRACE_LEAVE();
+				return RCAST(Expression *, expression);
+			}
 		case KEYWORD_MATRIX:
-			UNIMPLEMENTED("matrix");
+			{
+				TypeExpression *expression = parse_operand_matrix_type(parser);
+				TRACE_LEAVE();
+				return RCAST(Expression *, expression);
+			}
 		case KEYWORD_STRUCT:
 			UNIMPLEMENTED("struct");
 		case KEYWORD_UNION:
@@ -1332,9 +1405,7 @@ static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
 	Array(Expression*) expressions = 0;
 	for (;;) {
 		Expression *expr = parse_expression(parser, lhs);
-		if (expr) {
-			array_push(expressions, expr);
-		}
+		array_push(expressions, expr);
 		if (!is_operator(parser->this_token, OPERATOR_COMMA) ||
 		     is_kind(parser->this_token, KIND_EOF))
 		{
@@ -1452,15 +1523,26 @@ static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Ar
 		}
 	}
 
-	const Size n_values = array_size(values->expressions);
-	if (constant && n_values == 0) {
-		PARSE_ERROR("Expected constant initializer");
-	} else if (n_values == 0 && n_names > 0) {
-		PARSE_ERROR("Missing constant value");
+	const Size n_values = values ? array_size(values->expressions) : 0;
+	if (!type) {
+		if (constant && n_values == 0) {
+			PARSE_ERROR("Expected constant initializer");
+		} else if (n_values == 0 && n_names > 0) {
+			PARSE_ERROR("Missing constant value");
+		}
 	}
 
 	if (parser->expression_depth >= 0) {
-		expect_semicolon(parser);
+		const Token token = parser->this_token;
+		if (is_kind(token, KIND_RBRACE) && token.location.line == parser->last_token.location.line) {
+			// Do nothing.
+		} else {
+			expect_semicolon(parser);
+		}
+	}
+
+	if (!parser->this_procedure && n_values > 0 && n_names != n_values) {
+		PARSE_ERROR("Expected %d expressions on the right-hand side, got %d instead", n_names, n_values);
 	}
 
 	DeclarationStatement *statement = tree_new_declaration_statement(parser->tree, type, names, values);

@@ -54,6 +54,8 @@ typedef struct ArrayType ArrayType;
 typedef struct DynamicArrayType DynamicArrayType;
 typedef struct BitSetType BitSetType;
 typedef struct TypeidType TypeidType;
+typedef struct MapType MapType;
+typedef struct MatrixType MatrixType;
 
 // Misc.
 typedef struct Identifier Identifier;
@@ -109,6 +111,8 @@ enum TypeKind {
 	TYPE_DYNAMIC_ARRAY, // [dynamic]T
 	TYPE_BIT_SET,       // bit_set[T] or bit_set[T; U]
 	TYPE_TYPEID,        // typeid
+	TYPE_MAP,           // map[K]V
+	TYPE_MATRIX,        // matrix[R,C]T
 };
 
 enum BlockFlag {
@@ -393,6 +397,19 @@ struct TypeidType {
 	Type *specialization;
 };
 
+struct MapType {
+	Type base;
+	Type *key;
+	Type *value;
+};
+
+struct MatrixType {
+	Type base;
+	Expression *columns;
+	Expression *rows;
+	Type *type;
+};
+
 // Misc.
 struct Identifier {
 	String contents;
@@ -464,6 +481,8 @@ ArrayType *tree_new_array_type(Tree *Tree, Type *type, Expression *count);
 DynamicArrayType *tree_new_dynamic_array_type(Tree *tree, Type *type);
 BitSetType *tree_new_bit_set_type(Tree *tree, Expression *expression, Type *underlying);
 TypeidType *tree_new_typeid_type(Tree *tree, Type *specialization);
+MapType *tree_new_map_type(Tree *tree, Type *key, Type *value);
+MatrixType *tree_new_matrix_type(Tree *tree, Expression *rows, Expression *columns, Type *type);
 
 Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value);
 
