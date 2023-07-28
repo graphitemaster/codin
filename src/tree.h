@@ -36,6 +36,7 @@ typedef struct DeferStatement DeferStatement;
 typedef struct BranchStatement BranchStatement;
 
 // Values.
+// TODO(dweiler): Remove value, should just be an expression?
 typedef struct Value Value;
 typedef struct LiteralValue LiteralValue;
 typedef struct CompoundLiteralValue CompoundLiteralValue;
@@ -189,6 +190,7 @@ struct BinaryExpression {
 };
 
 // <on_true> <operation> <cond> <on_false>
+// <cond> ? <on_true> : <on_false>
 struct TernaryExpression {
 	Expression base;
 	KeywordKind operation; // KEYWORD_IF, KEYWORD_WHEN
@@ -197,24 +199,32 @@ struct TernaryExpression {
 	Expression *on_false;
 };
 
+// cast(T)expr
+// (T)expr
+// T(expr)
 struct CastExpression {
 	Expression base;
 	Identifier *type; // When nullptr this is an implicit cast expression.
 	Expression *expression;
 };
 
+// .<identifier>
+// <operand>.<identifier>
 struct SelectorExpression {
 	Expression base;
 	Expression *operand; // When nullptr this is an implicit selector expression.
 	Identifier *identifier;
 };
 
+// <operand>(..<arguments>)
 struct CallExpression {
 	Expression base;
 	Expression *operand;
 	Array(Expression*) arguments;
 };
 
+// <operand>.(T)
+// <operand>.?
 struct AssertionExpression {
 	Expression base;
 	Expression *operand;

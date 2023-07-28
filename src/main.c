@@ -7,6 +7,7 @@
 #include "tree.h"
 #include "parser.h"
 #include "context.h"
+#include "dump.h"
 
 typedef struct Command Command;
 
@@ -51,7 +52,7 @@ static Bool dump_ast(Context *context, String file) {
 		return false;
 	}
 
-	tree_dump(tree);
+	dump(tree);
 
 	return true;
 }

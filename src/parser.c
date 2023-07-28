@@ -249,8 +249,6 @@ static Token expect_literal(Parser *parser, LiteralKind literal) {
 }
 
 static void expect_semicolon(Parser *parser) {
-	Context *context = parser->context;
-
 	if (accepted_kind(parser, KIND_SEMICOLON)) {
 		return;
 	}
@@ -359,7 +357,7 @@ static Type *parse_variable_name_or_type(Parser *parser) {
 		}
 		TypeidType *type = tree_new_typeid_type(parser->tree, specialization);
 		TRACE_LEAVE();
-		return CAST(Type *, type);
+		return RCAST(Type *, type);
 	}
 	Type *type = parse_type(parser);
 	TRACE_LEAVE();
@@ -486,9 +484,7 @@ static Array(Field*) parse_procedure_results(Parser *parser, Bool *diverging) {
 	
 	Array(Field*) fields = 0;
 
-	Sint32 expression_depth = parser->expression_depth;
 	if (!is_operator(parser->this_token, OPERATOR_LPAREN)) {
-		// Single return type
 		Type *type = parse_type(parser);
 		Identifier *identifier = tree_new_identifier(parser->tree, SCLIT("__unnamed"), false);
 		Field *field = tree_new_field(parser->tree, type, identifier, 0);
@@ -781,7 +777,7 @@ static TypeExpression *parse_operand_map_type(Parser *parser) {
 			break;
 		}
 	case EXPRESSION_TYPE:
-		key = CAST(TypeExpression *, key_expression)->type;
+		key = RCAST(TypeExpression *, key_expression)->type;
 		break;
 	default:
 		// The type could be an expression itself.
