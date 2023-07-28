@@ -2277,8 +2277,5 @@ Tree *parse(String filename, Context *context) {
 
 	TRACE_LEAVE();
 
-	void infer(Tree *tree);
-	infer(tree);
-
 	return tree;
 } 
