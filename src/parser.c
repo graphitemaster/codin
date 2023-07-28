@@ -276,18 +276,18 @@ static CallingConvention string_to_calling_convention(String input) {
 	return CCONV_INVALID;
 }
 
-static Identifier *parse_identifier(Parser *parser) {
+static Identifier *parse_identifier(Parser *parser, Bool poly) {
 	TRACE_ENTER();
-	Context *context = parser->context;
 	const Token token = parser->this_token;
 	if (is_kind(token, KIND_IDENTIFIER)) {
 		// NOTE(dweiler): Should write this a different way?
 		advancep(parser);
 	} else {
+		Context *context = parser->context;
 		const String got = token_to_string(token);
 		PARSE_ERROR("Expected identifier, got '%.*s'", SFMT(got));
 	}
-	Identifier *identifier = tree_new_identifier(parser->tree, token.string);
+	Identifier *identifier = tree_new_identifier(parser->tree, token.string, poly);
 	TRACE_LEAVE();
 	return identifier;
 }
@@ -314,6 +314,7 @@ static Type *parse_type_or_identifier(Parser *parser) {
 			TRACE_LEAVE();
 			return RCAST(Type *, type);
 		} else if (expression->kind == EXPRESSION_TYPE) {
+			TRACE_LEAVE();
 			return RCAST(TypeExpression *, expression)->type;
 		} else {
 			PARSE_ERROR("Unexpected expression");
@@ -417,7 +418,7 @@ static Array(Field*) parse_field_list(Parser *parser) {
 			StrBuf buf;
 			strbuf_init(&buf, context);
 			strbuf_put_formatted(&buf, "__unnamed_%d", CAST(Sint32, array_size(fields)));
-			Identifier *name = tree_new_identifier(parser->tree, strbuf_result(&buf));
+			Identifier *name = tree_new_identifier(parser->tree, strbuf_result(&buf), false);
 			array_push(fields, tree_new_field(parser->tree, list[i], name, value));
 		}
 	}
@@ -434,7 +435,7 @@ static Array(Field*) parse_field_list(Parser *parser) {
 		Type *type = 0;
 		Array(Identifier*) names = 0;
 		for (;;) {
-			Identifier *name = parse_identifier(parser);
+			Identifier *name = parse_identifier(parser, false);
 			array_push(names, name);
 			const Token token = parser->this_token;
 			if (!is_operator(token, OPERATOR_COMMA) || is_kind(token, KIND_EOF)) {
@@ -486,7 +487,7 @@ static Array(Field*) parse_procedure_results(Parser *parser, Bool *diverging) {
 	if (!is_operator(parser->this_token, OPERATOR_LPAREN)) {
 		// Single return type
 		Type *type = parse_type(parser);
-		Identifier *identifier = tree_new_identifier(parser->tree, SCLIT("__unnamed"));
+		Identifier *identifier = tree_new_identifier(parser->tree, SCLIT("__unnamed"), false);
 		Field *field = tree_new_field(parser->tree, type, identifier, 0);
 		array_push(fields, field);
 		TRACE_LEAVE();
@@ -515,8 +516,6 @@ static ProcedureType *parse_procedure_type(Parser *parser) {
 		convention = string_to_calling_convention(string_unquote(string, "\"`"));
 		if (convention == CCONV_INVALID) {
 			PARSE_ERROR("Unknown calling convention '%.*s'", SFMT(string));
-			TRACE_LEAVE();
-			return 0;
 		}
 	}
 
@@ -689,40 +688,92 @@ static Statement *parse_directive_for_statement(Parser *parser, BlockFlag block_
 	}
 
 	TRACE_LEAVE();
+
 	return statement;
+}
+
+static ValueExpression *parse_operand_identifier(Parser *parser) {
+	TRACE_ENTER();
+	Identifier *identifier = parse_identifier(parser, false);
+	IdentifierValue *value = tree_new_identifier_value(parser->tree, identifier);
+	ValueExpression *expression = tree_new_value_expression(parser->tree, RCAST(Value *, value));
+	TRACE_LEAVE();
+	return expression;
+}
+
+static ValueExpression *parse_operand_literal(Parser *parser) {
+	TRACE_ENTER();
+	const Token token = advancep(parser);
+	LiteralValue *value = tree_new_literal_value(parser->tree, token.as_literal, token.string);
+	ValueExpression *expression = tree_new_value_expression(parser->tree, RCAST(Value *, value));
+	TRACE_LEAVE();
+	return expression;
+}
+
+static ValueExpression *parse_operand_compound_literal(Parser *parser) {
+	TRACE_ENTER();
+	CompoundLiteralValue *value = parse_compound_literal_value(parser, 0);
+	ValueExpression *expression = tree_new_value_expression(parser->tree, RCAST(Value *, value));
+	TRACE_LEAVE();
+	return expression;
+}
+
+static TypeExpression *parse_operand_bit_set_type(Parser *parser) {
+	TRACE_ENTER();
+
+	expect_keyword(parser, KEYWORD_BIT_SET);
+	expect_operator(parser, OPERATOR_LBRACKET);
+	Expression *expression = parse_expression(parser, false);
+	Type *underlying = 0;
+	if (accepted_kind(parser, KIND_SEMICOLON)) {
+		underlying = parse_type(parser);
+	}
+	expect_operator(parser, OPERATOR_RBRACKET);
+
+	BitSetType *type = tree_new_bit_set_type(parser->tree, expression, underlying);
+
+	TypeExpression *result = tree_new_type_expression(parser->tree, RCAST(Type *, type));
+
+	TRACE_LEAVE();
+
+	return result;
+}
+
+static TypeExpression *parse_operand_typeid_type(Parser *parser) {
+	TRACE_ENTER();
+
+	expect_keyword(parser, KEYWORD_TYPEID);
+
+	TypeidType *type = tree_new_typeid_type(parser->tree, 0);
+	TypeExpression *expression = tree_new_type_expression(parser->tree, RCAST(Type *, type));
+
+	TRACE_LEAVE();
+
+	return expression;
 }
 
 static Expression *parse_operand(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
 	Context *context = parser->context;
 	const Token token = parser->this_token;
-	Expression *expression = 0;
 	switch (token.kind) {
 	case KIND_IDENTIFIER:
 		{
-			Identifier *identifier = parse_identifier(parser);
-			IdentifierValue *value = tree_new_identifier_value(parser->tree, identifier);
-			expression = RCAST(Expression *, tree_new_value_expression(parser->tree, RCAST(Value *, value)));
+			ValueExpression *expression = parse_operand_identifier(parser);
 			TRACE_LEAVE();
-			return expression;
+			return RCAST(Expression *, expression);
 		}
 	case KIND_LITERAL:
 		switch (token.as_literal) {
-		case LITERAL_INTEGER:
-			FALLTHROUGH();
-		case LITERAL_FLOAT:
-			FALLTHROUGH();
-		case LITERAL_IMAGINARY:
-			FALLTHROUGH();
-		case LITERAL_RUNE:
-			FALLTHROUGH();
+		case LITERAL_INTEGER:   FALLTHROUGH();
+		case LITERAL_FLOAT:     FALLTHROUGH();
+		case LITERAL_IMAGINARY: FALLTHROUGH();
+		case LITERAL_RUNE:      FALLTHROUGH();
 		case LITERAL_STRING:
 			{
-				const Token token = advancep(parser);
-				LiteralValue *value = tree_new_literal_value(parser->tree, token.as_literal, token.string);
-				expression = RCAST(Expression *, tree_new_value_expression(parser->tree, RCAST(Value *, value)));
+				ValueExpression *expression = parse_operand_literal(parser);
 				TRACE_LEAVE();
-				return expression;
+				return RCAST(Expression *, expression);
 			}
 		case LITERAL_COUNT:
 			UNREACHABLE();
@@ -730,58 +781,40 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 		break;
 	case KIND_LBRACE:
 		if (!lhs) {
-			CompoundLiteralValue *value = parse_compound_literal_value(parser, 0);
-			expression = RCAST(Expression *, tree_new_value_expression(parser->tree, RCAST(Value *, value)));
+			ValueExpression *expression = parse_operand_compound_literal(parser);
 			TRACE_LEAVE();
-			return expression;
+			return RCAST(Expression *, expression);
 		}
 		break;
 	case KIND_DIRECTIVE:
-		{
-			UNIMPLEMENTED("directive");
-			const Token token = expect_kind(parser, KIND_DIRECTIVE);
-			const String directive = directive_to_string(token.as_directive);
-			printf("%.*s\n", SFMT(directive));
-		}
-		TRACE_LEAVE();
-		return 0;
+		UNIMPLEMENTED("directive");
 	case KIND_KEYWORD:
 		switch (token.as_keyword) {
 		case KEYWORD_DISTINCT:
 			UNIMPLEMENTED("distinct");
 		case KEYWORD_PROC:
-			expect_keyword(parser, KEYWORD_PROC);
-			if (is_kind(parser->this_token, KIND_LBRACE)) {
-				UNIMPLEMENTED("Procedure groups");
-			} else {
-				expression = RCAST(Expression *, parse_procedure(parser));
+			{
+				Expression *expression = 0;
+				expect_keyword(parser, KEYWORD_PROC);
+				if (is_kind(parser->this_token, KIND_LBRACE)) {
+					UNIMPLEMENTED("Procedure groups");
+				} else {
+					expression = RCAST(Expression *, parse_procedure(parser));
+				}
+				TRACE_LEAVE();
+				return expression;
 			}
-			TRACE_LEAVE();
-			return expression;
 		case KEYWORD_BIT_SET:
 			{
-				expect_keyword(parser, KEYWORD_BIT_SET);
-				expect_operator(parser, OPERATOR_LBRACKET);
-				Expression *expression = parse_expression(parser, false);
-				Type *underlying = 0;
-				if (accepted_kind(parser, KIND_SEMICOLON)) {
-					underlying = parse_type(parser);
-				}
-				expect_operator(parser, OPERATOR_RBRACKET);
-		
-				BitSetType *type = tree_new_bit_set_type(parser->tree, expression, underlying);
-				expression = RCAST(Expression *, tree_new_type_expression(parser->tree, RCAST(Type *, type)));
-
+				TypeExpression *expression = parse_operand_bit_set_type(parser);
 				TRACE_LEAVE();
-		
-				return expression;
+				return RCAST(Expression *, expression);
 			}
 		case KEYWORD_TYPEID:
 			{
-				expect_keyword(parser, KEYWORD_TYPEID);
-				expression = RCAST(Expression *, tree_new_type_expression(parser->tree, RCAST(Type *, tree_new_typeid_type(parser->tree, 0))));
+				TypeExpression *expression = parse_operand_typeid_type(parser);
 				TRACE_LEAVE();
-				return expression;
+				return RCAST(Expression *, expression);
 			}
 		/*
 		case KEYWORD_MAP:
@@ -801,7 +834,6 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 		*/
 		default:
 			break;
-			// ICE("Unexpected keyword in operand");
 		}
 		break;
 	case KIND_OPERATOR:
@@ -884,12 +916,11 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 		{
 			// TODO(dweiler): cleanup / fix
 			expect_kind(parser, KIND_CONST);
-			Identifier *identifier = parse_identifier(parser);
-			identifier->poly = true;
+			Identifier *identifier = parse_identifier(parser, true);
 			IdentifierValue *value = tree_new_identifier_value(parser->tree, identifier);
-			expression = RCAST(Expression *, tree_new_value_expression(parser->tree, RCAST(Value *, value)));
+			ValueExpression *expression = tree_new_value_expression(parser->tree, RCAST(Value *, value));
 			TRACE_LEAVE();
-			return expression;
+			return RCAST(Expression *, expression);
 		}
 		break;
 	default:
@@ -1010,7 +1041,7 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 				switch (parser->this_token.kind) {
 				case KIND_IDENTIFIER:
 					// .ident
-					ident = parse_identifier(parser);
+					ident = parse_identifier(parser, false);
 					operand = RCAST(Expression *, tree_new_selector_expression(parser->tree, operand, ident));
 					break;
 				case KIND_OPERATOR:
@@ -1025,7 +1056,8 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 					case OPERATOR_QUESTION:
 						// .?
 						expect_operator(parser, OPERATOR_QUESTION);
-						type = RCAST(Type *, tree_new_identifier_type(parser->tree, tree_new_identifier(parser->tree, SCLIT("?"))));
+						ident = tree_new_identifier(parser->tree, SCLIT("?"), false);
+						type = RCAST(Type *, tree_new_identifier_type(parser->tree, ident));
 						operand = RCAST(Expression *, tree_new_assertion_expression(parser->tree, operand, type));
 						break;
 					default:
@@ -1041,7 +1073,7 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 			case OPERATOR_ARROW:
 				// ->ident
 				advancep(parser);
-				ident = parse_identifier(parser);
+				ident = parse_identifier(parser, false);
 				operand = RCAST(Expression *, tree_new_selector_expression(parser->tree, operand, ident));
 				break;
 			case OPERATOR_LBRACKET:
@@ -1315,7 +1347,7 @@ static BlockStatement *parse_block_statement(Parser *parser, BlockFlag flags, Bo
 	return body;
 }
 
-static DeclarationStatement *parse_declaration_statement(Parser *parser, Array(Identifier*) names) {
+static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Array(Identifier*) names) {
 	// ':'
 	TRACE_ENTER();
 
@@ -1361,6 +1393,59 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, Array(I
 	return statement;
 }
 
+static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExpression *lhs) {
+	Context *context = parser->context;
+
+	TRACE_ENTER();
+
+	expect_operator(parser, OPERATOR_COLON);
+
+	// Everything inside 'lhs' should be an ValueExpression of type IdentifierValue.
+	const Uint64 n_names = array_size(lhs->expressions);
+	Array(Identifier *) names = 0;
+	for (Uint64 i = 0; i < n_names; i++) {
+		const Expression *expression = lhs->expressions[i];
+		if (expression->kind != EXPRESSION_VALUE) {
+			PARSE_ERROR("Expected identifier");
+		}
+		const Value *value = RCAST(const ValueExpression *, expression)->value;
+		if (value->kind != VALUE_IDENTIFIER) {
+			PARSE_ERROR("Expected identifier");
+		}
+		array_push(names, RCAST(const IdentifierValue *, value)->identifier);
+	}
+
+	DeclarationStatement *statement = parse_declaration_statement_tail(parser, names);
+
+	TRACE_LEAVE();
+
+	return statement;
+}
+
+static AssignmentStatement *parse_assignment_statement(Parser *parser, ListExpression *lhs) {
+	Context *context = parser->context;
+
+	TRACE_ENTER();
+
+	if (!parser->this_procedure) {
+		PARSE_ERROR("Cannot use assignment statement at file scope");
+	}
+
+	const AssignmentKind kind = parser->this_token.as_assignment;
+
+	advancep(parser);
+	ListExpression *rhs = parse_rhs_list_expression(parser);
+	if (array_size(rhs->expressions) == 0) {
+		PARSE_ERROR("Missing right-hand side in assignment");
+	}
+
+	AssignmentStatement *statement = tree_new_assignment_statement(parser->tree, kind, lhs, rhs);
+
+	TRACE_LEAVE();
+
+	return statement;
+}
+
 static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 	TRACE_ENTER();
 
@@ -1371,16 +1456,7 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 	switch (token.kind) {
 	case KIND_ASSIGNMENT:
 		{
-			if (!parser->this_procedure) {
-				PARSE_ERROR("Cannot use assignment statement at file scope");
-			}
-			advancep(parser);
-			ListExpression *rhs = parse_rhs_list_expression(parser);
-			if (array_size(rhs->expressions) == 0) {
-				PARSE_ERROR("Missing right-hand side in assignment");
-				return 0;
-			}
-			AssignmentStatement *statement = tree_new_assignment_statement(parser->tree, token.as_assignment, lhs, rhs);
+			AssignmentStatement *statement = parse_assignment_statement(parser, lhs);
 			TRACE_LEAVE();
 			return RCAST(Statement *, statement);
 		}
@@ -1399,44 +1475,20 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 			break;
 		case OPERATOR_COLON:
 			{
-				expect_operator(parser, OPERATOR_COLON);
-				// Everything inside 'lhs' should be an ValueExpression of type IdentifierValue
-				const Uint64 n_names = array_size(lhs->expressions);
-				Array(Identifier *) names = 0;
-				for (Uint64 i = 0; i < n_names; i++) {
-					const Expression *expression = lhs->expressions[i];
-					if (expression->kind != EXPRESSION_VALUE) {
-						PARSE_ERROR("Expected identifier");
-					}
-					const Value *value = RCAST(const ValueExpression *, expression)->value;
-					if (value->kind != VALUE_IDENTIFIER) {
-						PARSE_ERROR("Expected identifier");
-					}
-					array_push(names, RCAST(const IdentifierValue *, value)->identifier);
-				}
-				DeclarationStatement *statement = parse_declaration_statement(parser, names);
+				DeclarationStatement *statement = parse_declaration_statement(parser, lhs);
 				TRACE_LEAVE();
 				return RCAST(Statement *, statement);
 			}
 		default:
-			{
-				// const String string = operator_to_string(token.as_operator);
-				// ICE("Unexpected operator '%.*s' in statement", SFMT(string));
-			}
+			break;
 		}
-		break;
 	default:
-		// const String string = token_to_string(token);
-		// PARSE_ERROR("Unexpected '%.*s'",
-		// 	CAST(int,          string.size),
-		// 	CAST(const char *, string.data));
 		break;
 	}
 
 	Array(Expression*) expressions = lhs->expressions;
 	if (array_size(expressions) == 0 || array_size(expressions) > 1) {
 		PARSE_ERROR("Expected one expression on the left-hand side");
-		return 0;
 	}
 
 	ExpressionStatement *statement = tree_new_expression_statement(parser->tree, expressions[0]);
@@ -1446,7 +1498,7 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 	return RCAST(Statement *, statement);
 }
 
-static ImportStatement *parse_import_declaration(Parser *parser) {
+static ImportStatement *parse_import_statement(Parser *parser) {
 	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_IMPORT);
@@ -1728,29 +1780,53 @@ static ReturnStatement *parse_return_statement(Parser *parser) {
 	return statement;
 }
 
+static Statement *parse_basic_simple_statement(Parser *parser, Bool allow_in) {
+	TRACE_ENTER();
+	Statement *statement = parse_simple_statement(parser, allow_in);
+	expect_semicolon(parser);
+	TRACE_LEAVE();
+	return statement;
+}
+
+static BranchStatement *parse_branch_statement(Parser *parser, KeywordKind kind) {
+	TRACE_ENTER();
+	const Token token = advancep(parser);
+	Identifier *label = 0;
+	if (!is_keyword(token, KEYWORD_FALLTHROUGH) && is_kind(parser->this_token, KIND_IDENTIFIER)) {
+		label = parse_identifier(parser, false);
+	}
+	BranchStatement *statement = tree_new_branch_statement(parser->tree, kind, label);
+	TRACE_LEAVE();
+	return statement;
+}
+
+static EmptyStatement *parse_empty_statement(Parser *parser) {
+	TRACE_ENTER();
+	EmptyStatement *statement = tree_new_empty_statement(parser->tree);
+	expect_semicolon(parser);
+	TRACE_LEAVE();
+	return statement;
+}
+
 static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
 	Context *context = parser->context;
-	Statement *statement = 0;
 	const Token token = parser->this_token;
 	switch (token.kind) {
 	case KIND_EOF:
 		ICE("Unexpected EOF");
 	case KIND_LITERAL:
 		switch (token.as_literal) {
-		case LITERAL_INTEGER:
-			FALLTHROUGH();
-		case LITERAL_FLOAT:
-			FALLTHROUGH();
-		case LITERAL_IMAGINARY:
-			FALLTHROUGH();
-		case LITERAL_RUNE:
-			FALLTHROUGH();
+		case LITERAL_INTEGER:   FALLTHROUGH();
+		case LITERAL_FLOAT:     FALLTHROUGH();
+		case LITERAL_IMAGINARY: FALLTHROUGH();
+		case LITERAL_RUNE:      FALLTHROUGH();
 		case LITERAL_STRING:
-			statement = parse_simple_statement(parser, false);
-			expect_semicolon(parser);
-			TRACE_LEAVE();
-			return statement;
+			{
+				Statement *statement = parse_basic_simple_statement(parser, false);
+				TRACE_LEAVE();
+				return statement;
+			}
 		default:
 			ICE("Unexpected literal");
 		}
@@ -1761,53 +1837,55 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 			// Needed to support assignment to context.
 			FALLTHROUGH();
 		case KEYWORD_PROC:
-			statement = parse_simple_statement(parser, false);
-			expect_semicolon(parser);
-			TRACE_LEAVE();
-			return statement;
+			{
+				Statement *statement = parse_basic_simple_statement(parser, false);
+				TRACE_LEAVE();
+				return statement;
+			}
 		case KEYWORD_FOREIGN:
 			UNIMPLEMENTED("foreign declaration");
 		case KEYWORD_IF:
-			statement = RCAST(Statement *, parse_if_statement(parser, block_flags));
-			TRACE_LEAVE();
-			return statement;
+			{
+				IfStatement *statement = parse_if_statement(parser, block_flags);
+				TRACE_LEAVE();
+				return RCAST(Statement *, statement);
+			}
 		case KEYWORD_WHEN:
 			UNIMPLEMENTED("when");
 		case KEYWORD_IMPORT:
-			statement = RCAST(Statement *, parse_import_declaration(parser));
-			TRACE_LEAVE();
-			return statement;
+			{
+				ImportStatement *statement = parse_import_statement(parser);
+				TRACE_LEAVE();
+				return RCAST(Statement *, statement);
+			}
 		case KEYWORD_FOR:
-			statement = RCAST(Statement *, parse_for_statement(parser, block_flags));
-			TRACE_LEAVE();
-			return statement;
+			{
+				ForStatement *statement = parse_for_statement(parser, block_flags);
+				TRACE_LEAVE();
+				return RCAST(Statement *, statement);
+			}
 		case KEYWORD_SWITCH:
 			UNIMPLEMENTED("switch statement");
 		case KEYWORD_DEFER:
-			statement = RCAST(Statement *, parse_defer_statement(parser, block_flags));
-			TRACE_LEAVE();
-			return statement;
+			{
+				DeferStatement *statement = parse_defer_statement(parser, block_flags);
+				TRACE_LEAVE();
+				return RCAST(Statement *, statement);
+			}
 		case KEYWORD_RETURN:
-			statement = RCAST(Statement *, parse_return_statement(parser));
-			TRACE_LEAVE();
-			return statement;
-		case KEYWORD_BREAK:
-			FALLTHROUGH();
-		case KEYWORD_CONTINUE:
-			FALLTHROUGH();
+			{
+				ReturnStatement *statement = parse_return_statement(parser);
+				TRACE_LEAVE();
+				return RCAST(Statement *, statement);
+			}
+		case KEYWORD_BREAK:       FALLTHROUGH();
+		case KEYWORD_CONTINUE:    FALLTHROUGH();
 		case KEYWORD_FALLTHROUGH:
 			{
-				const Token token = advancep(parser);
-				Identifier *label = 0;
-				if (!is_keyword(token, KEYWORD_FALLTHROUGH) &&
-				     is_kind(parser->this_token, KIND_IDENTIFIER))
-				{
-					label = parse_identifier(parser);
-				}
-				statement = RCAST(Statement *, tree_new_branch_statement(parser->tree, token.as_keyword, label));
+				BranchStatement *statement = parse_branch_statement(parser, token.as_keyword);
+				TRACE_LEAVE();
+				return RCAST(Statement *, statement);
 			}
-			TRACE_LEAVE();
-			return statement;
 		case KEYWORD_USING:
 			UNIMPLEMENTED("using statement");
 		default:
@@ -1815,29 +1893,25 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 		}
 		break;
 	case KIND_IDENTIFIER:
-		statement = parse_simple_statement(parser, false);
-		expect_semicolon(parser);
-		TRACE_LEAVE();
-		return statement;
-	case KIND_OPERATOR:
-		switch (token.as_operator) {
-		case OPERATOR_LPAREN:
-			FALLTHROUGH();
-		case OPERATOR_POINTER:
-			FALLTHROUGH();
-		case OPERATOR_ADD:
-			FALLTHROUGH();
-		case OPERATOR_SUB:
-			FALLTHROUGH();
-		case OPERATOR_XOR:
-			FALLTHROUGH();
-		case OPERATOR_NOT:
-			FALLTHROUGH();
-		case OPERATOR_AND:
-			statement = parse_simple_statement(parser, false);
-			expect_semicolon(parser);
+		{
+			Statement *statement = parse_basic_simple_statement(parser, false);
 			TRACE_LEAVE();
 			return statement;
+		}
+	case KIND_OPERATOR:
+		switch (token.as_operator) {
+		case OPERATOR_LPAREN:  FALLTHROUGH();
+		case OPERATOR_POINTER: FALLTHROUGH();
+		case OPERATOR_ADD:     FALLTHROUGH();
+		case OPERATOR_SUB:     FALLTHROUGH();
+		case OPERATOR_XOR:     FALLTHROUGH();
+		case OPERATOR_NOT:     FALLTHROUGH();
+		case OPERATOR_AND:
+			{
+				Statement *statement = parse_basic_simple_statement(parser, false);
+				TRACE_LEAVE();
+				return statement;
+			}
 		default:
 			break;
 		}
@@ -1845,19 +1919,23 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 	case KIND_ATTRIBUTE:
 		UNIMPLEMENTED("attribute");
 	case KIND_DIRECTIVE:
-		// Genius..
-		statement = RCAST(Statement *, parse_directive_for_statement(parser, block_flags));
-		TRACE_LEAVE();
-		return statement;
+		{
+			Statement *statement = parse_directive_for_statement(parser, block_flags);
+			TRACE_LEAVE();
+			return statement;
+		}
 	case KIND_LBRACE:
-		statement = RCAST(Statement *, parse_block_statement(parser, block_flags, false));
-		TRACE_LEAVE();
-		return statement;
+		{
+			BlockStatement *statement = parse_block_statement(parser, block_flags, false);
+			TRACE_LEAVE();
+			return RCAST(Statement *, statement);
+		}
 	case KIND_SEMICOLON:
-		statement = RCAST(Statement *, tree_new_empty_statement(parser->tree));
-		expect_semicolon(parser);
-		TRACE_LEAVE();
-		return statement;
+		{
+			EmptyStatement *statement = parse_empty_statement(parser);
+			TRACE_LEAVE();
+			return RCAST(Statement *, statement);
+		}
 	default:
 		ICE("Unexpected token in statement");
 	}

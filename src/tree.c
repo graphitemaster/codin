@@ -226,11 +226,12 @@ IdentifierValue *tree_new_identifier_value(Tree *tree, Identifier *identifier) {
 	return value;
 }
 
-Identifier *tree_new_identifier(Tree *tree, String contents) {
+Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly) {
 	Context *context = tree->context;
 	Allocator *allocator = context->allocator;
 	Identifier *identifier = CAST(Identifier *, allocator->allocate(allocator, sizeof *identifier));
 	identifier->contents = string_copy(contents);
+	identifier->poly = poly;
 	return identifier;
 }
 
@@ -654,6 +655,7 @@ Bool tree_dump_bit_set_type(const BitSetType *type, Sint32 depth) {
 }
 
 Bool tree_dump_typeid_type(const TypeidType *type, Sint32 depth) {
+	(void)type;
 	pad(depth);
 	printf("(typeid)");
 	return true;

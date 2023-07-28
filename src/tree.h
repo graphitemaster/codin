@@ -452,7 +452,7 @@ LiteralValue *tree_new_literal_value(Tree *tree, LiteralKind kind, String value)
 CompoundLiteralValue *tree_new_compound_literal_value(Tree *tree, Expression *expression, Array(Expression*) expressions);
 IdentifierValue *tree_new_identifier_value(Tree *tree, Identifier *identifier);
 
-Identifier *tree_new_identifier(Tree *tree, String contents);
+Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly);
 
 IdentifierType *tree_new_identifier_type(Tree *tree, Identifier *identifier);
 ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);
