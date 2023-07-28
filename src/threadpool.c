@@ -92,7 +92,9 @@ Bool threadpool_queue(ThreadPool *pool, void (*function)(void*), void *user, voi
 		mutex_unlock(&pool->mutex);
 		return false;
 	}
+
 	cond_signal(&pool->cond);
 	mutex_unlock(&pool->mutex);
+
 	return true;
 }

@@ -92,6 +92,26 @@ TypeExpression *tree_new_type_expression(Tree *tree, Type *type) {
 	return expression;
 }
 
+IndexExpression *tree_new_index_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs) {
+	Allocator *allocator = tree->context->allocator;
+	IndexExpression *expression = CAST(IndexExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_INDEX;
+	expression->operand = operand;
+	expression->lhs = lhs;
+	expression->rhs = rhs;
+	return expression;
+}
+
+SliceExpression *tree_new_slice_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs) {
+	Allocator *allocator = tree->context->allocator;
+	SliceExpression *expression = CAST(SliceExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_SLICE;
+	expression->operand = operand;
+	expression->lhs = lhs;
+	expression->rhs = rhs;
+	return expression;
+}
+
 // Statements.
 EmptyStatement *tree_new_empty_statement(Tree *tree) {
 	Allocator *allocator = tree->context->allocator;

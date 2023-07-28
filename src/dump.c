@@ -333,6 +333,36 @@ Bool dump_type_expression(const TypeExpression *expression, Sint32 depth) {
 	return true;
 }
 
+Bool dump_index_expression(const IndexExpression *expression, Sint32 depth) {
+	pad(depth);
+	printf("(index\n");
+	dump_expression(expression->operand, depth + 1);
+	printf("\n");
+	dump_expression(expression->lhs, depth + 1);
+	if (expression->rhs) {
+		printf("\n");
+		dump_expression(expression->rhs, depth + 1);
+	}
+	printf(")");
+	return true;
+}
+
+Bool dump_slice_expression(const SliceExpression *expression, Sint32 depth) {
+	pad(depth);
+	printf("(slice\n");
+	dump_expression(expression->operand, depth + 1);
+	if (expression->lhs) {
+		printf("\n");
+		dump_expression(expression->lhs, depth + 1);
+	}
+	if (expression->rhs) {
+		printf("\n");
+		dump_expression(expression->rhs, depth + 1);
+	}
+	printf(")");
+	return true;
+}
+
 Bool dump_expression(const Expression *expression, Sint32 depth) {
 	switch (expression->kind) {
 	case EXPRESSION_LIST:      return dump_list_expression(RCAST(const ListExpression *, expression), depth);
@@ -346,6 +376,8 @@ Bool dump_expression(const Expression *expression, Sint32 depth) {
 	case EXPRESSION_VALUE:     return dump_value_expression(RCAST(const ValueExpression *, expression), depth);
 	case EXPRESSION_PROCEDURE: return dump_procedure_expression(RCAST(const ProcedureExpression *, expression), depth);
 	case EXPRESSION_TYPE:      return dump_type_expression(RCAST(const TypeExpression *, expression), depth);
+	case EXPRESSION_INDEX:     return dump_index_expression(RCAST(const IndexExpression *, expression), depth);
+	case EXPRESSION_SLICE:     return dump_slice_expression(RCAST(const SliceExpression *, expression), depth);
 	}
 	return false;
 }

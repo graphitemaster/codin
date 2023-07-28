@@ -1,33 +1,17 @@
 package main
 
 // TODO:
-// distinct
-// struct
-// union
-// enum
-// attributes
-// switch
-// expression directives (partial, assert, panic, unroll)
-// procedure groups
-// [] indexing
-// foreign declarations
-// implicit selector expressions
-// using statement
+//  distinct
+//  struct, union, enum
+//  attributes (@static, @private, etc)
+//  switch
+//  expression directives (partial, assert, panic, unroll)
+//  procedure groups
+//  foreign decls
+//  implicit selector expressions (.ENUM inference)
 
 import "core:fmt"
 
-foo :: proc() -> int {
-  if true
-  {
-    x := 10
-    y := 20
-    z := true if true else false
-  }
-  for
-
-  {
-    fmt.printf("Hello, world\n");
-  }
-
-  return 0;
+foo :: proc() {
+  x: matrix[4, 4]f32;
 }

@@ -1199,14 +1199,77 @@ static CompoundLiteralValue *parse_compound_literal_value(Parser *parser, Expres
 	return value;
 }
 
+static Expression *parse_index_expression(Parser *parser, Expression *operand) {
+	TRACE_ENTER();
+
+	Context *context = parser->context;
+
+	Expression *lhs = 0;
+	Expression *rhs = 0;
+
+	parser->expression_depth++;
+
+	// [
+	const Token token = expect_operator(parser, OPERATOR_LBRACKET);
+
+	// [lhs
+	if (!is_operator(token, OPERATOR_ELLIPSIS)
+	 && !is_operator(token, OPERATOR_RANGEFULL)
+	 && !is_operator(token, OPERATOR_RANGEHALF)
+	 && !is_operator(token, OPERATOR_COLON))
+	{
+		lhs = parse_expression(parser, false);
+	}
+
+	// Do not allow .., ..=, or ..< inside
+	if (is_operator(parser->this_token, OPERATOR_ELLIPSIS)
+	 || is_operator(parser->this_token, OPERATOR_RANGEFULL)
+	 || is_operator(parser->this_token, OPERATOR_RANGEHALF))
+	{
+		PARSE_ERROR("Expected a colon in indexing expression");
+	}
+
+	// Handle [,rhs] or [:rhs]
+	Token interval = TOKEN_NIL;
+	if (is_operator(parser->this_token, OPERATOR_COMMA)
+	 || is_operator(parser->this_token, OPERATOR_COLON))
+	{
+		interval = advancep(parser); 
+		if (!is_operator(interval, OPERATOR_RBRACKET) && !is_kind(interval, KIND_EOF)) {
+			rhs = parse_expression(parser, false);
+		}
+	}
+
+	parser->expression_depth--;
+
+	expect_operator(parser, OPERATOR_RBRACKET);
+
+	Expression *expression = 0;
+	if (interval.kind != KIND_INVALID) {
+		if (is_operator(interval, OPERATOR_COMMA)) {
+			// Indexing a matrix
+			expression = RCAST(Expression *, tree_new_index_expression(parser->tree, operand, lhs, rhs));
+		} else {
+			expression = RCAST(Expression *, tree_new_slice_expression(parser->tree, operand, lhs, rhs));
+		}
+	} else {
+		expression = RCAST(Expression *, tree_new_index_expression(parser->tree, operand, lhs, rhs));
+	}
+
+	TRACE_LEAVE();
+
+	return expression;
+}
+
 static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bool lhs) {
 	TRACE_ENTER();
 
 	Context *context = parser->context;
 
 	if (!operand) {
-		// if (parser->)
-		// PARSE_ERROR("Expected an operand");
+		if (parser->allow_newline) {
+			PARSE_ERROR("Expected an operand");
+		}
 		TRACE_LEAVE();
 		return 0;
 	}
@@ -1266,14 +1329,14 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 				operand = RCAST(Expression *, tree_new_selector_expression(parser->tree, operand, ident));
 				break;
 			case OPERATOR_LBRACKET:
-				UNIMPLEMENTED("Indexing with []");
-			case OPERATOR_POINTER:
-				expect_operator(parser, OPERATOR_POINTER);
-				operand = RCAST(Expression *, tree_new_unary_expression(parser->tree, OPERATOR_POINTER, operand));
+				// [i], [:], [i:], [:i], [a:b], [c,r]
+				operand = RCAST(Expression *, parse_index_expression(parser, operand));
 				break;
+			case OPERATOR_POINTER:
+				FALLTHROUGH();
 			case OPERATOR_OR_RETURN:
-				expect_operator(parser, OPERATOR_OR_RETURN);
-				operand = RCAST(Expression *, tree_new_unary_expression(parser->tree, OPERATOR_OR_RETURN, operand));
+				expect_operator(parser, token.as_operator);
+				operand = RCAST(Expression *, tree_new_unary_expression(parser->tree, token.as_operator, operand));
 				break;
 			default:
 				TRACE_LEAVE();

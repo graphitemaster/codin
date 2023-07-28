@@ -20,6 +20,8 @@ typedef struct AssertionExpression AssertionExpression;
 typedef struct ValueExpression ValueExpression;
 typedef struct ProcedureExpression ProcedureExpression;
 typedef struct TypeExpression TypeExpression;
+typedef struct IndexExpression IndexExpression;
+typedef struct SliceExpression SliceExpression;
 
 // Statements.
 typedef struct Statement Statement;
@@ -76,6 +78,8 @@ enum ExpressionKind {
 	EXPRESSION_VALUE,
 	EXPRESSION_PROCEDURE,
 	EXPRESSION_TYPE,
+	EXPRESSION_INDEX,
+	EXPRESSION_SLICE,
 };
 
 enum StatementKind {
@@ -105,7 +109,7 @@ enum ProcedureKind {
 
 enum TypeKind {
 	TYPE_IDENTIFIER,    // Unresolved type identifier.
-	TYPE_BUILTIN,       // b{8,16,32,64}, f{16,32,64}(le|be), (i|u){8,16,32,64,128}(le|be), 
+	TYPE_BUILTIN,       // b{8,16,32,64}, f{16,32,64}(le|be), (i|u)8, (i|u){16,32,64,128}(le|be), 
 	TYPE_PROCEDURE,     // proc
 	TYPE_POINTER,       // ^T
 	TYPE_MULTI_POINTER, // [^]T
@@ -119,8 +123,8 @@ enum TypeKind {
 };
 
 enum BuiltinTypeKind {
-	BUILTIN_TYPE_SINT,    // i{8,16,32,64,128}(le|be)
-	BUILTIN_TYPE_UINT,    // u{8,16,32,64,128}(le|be)
+	BUILTIN_TYPE_SINT,    // i8,i{16,32,64,128}(le|be)
+	BUILTIN_TYPE_UINT,    // u8,u{16,32,64,128}(le|be)
 	BUILTIN_TYPE_FLOAT,   // f{16,32,64}(le|be)
 	BUILTIN_TYPE_BOOL,    // b{8,16,32,64}
 	BUILTIN_TYPE_STRING,  // string
@@ -265,6 +269,20 @@ struct ProcedureExpression {
 struct TypeExpression {
 	Expression base;
 	Type *type;
+};
+
+struct IndexExpression {
+	Expression base;
+	Expression *operand;
+	Expression *lhs;
+	Expression *rhs;
+};
+
+struct SliceExpression {
+	Expression base;
+	Expression *operand;
+	Expression *lhs;
+	Expression *rhs;
 };
 
 // Statements.
@@ -490,6 +508,8 @@ AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *opera
 ValueExpression *tree_new_value_expression(Tree *tree, Value *value);
 ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, ListExpression *where_clauses, BlockStatement *body);
 TypeExpression *tree_new_type_expression(Tree *tree, Type *type);
+IndexExpression *tree_new_index_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs);
+SliceExpression *tree_new_slice_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs);
 
 EmptyStatement *tree_new_empty_statement(Tree *tree);
 ImportStatement *tree_new_import_statement(Tree *tree, String name, String package);
