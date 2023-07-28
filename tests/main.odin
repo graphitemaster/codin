@@ -14,7 +14,8 @@ package main
 // using statement
 
 foo :: proc() -> int {
-  x := 10;
-  x += 20;
-  return x;
+  x :: true when true else false;
+ // x += 20;
+  // return x;
+  return 0;
 }
