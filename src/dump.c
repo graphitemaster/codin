@@ -127,7 +127,6 @@ Bool dump_call_expression(const CallExpression *expression, Sint32 depth) {
 	return true;
 }
 
-Bool dump_type(const Type *type, Sint32 depth);
 Bool dump_assertion_expression(const AssertionExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(assert-type\n");
@@ -146,6 +145,12 @@ Bool dump_value_expression(const ValueExpression *expression, Sint32 depth) {
 Bool dump_identifier_type(const IdentifierType *type, Sint32 depth) {
 	pad(depth);
 	printf("(ident '%.*s')", SFMT(type->identifier->contents));
+	return true;
+}
+
+Bool dump_builtin_type(const BuiltinType *type, Sint32 depth) {
+	pad(depth);
+	printf("(builtin '%.*s')", SFMT(type->identifier));
 	return true;
 }
 
@@ -305,6 +310,7 @@ Bool dump_procedure_expression(const ProcedureExpression *expression, Sint32 dep
 Bool dump_type(const Type *type, Sint32 depth) {
 	switch (type->kind) {
 	case TYPE_IDENTIFIER:    return dump_identifier_type(RCAST(const IdentifierType *, type), depth);
+	case TYPE_BUILTIN:       return dump_builtin_type(RCAST(const BuiltinType *, type), depth);
 	case TYPE_PROCEDURE:     return dump_procedure_type(RCAST(const ProcedureType *, type), depth);
 	case TYPE_POINTER:       return dump_pointer_type(RCAST(const PointerType *, type), depth);
 	case TYPE_MULTI_POINTER: return dump_multi_pointer_type(RCAST(const MultiPointerType *, type), depth);

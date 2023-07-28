@@ -44,6 +44,7 @@ typedef struct IdentifierValue IdentifierValue;
 
 // Types.
 typedef struct Type Type;
+typedef struct BuiltinType BuiltinType;
 typedef struct IdentifierType IdentifierType;
 typedef struct ProcedureType ProcedureType;
 typedef struct ConcreteProcedureType ConcreteProcedureType;
@@ -104,6 +105,7 @@ enum ProcedureKind {
 
 enum TypeKind {
 	TYPE_IDENTIFIER,    // Unresolved type identifier.
+	TYPE_BUILTIN,       // b{8,16,32,64}, f{16,32,64}(le|be), (i|u){8,16,32,64,128}(le|be), 
 	TYPE_PROCEDURE,     // proc
 	TYPE_POINTER,       // ^T
 	TYPE_MULTI_POINTER, // [^]T
@@ -114,6 +116,21 @@ enum TypeKind {
 	TYPE_TYPEID,        // typeid
 	TYPE_MAP,           // map[K]V
 	TYPE_MATRIX,        // matrix[R,C]T
+};
+
+enum BuiltinTypeKind {
+	BUILTIN_TYPE_SINT,    // i{8,16,32,64,128}(le|be)
+	BUILTIN_TYPE_UINT,    // u{8,16,32,64,128}(le|be)
+	BUILTIN_TYPE_FLOAT,   // f{16,32,64}(le|be)
+	BUILTIN_TYPE_BOOL,    // b{8,16,32,64}
+	BUILTIN_TYPE_STRING,  // string
+	BUILTIN_TYPE_POINTER, // rawptr
+};
+
+enum Endianess {
+	ENDIANESS_NA, // Not applicable.
+	ENDIANESS_LITTLE,
+	ENDIANESS_BIG,
 };
 
 enum BlockFlag {
@@ -142,6 +159,8 @@ typedef enum StatementKind StatementKind;
 typedef enum ValueKind ValueKind;
 typedef enum ProcedureKind ProcedureKind;
 typedef enum TypeKind TypeKind;
+typedef enum BuiltinTypeKind BuiltinTypeKind;
+typedef enum Endianess Endianess;
 
 typedef enum BlockFlag BlockFlag;
 typedef enum ProcedureFlag ProcedureFlag;
@@ -348,6 +367,15 @@ struct Type {
 	Bool poly;
 };
 
+struct BuiltinType {
+	Type base;
+	String identifier;
+	BuiltinTypeKind kind;
+	Uint16 size_of;
+	Uint16 align_of;
+	Endianess endianess;
+};
+
 struct IdentifierType {
 	Type base;
 	Identifier *identifier;
@@ -444,7 +472,8 @@ inline String calling_convention_to_string(CallingConvention cc) {
 
 struct Tree {
 	Context *context;
-	String package;
+	String package_name;
+	String file_name;
 	Array(Statement*) statements;
 };
 

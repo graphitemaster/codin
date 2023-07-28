@@ -33,22 +33,22 @@
 #endif
 
 // Token kinds
-//   ENUM,         NAME
-KIND(INVALID,      "invalid")
-KIND(EOF,          "end of file")
-KIND(COMMENT,      "comment")
-KIND(IDENTIFIER,   "identifier")
-KIND(LITERAL,      "literal")
-KIND(OPERATOR,     "operator")
-KIND(KEYWORD,      "keyword")
-KIND(ASSIGNMENT,   "assignment")
-KIND(DIRECTIVE,    "directive")     // '#' is a directive (not an operator)
-KIND(ATTRIBUTE,    "attribute")     // '@' is a attribute (not an operator)
-KIND(CONST,        "const")         // '$' is a constant (not an operator)
-KIND(SEMICOLON,    "semicolon")     // ';' is a terminator
-KIND(LBRACE,       "left brace")    // '{' is not an operator
-KIND(RBRACE,       "right brace")   // '}' is not an operator
-KIND(UNDEFINED,    "undefined")     // '---' is not an operator
+//   ENUM,         NAME,          ASI
+KIND(INVALID,      "invalid",     false)
+KIND(EOF,          "end of file", false)
+KIND(COMMENT,      "comment",     false)
+KIND(IDENTIFIER,   "identifier",  true)
+KIND(LITERAL,      "literal",     true)
+KIND(OPERATOR,     "operator",    false) // ASI handled by OPERATOR ASI column
+KIND(KEYWORD,      "keyword",     false) // ASI handled by KEYWORD ASI column
+KIND(ASSIGNMENT,   "assignment",  true)
+KIND(DIRECTIVE,    "directive",   false) // '#' is a directive (not an operator)
+KIND(ATTRIBUTE,    "attribute",   false) // '@' is a attribute (not an operator)
+KIND(CONST,        "const",       false) // '$' is a constant (not an operator)
+KIND(SEMICOLON,    "semicolon",   false) // ';' is a terminator
+KIND(LBRACE,       "left brace",  false) // '{' is not an operator
+KIND(RBRACE,       "right brace", true)  // '}' is not an operator
+KIND(UNDEFINED,    "undefined",   true)  // '---' is not an operator
 
 // Assignment tokens.
 //
@@ -80,80 +80,80 @@ LITERAL(RUNE,      "rune")
 LITERAL(STRING,    "string")
 
 // Operators
-//       ENUM,         MATCH,       PRECEDENCE
-OPERATOR(NOT,          "!",         0)
-OPERATOR(POINTER,      "^",         0)
-OPERATOR(ARROW,        "->",        0)
-OPERATOR(LPAREN,       "(",         0)
-OPERATOR(RPAREN,       ")",         0)
-OPERATOR(LBRACKET,     "[",         0)
-OPERATOR(RBRACKET,     "]",         0)
-OPERATOR(COLON,        ":",         0)
-OPERATOR(PERIOD,       ".",         0)
-OPERATOR(COMMA,        ",",         0)
-OPERATOR(IN,           "in",        0) // Produces a value, therefore an operator.
-OPERATOR(NOT_IN,       "not_in",    0) // Produces a value, therefore an operator.
-OPERATOR(AUTO_CAST,    "auto_cast", 0) // Produces a value, therefore an operator.
-OPERATOR(CAST,         "cast",      0) // Produces a value, therefore an operator.
-OPERATOR(TRANSMUTE,    "transmute", 0) // Produces a value, therefore an operator.
-OPERATOR(OR_ELSE,      "or_else",   1) // Produces a value, therefore an operator.
-OPERATOR(OR_RETURN,    "or_return", 0) // Produces a value, therefore an operator.
-OPERATOR(QUESTION,     "?",         1)
-OPERATOR(ELLIPSIS,     "..",        2)
-OPERATOR(RANGEFULL,    "..=",       2)
-OPERATOR(RANGEHALF,    "..<",       2)
-OPERATOR(CMPOR,        "||",        3)
-OPERATOR(CMPAND,       "&&",        4)
-OPERATOR(CMPEQ,        "==",        5)
-OPERATOR(NOTEQ,        "!=",        5)
-OPERATOR(LT,           "<",         5)
-OPERATOR(GT,           ">",         5)
-OPERATOR(LTEQ,         "<=",        5)
-OPERATOR(GTEQ,         ">=",        5)
-OPERATOR(ADD,          "+",         6)
-OPERATOR(SUB,          "-",         6)
-OPERATOR(OR,           "|",         6)
-OPERATOR(XOR,          "~",         6)
-OPERATOR(QUO,          "/",         7)
-OPERATOR(MUL,          "*",         7)
-OPERATOR(MOD,          "%",         7)
-OPERATOR(MODMOD,       "%%",        7)
-OPERATOR(AND,          "&",         7)
-OPERATOR(ANDNOT,       "&~",        7)
-OPERATOR(SHL,          "<<",        7)
-OPERATOR(SHR,          ">>",        7)
+//       ENUM,         MATCH,       PRECEDENCE,    ASI
+OPERATOR(NOT,          "!",         0,             false)
+OPERATOR(POINTER,      "^",         0,             true)
+OPERATOR(ARROW,        "->",        0,             false)
+OPERATOR(LPAREN,       "(",         0,             false)
+OPERATOR(RPAREN,       ")",         0,             true)
+OPERATOR(LBRACKET,     "[",         0,             false)
+OPERATOR(RBRACKET,     "]",         0,             true)
+OPERATOR(COLON,        ":",         0,             false)
+OPERATOR(PERIOD,       ".",         0,             false)
+OPERATOR(COMMA,        ",",         0,             false)
+OPERATOR(IN,           "in",        0,             false)  // Produces a value, therefore an operator.
+OPERATOR(NOT_IN,       "not_in",    0,             false)  // Produces a value, therefore an operator.
+OPERATOR(AUTO_CAST,    "auto_cast", 0,             false)  // Produces a value, therefore an operator.
+OPERATOR(CAST,         "cast",      0,             false)  // Produces a value, therefore an operator.
+OPERATOR(TRANSMUTE,    "transmute", 0,             false)  // Produces a value, therefore an operator.
+OPERATOR(OR_ELSE,      "or_else",   1,             false)  // Produces a value, therefore an operator.
+OPERATOR(OR_RETURN,    "or_return", 0,             true)   // Produces a value, therefore an operator.
+OPERATOR(QUESTION,     "?",         1,             true)
+OPERATOR(ELLIPSIS,     "..",        2,             false)
+OPERATOR(RANGEFULL,    "..=",       2,             false)
+OPERATOR(RANGEHALF,    "..<",       2,             false)
+OPERATOR(CMPOR,        "||",        3,             false)
+OPERATOR(CMPAND,       "&&",        4,             false)
+OPERATOR(CMPEQ,        "==",        5,             false)
+OPERATOR(NOTEQ,        "!=",        5,             false)
+OPERATOR(LT,           "<",         5,             false)
+OPERATOR(GT,           ">",         5,             false)
+OPERATOR(LTEQ,         "<=",        5,             false)
+OPERATOR(GTEQ,         ">=",        5,             false)
+OPERATOR(ADD,          "+",         6,             false)
+OPERATOR(SUB,          "-",         6,             false)
+OPERATOR(OR,           "|",         6,             false)
+OPERATOR(XOR,          "~",         6,             false)
+OPERATOR(QUO,          "/",         7,             false)
+OPERATOR(MUL,          "*",         7,             false)
+OPERATOR(MOD,          "%",         7,             false)
+OPERATOR(MODMOD,       "%%",        7,             false)
+OPERATOR(AND,          "&",         7,             false)
+OPERATOR(ANDNOT,       "&~",        7,             false)
+OPERATOR(SHL,          "<<",        7,             false)
+OPERATOR(SHR,          ">>",        7,             false)
 
 // Keywords
-//      ENUM,        MATCH
-KEYWORD(IMPORT,      "import")
-KEYWORD(FOREIGN,     "foreign")
-KEYWORD(PACKAGE,     "package")
-KEYWORD(TYPEID,      "typeid")
-KEYWORD(WHERE,       "where") 
-KEYWORD(WHEN,        "when")   // Can be an operator in (x when y else z)
-KEYWORD(IF,          "if")     // Can be an operator in (x if y else z)
-KEYWORD(ELSE,        "else")   // Can be an operator in above examples.
-KEYWORD(FOR,         "for")
-KEYWORD(SWITCH,      "switch")
-KEYWORD(DO,          "do")
-KEYWORD(CASE,        "case")
-KEYWORD(BREAK,       "break")
-KEYWORD(CONTINUE,    "continue")
-KEYWORD(FALLTHROUGH, "fallthrough")
-KEYWORD(DEFER,       "defer")
-KEYWORD(RETURN,      "return")
-KEYWORD(PROC,        "proc")
-KEYWORD(STRUCT,      "struct")
-KEYWORD(UNION,       "union")
-KEYWORD(ENUM,        "enum")
-KEYWORD(BIT_SET,     "bit_set")
-KEYWORD(MAP,         "map")
-KEYWORD(DYNAMIC,     "dynamic")
-KEYWORD(DISTINCT,    "distinct")
-KEYWORD(USING,       "using")
-KEYWORD(CONTEXT,     "context")
-KEYWORD(ASM,         "asm")
-KEYWORD(MATRIX,      "matrix")
+//      ENUM,        MATCH,            ASI
+KEYWORD(IMPORT,      "import",         false)
+KEYWORD(FOREIGN,     "foreign",        false)
+KEYWORD(PACKAGE,     "package",        false)
+KEYWORD(TYPEID,      "typeid",         true)
+KEYWORD(WHERE,       "where",          false) 
+KEYWORD(WHEN,        "when",           false) // Can be an operator in (x when y else z)
+KEYWORD(IF,          "if",             false) // Can be an operator in (x if y else z)
+KEYWORD(ELSE,        "else",           false) // Can be an operator in above examples.
+KEYWORD(FOR,         "for",            false)
+KEYWORD(SWITCH,      "switch",         false)
+KEYWORD(DO,          "do",             false)
+KEYWORD(CASE,        "case",           false)
+KEYWORD(BREAK,       "break",          true)
+KEYWORD(CONTINUE,    "continue",       true)
+KEYWORD(FALLTHROUGH, "fallthrough",    true)
+KEYWORD(DEFER,       "defer",          false)
+KEYWORD(RETURN,      "return",         true)
+KEYWORD(PROC,        "proc",           false)
+KEYWORD(STRUCT,      "struct",         false)
+KEYWORD(UNION,       "union",          false)
+KEYWORD(ENUM,        "enum",           false)
+KEYWORD(BIT_SET,     "bit_set",        false)
+KEYWORD(MAP,         "map",            false)
+KEYWORD(DYNAMIC,     "dynamic",        false)
+KEYWORD(DISTINCT,    "distinct",       false)
+KEYWORD(USING,       "using",          false)
+KEYWORD(CONTEXT,     "context",        false)
+KEYWORD(ASM,         "asm",            false)
+KEYWORD(MATRIX,      "matrix",         false)
 
 // Direcitves
 //        ENUM,                     MATCH

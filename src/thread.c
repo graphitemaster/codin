@@ -73,8 +73,8 @@ Bool _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *con
 
 Bool thread_join(Thread *thread) {
 #if defined(OS_POSIX)
-	pthread_t handle = *RCAST(pthread_t*, thread->storage);
-	if (pthread_join(handle, 0) != 0) {
+	pthread_t *handle = RCAST(pthread_t*, thread->storage);
+	if (pthread_join(*handle, 0) != 0) {
 		return false;
 	}
 #elif defined(OS_WINDOWS)

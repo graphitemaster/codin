@@ -362,6 +362,7 @@ Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *valu
 
 void tree_init(Tree *tree, Context *context) {
 	tree->context = context;
-	tree->package = STRING_NIL;
+	tree->package_name = STRING_NIL;
+	tree->file_name = STRING_NIL;
 	tree->statements = 0;
 }

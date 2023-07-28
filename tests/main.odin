@@ -1,5 +1,6 @@
 package main
 
+// TODO:
 // distinct
 // struct
 // union
@@ -13,8 +14,20 @@ package main
 // implicit selector expressions
 // using statement
 
+import "core:fmt"
+
 foo :: proc() -> int {
-  x: map[string]map[[2]int]matrix[4, 4]f32 = {};
-  _ = x;
+  if true
+  {
+    x := 10
+    y := 20
+    z := true if true else false
+  }
+  for
+
+  {
+    fmt.printf("Hello, world\n");
+  }
+
   return 0;
 }

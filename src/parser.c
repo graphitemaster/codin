@@ -48,7 +48,7 @@ struct Parser {
 	ProcedureType *this_procedure;
 	Sint32 trace_depth;
 	Sint32 expression_depth;
-	Uint64 unique_id;
+	Bool allow_newline;
 };
 
 static void parser_trace_enter(Parser *parser, const char *function) {
@@ -82,7 +82,6 @@ static Bool parser_init(Parser *parser, String filename, Context *context) {
 	parser->last_token = TOKEN_NIL;
 	parser->trace_depth = 0;
 	parser->expression_depth = 0;
-	parser->unique_id = 0;
 
 	return true;
 }
@@ -140,9 +139,33 @@ static Bool accepted_keyword(Parser *parser, KeywordKind keyword) {
 	return false;
 }
 
+static Bool accepted_separator(Parser *parser) {
+	const Token token = parser->this_token;
+	if (accepted_operator(parser, OPERATOR_COMMA)) {
+		return true;
+	}
+	if (is_kind(token, KIND_SEMICOLON)) {
+		// TODO(dweiler): Check that the next token is } or )
+		advancep(parser);
+		return true;
+	}
+	return false;
+}
+
+// Same as above but for control statements
+static Token peekp(Parser *parser);
+static Bool accepted_control_statement_separator(Parser *parser) {
+	const Token token = peekp(parser);
+	if (!is_kind(token, KIND_LBRACE)) {
+		return accepted_kind(parser, KIND_SEMICOLON);
+	}
+	if (string_compare(parser->this_token.string, SCLIT(";"))) {
+		return accepted_kind(parser, KIND_SEMICOLON);
+	}
+	return false;
+}
+
 static Bool ignore_newline(const Parser *parser) {
-	// BUG(dweiler): Determine why this has to be >= and not > in the case of
-	// procedure groups.
 	return parser->expression_depth > 0;
 }
 
@@ -171,7 +194,7 @@ static Bool advance_possible_newline_within(Parser *parser) {
 	if (token.location.line + 1 < next.location.line) {
 		return false;
 	}
-	if (!(is_kind(next, KIND_LBRACE) || is_keyword(next, KEYWORD_ELSE) || is_keyword(next, KEYWORD_WHERE))) {
+	if (!is_kind(next, KIND_LBRACE) && !is_keyword(next, KEYWORD_ELSE) && is_keyword(next, KEYWORD_WHERE)) {
 		return false;
 	}
 	advancep(parser);
@@ -249,6 +272,8 @@ static Token expect_literal(Parser *parser, LiteralKind literal) {
 }
 
 static void expect_semicolon(Parser *parser) {
+	Context *context = parser->context;
+
 	if (accepted_kind(parser, KIND_SEMICOLON)) {
 		return;
 	}
@@ -259,7 +284,7 @@ static void expect_semicolon(Parser *parser) {
 	}
 
 	if (token.location.line == parser->last_token.location.line) {
-		// PARSE_ERROR("Expected ';'");
+		PARSE_ERROR("Expected ';'");
 	}
 }
 
@@ -369,6 +394,9 @@ static Array(Field*) parse_field_list(Parser *parser) {
 
 	Context *context = parser->context;
 
+	const Bool allow_newline = parser->allow_newline;
+	parser->allow_newline = true;
+
 	Array(Field*) fields = 0;
 
 	// When parsing a field list we may have
@@ -382,7 +410,7 @@ static Array(Field*) parse_field_list(Parser *parser) {
 	{
 		Type *name_or_type = parse_variable_name_or_type(parser);
 		array_push(list, name_or_type);
-		if (!accepted_operator(parser, OPERATOR_COMMA)) {
+		if (!accepted_separator(parser)) {
 			break;
 		}
 	}
@@ -425,13 +453,15 @@ static Array(Field*) parse_field_list(Parser *parser) {
 	}
 
 	// Early out for trailing fields.
-	if (!accepted_operator(parser, OPERATOR_COMMA)) {
+	if (!accepted_separator(parser)) {
 		TRACE_LEAVE();
+		parser->allow_newline = allow_newline;
 		return fields;
 	}
 
-	while (!is_operator(parser->this_token, OPERATOR_RPAREN) &&
-				 !is_kind(parser->this_token, KIND_EOF))
+	while (!is_operator(parser->this_token, OPERATOR_RPAREN)
+	    && !is_kind(parser->this_token, KIND_EOF)
+			&& !is_kind(parser->this_token, KIND_SEMICOLON))
 	{
 		Type *type = 0;
 		Array(Identifier*) names = 0;
@@ -456,10 +486,12 @@ static Array(Field*) parse_field_list(Parser *parser) {
 		for (Uint64 i = 0; i < n_names; i++) {
 			array_push(fields, tree_new_field(parser->tree, type, names[i], value));
 		}
-		if (!accepted_operator(parser, OPERATOR_COMMA)) {
+		if (!accepted_separator(parser)) {
 			break;
 		}
 	}
+
+	parser->allow_newline = true;
 
 	TRACE_LEAVE();
 
@@ -497,6 +529,8 @@ static Array(Field*) parse_procedure_results(Parser *parser, Bool *diverging) {
 
 	fields = parse_field_list(parser);
 
+	advance_possible_newline(parser);
+
 	expect_operator(parser, OPERATOR_RPAREN);
 
 	TRACE_LEAVE();
@@ -522,6 +556,10 @@ static ProcedureType *parse_procedure_type(Parser *parser) {
 	
 	Array(Field*) fields = parse_field_list(parser);
 
+	advance_possible_newline(parser);
+
+	expect_operator(parser, OPERATOR_RPAREN);
+
 	// Check if generic (needs to be monomorphized) procedure.
 	Bool is_generic = false;
 	Uint64 n_fields = array_size(fields);
@@ -536,8 +574,6 @@ static ProcedureType *parse_procedure_type(Parser *parser) {
 			break;
 		}
 	}
-
-	expect_operator(parser, OPERATOR_RPAREN);
 
 	Bool diverging = false;
 	Array(Field*) results = parse_procedure_results(parser, &diverging);
@@ -565,7 +601,7 @@ static ProcedureType *parse_procedure_type(Parser *parser) {
 static BlockStatement *parse_body(Parser *parser, BlockFlag flags);
 static ListExpression *parse_rhs_list_expression(Parser *parser);
 
-static ProcedureExpression *parse_procedure(Parser *parser) {
+static Expression *parse_procedure(Parser *parser) {
 	TRACE_ENTER();
 	Context *context = parser->context;
 
@@ -580,7 +616,7 @@ static ProcedureExpression *parse_procedure(Parser *parser) {
 			PARSE_ERROR("Specialization of non-const and non-polymorphic procedure");
 		}
 		expect_keyword(parser, KEYWORD_WHERE);
-		Sint32 expression_depth = parser->expression_depth;
+		const Sint32 expression_depth = parser->expression_depth;
 		parser->expression_depth = -1;
 		where_clauses = parse_rhs_list_expression(parser);
 		parser->expression_depth = expression_depth;
@@ -631,14 +667,16 @@ static ProcedureExpression *parse_procedure(Parser *parser) {
 		BlockStatement *body = parse_body(parser, block_flags);
 		ProcedureExpression *expression = tree_new_procedure_expression(parser->tree, type, where_clauses, body);
 		TRACE_LEAVE();
-		return expression;
+		return RCAST(Expression *, expression);
 	}
 
-	ICE("Unexpected situation in procedure parsing");
+	// ICE("Unexpected situation in procedure parsing");
+
+	TypeExpression *expression = tree_new_type_expression(parser->tree, RCAST(Type *, type));
 
 	TRACE_LEAVE();
 
-	return 0;
+	return RCAST(Expression *, expression);
 }
 
 static CallExpression *parse_call_expression(Parser *parser, Expression *operand);
@@ -954,7 +992,7 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 				if (is_kind(parser->this_token, KIND_LBRACE)) {
 					UNIMPLEMENTED("Procedure groups");
 				} else {
-					expression = RCAST(Expression *, parse_procedure(parser));
+					expression = parse_procedure(parser);
 				}
 				TRACE_LEAVE();
 				return expression;
@@ -1005,14 +1043,16 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 				if (is_operator(parser->last_token, OPERATOR_RPAREN)) {
 					PARSE_ERROR("Empty parenthesized expression");
 				}
-				Sint32 expression_depth = parser->expression_depth;
+				const Sint32 expression_depth = parser->expression_depth;
+				const Bool allow_newline = parser->allow_newline;
 				if (expression_depth < 0) {
-					// TODO(dweiler): ASI
+					parser->allow_newline = false;
 				}
 				parser->expression_depth = (expression_depth < 0 ? 0 : expression_depth) + 1;
 				Expression *operand = parse_expression(parser, false);
 				expect_operator(parser, OPERATOR_RPAREN);
 				parser->expression_depth = expression_depth;
+				parser->allow_newline = allow_newline;
 				TRACE_LEAVE();
 				return operand;
 			}
@@ -1082,8 +1122,10 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 	Context *context = parser->context;
 
 	Array(Expression*) arguments = 0;
-	const Sint32 depth = parser->expression_depth;
+	const Sint32 expression_depth = parser->expression_depth;
+	const Bool allow_newline = parser->allow_newline;
 	parser->expression_depth = 0;
+	parser->allow_newline = true;
 
 	expect_operator(parser, OPERATOR_LPAREN);
 
@@ -1114,13 +1156,15 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 		} else if (has_ellipsis) {
 			PARSE_ERROR("Position arguments not allowed after '..'");
 		}
+
 		array_push(arguments, argument);
 
-		if (!accepted_operator(parser, OPERATOR_COMMA)) {
+		if (!accepted_separator(parser)) {
 			break;
 		}
 	}
-	parser->expression_depth = depth;
+	parser->allow_newline = allow_newline;
+	parser->expression_depth = expression_depth;
 	expect_operator(parser, OPERATOR_RPAREN);
 	CallExpression *expression = tree_new_call_expression(parser->tree, operand, arguments);
 	TRACE_LEAVE();
@@ -1130,7 +1174,7 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 static Token expect_closing(Parser *parser, Kind kind) {
 	const Token token = parser->this_token;
 	if (!is_kind(token, kind) && is_kind(token, KIND_SEMICOLON)
-		&& string_compare(token.string, SCLIT("\n")))
+		&& (string_compare(token.string, SCLIT("\n")) || is_kind(token, KIND_EOF)))
 	{
 		advancep(parser);
 	}
@@ -1337,7 +1381,7 @@ static Expression *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec
 	Expression *expr = parse_unary_expression(parser, lhs);
 
 	// Simple operator precedence climbing.
-	#define OPERATOR(ident, match, prec) (prec),
+	#define OPERATOR(ident, match, prec, ...) (prec),
 	static const int PRECEDENCE[] = {
 		#include "lexemes.h"
 		0,
@@ -1398,6 +1442,8 @@ static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
 
 	Context *context = parser->context;
 
+	const Bool allow_newline = parser->allow_newline;
+
 	Array(Expression*) expressions = 0;
 	for (;;) {
 		Expression *expr = parse_expression(parser, lhs);
@@ -1411,6 +1457,8 @@ static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
 	}
 
 	ListExpression *expression = tree_new_list_expression(parser->tree, expressions);
+
+	parser->allow_newline = allow_newline;
 
 	TRACE_LEAVE();
 
@@ -1463,11 +1511,13 @@ static Array(Statement*) parse_statement_list(Parser *parser, BlockFlag block_fl
 static BlockStatement *parse_body(Parser *parser, BlockFlag flags) {
 	TRACE_ENTER();
 	const Sint32 depth = parser->expression_depth;
+	const Bool allow_newline = parser->allow_newline;
 	parser->expression_depth = 0;
 	expect_kind(parser, KIND_LBRACE);
 	Array(Statement*) statements = parse_statement_list(parser, flags);
 	expect_kind(parser, KIND_RBRACE);
 	parser->expression_depth = depth;
+	parser->allow_newline = allow_newline;
 	BlockStatement *statement = tree_new_block_statement(parser->tree, flags, statements);
 	TRACE_LEAVE();
 	return statement;
@@ -1706,24 +1756,16 @@ static Expression *convert_statement_to_expression(Parser *parser, Statement *st
 
 static BlockStatement *parse_do_body(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
-	const Sint32 depth = parser->expression_depth;
+	const Sint32 expression_depth = parser->expression_depth;
+	const Bool allow_newline = parser->allow_newline;
 	parser->expression_depth = 0;
+	parser->allow_newline = false;
 	Statement *statement = parse_statement(parser, block_flags);
 	BlockStatement *body = convert_statement_to_body(parser, block_flags, statement);
-	parser->expression_depth = depth;
+	parser->expression_depth = expression_depth;
+	parser->allow_newline = allow_newline;
 	TRACE_LEAVE();
 	return body;
-}
-
-static Bool accepted_control_statement_separator(Parser *parser) {
-	const Token token = peekp(parser);
-	if (!is_kind(token, KIND_LBRACE)) {
-		return accepted_kind(parser, KIND_SEMICOLON);
-	}
-	if (string_compare(parser->this_token.string, SCLIT("\n"))) {
-		return accepted_kind(parser, KIND_SEMICOLON);
-	}
-	return false;
 }
 
 static IfStatement *parse_if_statement(Parser *parser, BlockFlag block_flags) {
@@ -2107,6 +2149,8 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 	return 0;
 }
 
+	void infer(Tree *tree);
+
 Tree *parse(String filename, Context *context) {
 	Parser parse;
 	Parser *parser = &parse;
@@ -2153,7 +2197,8 @@ Tree *parse(String filename, Context *context) {
 		}
 	}
 
-	tree->package = package.string;
+	tree->package_name = package.string;
+	tree->file_name = string_copy(filename);
 
 	while (!is_kind(parser->this_token, KIND_EOF)) {
 		Statement *statement = parse_statement(parser, CAST(BlockFlag, 0));

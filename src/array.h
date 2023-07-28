@@ -25,6 +25,9 @@ struct ALIGN(16) Array {
 #define array_size(array) \
 	((array) ? array_meta(array)->size : 0)
 
+#define array_capacity(array) \
+	((arrray) ? array_meta(array)->capacity : 0)
+
 #define array_expand(array, size_) \
 	(array_try_grow((array), (size_)) \
 		? (array_meta(array)->size += (size_), true) \

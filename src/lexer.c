@@ -18,7 +18,7 @@ const Source SOURCE_NIL = { { 0, 0 }, { 0, 0 } };
 
 // Searches for a keyword
 static Bool keyword_find(String string, KeywordKind *result) {
-	#define KEYWORD(ident, content) \
+	#define KEYWORD(ident, content, ...) \
 		if (string_compare(string, SCLIT(content))) { \
 			*result = KEYWORD_ ## ident; \
 			return true; \
@@ -257,7 +257,7 @@ Token lexer_peek(Lexer *lexer) {
 	return peek;
 }
 
-Token lexer_next(Lexer *lexer) {
+Token lexer_tokenize(Lexer *lexer) {
 	Context *context = lexer->context;
 	if (lexer->peek.kind != KIND_INVALID) {
 		const Token token = lexer->peek;
@@ -300,6 +300,7 @@ Token lexer_next(Lexer *lexer) {
 			token.kind = KIND_EOF;
 			if (lexer->asi) {
 				lexer->asi = false;
+				token.string = SCLIT("\n");
 				token.kind = KIND_SEMICOLON;
 				return token;
 			}
@@ -644,7 +645,7 @@ Token lexer_next(Lexer *lexer) {
 
 // Simple helper routines
 String kind_to_string(Kind kind) {
-	#define KIND(enumerator, name) SLIT(name),
+	#define KIND(enumerator, name, ...) SLIT(name),
 	static const String KINDS[] = {
 		#include "lexemes.h"
 	};
@@ -660,7 +661,7 @@ String literal_to_string(LiteralKind literal) {
 }
 
 String keyword_to_string(KeywordKind keyword) {
-	#define KEYWORD(ident, string) SLIT(string),
+	#define KEYWORD(ident, string, ...) SLIT(string),
 	static const String KEYWORDS[] = {
 		#include "lexemes.h"
 	};
@@ -692,7 +693,7 @@ String directive_to_string(DirectiveKind directive) {
 }
 
 String token_to_string(Token token) {
-	#define KIND(enumerator, kind) SLIT(#enumerator),
+	#define KIND(enumerator, kind, ...) SLIT(#enumerator),
 	static const String STRINGS[] = {
 		#include "lexemes.h"
 	};
@@ -713,4 +714,41 @@ String token_to_string(Token token) {
 		return STRINGS[token.kind];
 	}
 	UNREACHABLE();
+}
+
+
+Token lexer_next(Lexer *lexer) {
+	Token token = lexer_tokenize(lexer);
+
+	#define KIND(enum, name, asi) asi,
+	static const Bool KIND_ASI[] = {
+		#include "lexemes.h"
+	};
+	#undef KIND
+
+	#define OPERATOR(enum, match, precedence, asi) asi,
+	static const Bool OPERATOR_ASI[] = {
+		#include "lexemes.h"
+	};
+	#undef OPERATOR
+
+	#define KEYWORD(enum, match, asi) asi,
+	static const Bool KEYWORD_ASI[] = {
+		#include "lexemes.h"
+	};
+	#undef KEYWORD
+
+	switch (token.kind) {
+	case KIND_OPERATOR:
+		lexer->asi = OPERATOR_ASI[token.as_operator];
+		break;
+	case KIND_KEYWORD:
+		lexer->asi = KEYWORD_ASI[token.as_keyword];
+		break;
+	default:
+		lexer->asi = KIND_ASI[token.kind];
+		break;
+	}
+
+	return token;
 }
