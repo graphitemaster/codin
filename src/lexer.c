@@ -111,7 +111,7 @@ static void skip_line(Lexer *lexer) {
 static void skip_whitespace(Lexer *lexer, Bool newline) {
 	for (;;) {
 		const Rune rune = lexer->rune;
-		if (rune == ' ' || rune == '\t' || rune == '\r' || (newline && rune == '\n')) {
+		if (rune == ' ' || rune == '\t' || rune == '\r' || (!newline && rune == '\n')) {
 			advancel(lexer);
 		} else {
 			break;

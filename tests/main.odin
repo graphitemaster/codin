@@ -12,6 +12,15 @@ package main
 
 import "core:fmt"
 
-foo :: proc() {
-  x: matrix[4, 4]f32;
+e :: proc() {
+  
+}
+
+a: int;
+
+b :: proc(x: int) {
+  e := 0;
+  {
+    f := 0;
+  }
 }

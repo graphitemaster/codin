@@ -49,6 +49,7 @@ struct Parser {
 	Sint32 trace_depth;
 	Sint32 expression_depth;
 	Bool allow_newline;
+	Bool allow_type;
 };
 
 static void parser_trace_enter(Parser *parser, const char *function) {
@@ -82,6 +83,8 @@ static Bool parser_init(Parser *parser, String filename, Context *context) {
 	parser->last_token = TOKEN_NIL;
 	parser->trace_depth = 0;
 	parser->expression_depth = 0;
+	parser->allow_newline = false;
+	parser->allow_type = false;
 
 	return true;
 }
@@ -324,10 +327,13 @@ static Type *parse_type_or_identifier(Parser *parser) {
 	Context *context = parser->context;
 	TRACE_ENTER();
 	const Sint32 depth = parser->expression_depth;
+	const Bool allow_type = parser->allow_type;
 	parser->expression_depth = -1;
+	parser->allow_type = true;
 	Expression *operand = parse_operand(parser, true);
 	Expression *expression = parse_atom_expression(parser, operand, true);
 	parser->expression_depth = depth;
+	parser->allow_type = allow_type;
 	if (expression) {
 		switch (expression->kind) {
 		case EXPRESSION_VALUE:
@@ -1267,11 +1273,11 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 	Context *context = parser->context;
 
 	if (!operand) {
-		if (parser->allow_newline) {
-			PARSE_ERROR("Expected an operand");
+		if (parser->allow_type) {
+			TRACE_LEAVE();
+			return 0;
 		}
-		TRACE_LEAVE();
-		return 0;
+		PARSE_ERROR("Expected an operand");
 	}
 
 	Identifier *ident = 0;
@@ -1339,8 +1345,7 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 				operand = RCAST(Expression *, tree_new_unary_expression(parser->tree, token.as_operator, operand));
 				break;
 			default:
-				TRACE_LEAVE();
-				return operand;
+				goto L_exit;
 			}
 			break;
 		case KIND_LBRACE:
@@ -2271,6 +2276,9 @@ Tree *parse(String filename, Context *context) {
 	}
 
 	TRACE_LEAVE();
+
+	void infer(Tree *tree);
+	infer(tree);
 
 	return tree;
 } 

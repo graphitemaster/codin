@@ -13,7 +13,7 @@ static void pad(Sint32 depth) {
 Bool dump_literal_value(const LiteralValue *value, Sint32 depth) {
 	pad(depth);
 	const String kind = literal_to_string(value->kind);
-	printf("(value '%.*s' %.*s)", SFMT(kind), SFMT(value->input));
+	printf("(lit '%.*s' %.*s)", SFMT(kind), SFMT(value->input));
 	return true;
 }
 
@@ -25,7 +25,7 @@ Bool dump_compound_literal_value(const CompoundLiteralValue *value, Sint32 depth
 
 Bool dump_identifier_value(const IdentifierValue *value, Sint32 depth) {
 	pad(depth);
-	printf("'%.*s'", SFMT(value->identifier->contents));
+	printf("'(ident %.*s')", SFMT(value->identifier->contents));
 	return true;
 }
 
@@ -141,7 +141,6 @@ Bool dump_value_expression(const ValueExpression *expression, Sint32 depth) {
 	return dump_value(expression->value, depth);
 }
 
-
 Bool dump_identifier_type(const IdentifierType *type, Sint32 depth) {
 	pad(depth);
 	printf("(ident '%.*s')", SFMT(type->identifier->contents));
@@ -156,6 +155,8 @@ Bool dump_builtin_type(const BuiltinType *type, Sint32 depth) {
 
 Bool dump_fields(Array(Field*) const fields, Sint32 depth) {
 	pad(depth);
+	printf("(fields\n");
+	pad(depth + 1);
 	const Uint64 n_fields = array_size(fields);
 	for (Uint64 i = 0; i < n_fields; i++) {
 		const Field *field = fields[i];
@@ -176,33 +177,31 @@ Bool dump_fields(Array(Field*) const fields, Sint32 depth) {
 			pad(depth);
 		}
 	}
+	printf(")");
 	return true;
 }
 
 Bool dump_procedure_type(const ProcedureType *type, Sint32 depth) {
 	pad(depth);
+	printf("(proc\n");
+	pad(depth + 1);
 	const String cc = calling_convention_to_string(type->convention);
 	printf("(cc '%.*s')", SFMT(cc));
 	if (type->params) {
 		printf("\n");
-		pad(depth);
-		printf("(args\n");
 		dump_fields(type->params, depth + 1);
-		printf(")");
 	}
 	if (type->results) {
 		printf("\n");
-		pad(depth);
-		printf("(results\n");
 		dump_fields(type->results, depth + 1);
-		printf(")");
 	}
+	printf(")");
 	return true;
 }
 
 Bool dump_pointer_type(const PointerType *type, Sint32 depth) {
 	pad(depth);
-	printf("(pointer\n");
+	printf("(ptr\n");
 	dump_type(type->type, depth + 1);
 	printf(")");
 	return true;
@@ -210,7 +209,7 @@ Bool dump_pointer_type(const PointerType *type, Sint32 depth) {
 
 Bool dump_multi_pointer_type(const MultiPointerType *type, Sint32 depth) {
 	pad(depth);
-	printf("(multi-pointer\n");
+	printf("(mptr\n");
 	dump_type(type->type, depth + 1);
 	printf(")");
 	return true;
@@ -226,7 +225,7 @@ Bool dump_slice_type(const SliceType *type, Sint32 depth) {
 
 Bool dump_array_type(const ArrayType *type, Sint32 depth) {
 	pad(depth);
-	printf("(array\n");
+	printf("(arr\n");
 	if (type->count) {
 		pad(depth + 1);
 		printf("(count\n");
@@ -243,7 +242,7 @@ Bool dump_array_type(const ArrayType *type, Sint32 depth) {
 
 Bool dump_dynamic_array_type(const ArrayType *type, Sint32 depth) {
 	pad(depth);
-	printf("(dynamic-array\n");
+	printf("(dynarr\n");
 	dump_type(type->type, depth + 1);
 	printf(")");
 	return true;
@@ -251,7 +250,7 @@ Bool dump_dynamic_array_type(const ArrayType *type, Sint32 depth) {
 
 Bool dump_bit_set_type(const BitSetType *type, Sint32 depth) {
 	pad(depth);
-	printf("(bit-set\n");
+	printf("(bitset\n");
 	dump_expression(type->expression, depth + 1);
 	if (type->underlying) {
 		printf("\n");
@@ -280,7 +279,7 @@ Bool dump_map_type(const MapType *type, Sint32 depth) {
 
 Bool dump_matrix_type(const MatrixType *type, Sint32 depth) {
 	pad(depth);
-	printf("(matrix\n");
+	printf("(mat\n");
 	dump_type(type->type, depth + 1);
 	printf("\n");
 	dump_expression(type->rows, depth + 1);
@@ -335,7 +334,7 @@ Bool dump_type_expression(const TypeExpression *expression, Sint32 depth) {
 
 Bool dump_index_expression(const IndexExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(index\n");
+	printf("(idx\n");
 	dump_expression(expression->operand, depth + 1);
 	printf("\n");
 	dump_expression(expression->lhs, depth + 1);
@@ -471,7 +470,7 @@ Bool dump_if_statement(const IfStatement *statement, Sint32 depth) {
 
 Bool dump_return_statement(const ReturnStatement *statement, Sint32 depth) {
 	pad(depth);
-	printf("(return");
+	printf("(ret");
 	const Uint64 n_results = array_size(statement->results);
 	if (n_results != 0) {
 		printf("\n");
