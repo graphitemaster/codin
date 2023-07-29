@@ -1,14 +1,10 @@
-#include <string.h>
-#include <stdlib.h>
 #include <stdio.h>
 
-#include "parser.h"
-#include "lexer.h"
-#include "report.h"
 #include "tree.h"
 #include "context.h"
-#include "utility.h"
 #include "strbuf.h"
+#include "report.h"
+#include "utility.h"
 
 #define TRACE 0
 
@@ -391,7 +387,6 @@ static Identifier *evaluate_identifier_type(const Type *type) {
 	case TYPE_EXPRESSION:
 		return evaluate_identifier_expression(RCAST(const ExpressionType *, type)->expression);
 	default:
-		printf("Unknown type\n");
 		return 0;
 	}
 	UNREACHABLE();
@@ -404,7 +399,6 @@ static Identifier *evaluate_identifier_expression(const Expression *expression) 
 	case EXPRESSION_TYPE:
 		return evaluate_identifier_type(RCAST(const TypeExpression *, expression)->type);
 	default:
-		printf("Unknown expression\n");
 		return 0;
 	}
 	UNREACHABLE();
@@ -632,10 +626,6 @@ static Expression *parse_procedure(Parser *parser) {
 
 	ListExpression *where_clauses = 0;
 	if (is_keyword(parser->this_token, KEYWORD_WHERE)) {
-		// Where specialization only allowed on generic procedures.
-		if (type->kind != PROCEDURE_GENERIC) {
-			PARSE_ERROR("Specialization of non-const and non-polymorphic procedure");
-		}
 		expect_keyword(parser, KEYWORD_WHERE);
 		const Sint32 expression_depth = parser->expression_depth;
 		parser->expression_depth = -1;
@@ -662,7 +652,6 @@ static Expression *parse_procedure(Parser *parser) {
 			break;
 		case DIRECTIVE_NO_BOUNDS_CHECK:
 			flags &= ~PROC_FLAG_BOUNDS_CHECK;
-			printf("Removing bounds check on flags %d\n", CAST(Sint32, flags));
 			break;
 		case DIRECTIVE_TYPE_ASSERT:
 			flags |= PROC_FLAG_TYPE_ASSERT;
@@ -690,8 +679,6 @@ static Expression *parse_procedure(Parser *parser) {
 		TRACE_LEAVE();
 		return RCAST(Expression *, expression);
 	}
-
-	// ICE("Unexpected situation in procedure parsing");
 
 	TypeExpression *expression = tree_new_type_expression(parser->tree, RCAST(Type *, type));
 
@@ -1202,7 +1189,6 @@ static CompoundLiteralExpression *parse_compound_literal_expression(Parser *pars
 	parser->expression_depth = 0;
 	if (!is_kind(parser->this_token, KIND_RBRACE)) {
 		UNIMPLEMENTED("Compound literal expressions");
-		// elements = parse_element_list(parser);
 	}
 	parser->expression_depth = depth;
 	expect_closing(parser, KIND_RBRACE);
@@ -1259,7 +1245,6 @@ static Expression *parse_index_expression(Parser *parser, Expression *operand) {
 	Expression *expression = 0;
 	if (interval.kind != KIND_INVALID) {
 		if (is_operator(interval, OPERATOR_COMMA)) {
-			// Indexing a matrix
 			expression = RCAST(Expression *, tree_new_index_expression(parser->tree, operand, lhs, rhs));
 		} else {
 			expression = RCAST(Expression *, tree_new_slice_expression(parser->tree, operand, lhs, rhs));
@@ -1432,7 +1417,6 @@ static TernaryExpression *parse_ternary_expression(Parser *parser, Expression *e
 		on_true = parse_expression(parser, lhs);
 		expect_operator(parser, OPERATOR_COLON);
 	} else {
-		// kind = KEYWORD_IF or KEYWORD_WHEN.
 		kind = parser->last_token.as_keyword;
 		cond = parse_expression(parser, lhs);
 		on_true = expr;
@@ -1520,11 +1504,9 @@ static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
 
 	Array(Expression*) expressions = 0;
 	for (;;) {
-		Expression *expr = parse_expression(parser, lhs);
-		array_push(expressions, expr);
-		if (!is_operator(parser->this_token, OPERATOR_COMMA) ||
-		     is_kind(parser->this_token, KIND_EOF))
-		{
+		Expression *expression = parse_expression(parser, lhs);
+		array_push(expressions, expression);
+		if (!is_operator(parser->this_token, OPERATOR_COMMA) || is_kind(parser->this_token, KIND_EOF)) {
 			break;
 		}
 		advancep(parser);
@@ -1947,7 +1929,7 @@ static WhenStatement *parse_when_statement(Parser *parser) {
 
 	TRACE_LEAVE();
 
-	return CAST(BlockStatement *, statement);
+	return statement;
 }
 
 static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) {

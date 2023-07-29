@@ -159,7 +159,6 @@ enum CallingConvention {
 
 typedef enum ExpressionKind ExpressionKind;
 typedef enum StatementKind StatementKind;
-typedef enum ValueKind ValueKind;
 typedef enum ProcedureKind ProcedureKind;
 typedef enum TypeKind TypeKind;
 typedef enum BuiltinTypeKind BuiltinTypeKind;
