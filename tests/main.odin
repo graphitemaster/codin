@@ -10,7 +10,7 @@ package main
 
 import "core:fmt"
 
-y :: proc() -> (int) {
+m :: proc() -> int {
   return 0
 }
 
@@ -27,5 +27,5 @@ x :: proc() {
  if true {
   fmt.printf("Hello, world!\n")
  } else do x = 0
- for i in 0..<10 do x += y()
+ for i in 0..<10 do x += m()
 }
