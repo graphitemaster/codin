@@ -66,17 +66,17 @@ typedef struct Field Field;
 
 enum ExpressionKind {
 	EXPRESSION_LIST,
-	EXPRESSION_UNARY,
-	EXPRESSION_BINARY,
-	EXPRESSION_TERNARY,
+	EXPRESSION_UNARY,     // <op> operand
+	EXPRESSION_BINARY,    // lhs <op> rhs
+	EXPRESSION_TERNARY,   // lhs <if|when> cond else rhs
 	EXPRESSION_CAST,
-	EXPRESSION_SELECTOR,
+	EXPRESSION_SELECTOR,  // base.field or .enumerator
 	EXPRESSION_CALL,
-	EXPRESSION_ASSERTION,
-	EXPRESSION_PROCEDURE,
+	EXPRESSION_ASSERTION, // operand.(T) or operand.?
+	EXPRESSION_PROCEDURE, // proc() {}
 	EXPRESSION_TYPE,
-	EXPRESSION_INDEX,
-	EXPRESSION_SLICE,
+	EXPRESSION_INDEX,     // x[n] x[a, b]
+	EXPRESSION_SLICE,     // x[:] x[n:] x[:n] x[a:b]
 	EXPRESSION_LITERAL,
 	EXPRESSION_COMPOUND_LITERAL,
 	EXPRESSION_IDENTIFIER,
@@ -86,7 +86,7 @@ enum StatementKind {
 	STATEMENT_EMPTY,
 	STATEMENT_BLOCK,
 	STATEMENT_IMPORT,
-	STATEMENT_EXPRESSION,
+	STATEMENT_EXPRESSION, 
 	STATEMENT_ASSIGNMENT,
 	STATEMENT_DECLARATION,
 	STATEMENT_IF,
@@ -94,7 +94,7 @@ enum StatementKind {
 	STATEMENT_RETURN,
 	STATEMENT_FOR,
 	STATEMENT_DEFER,
-	STATEMENT_BRANCH, // break, continue, fallthrough
+	STATEMENT_BRANCH,   // break, continue, fallthrough
 };
 
 enum ProcedureKind {
@@ -125,11 +125,13 @@ enum BuiltinTypeKind {
 	BUILTIN_TYPE_FLOAT,   // f{16,32,64}(le|be)
 	BUILTIN_TYPE_BOOL,    // b{8,16,32,64}
 	BUILTIN_TYPE_STRING,  // string
+	BUILTIN_TYPE_CSTRING, // cstring
 	BUILTIN_TYPE_POINTER, // rawptr
+	BUILTIN_TYPE_UINTPTR, // uintptr
 };
 
 enum Endianess {
-	ENDIANESS_NA, // Not applicable.
+	ENDIANESS_NA,         // Not applicable.
 	ENDIANESS_LITTLE,
 	ENDIANESS_BIG,
 };
@@ -533,8 +535,6 @@ ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) result
 DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
 BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label);
 
-Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly);
-
 IdentifierType *tree_new_identifier_type(Tree *tree, Identifier *identifier);
 ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);
 GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);
@@ -551,5 +551,6 @@ DistinctType *tree_new_distinct_type(Tree *tree, Type *type);
 ExpressionType *tree_new_expression_type(Tree *tree, Expression *expression);
 
 Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value);
+Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly);
 
 #endif // CODIN_TREE_H
