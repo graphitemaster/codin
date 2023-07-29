@@ -13,7 +13,7 @@ static void *our_memrrchr(const void *m, int c, size_t n) {
 
 const String STRING_NIL = { 0, 0 };
 
-String _string_copy_from_data(const Uint8 *data, Uint64 length, Context *context) {
+String _string_copy_from_data(const Uint8 *data, Size length, Context *context) {
 	if (length == 0) {
 		return STRING_NIL;
 	}
@@ -30,7 +30,7 @@ String _string_copy_from_null(const char *string, Context *context) {
 	if (string == 0) {
 		return STRING_NIL;
 	}
-	const Uint64 length = strlen(string);
+	const Size length = strlen(string);
 	return _string_copy_from_data(RCAST(const Uint8 *, string), length, context);
 }
 
@@ -65,7 +65,7 @@ void _string_free(String string, Context *context) {
 
 char* _string_to_null(String string, Context *context) {
 	Allocator *allocator = context->allocator;
-	const Uint64 length = string.length;
+	const Size length = string.length;
 	char *result = CAST(char*, allocator->allocate(allocator, length + 1));
 	if (!result) {
 		return 0;
@@ -85,7 +85,7 @@ Bool string_ends_with(String string, String suffix) {
 		memcmp(string.contents + (string.length - suffix.length), suffix.contents, suffix.length) == 0;
 }
 
-Bool string_find_first_byte(String string, Uint8 byte, Uint64 *index) {
+Bool string_find_first_byte(String string, Uint8 byte, Size *index) {
 	const Uint8 *find = CAST(const Uint8*, memchr(string.contents, byte, string.length));
 	if (find) {
 		*index = find - string.contents;
@@ -94,7 +94,7 @@ Bool string_find_first_byte(String string, Uint8 byte, Uint64 *index) {
 	return false;
 }
 
-Bool string_find_last_byte(String string, Uint8 byte, Uint64 *index) {
+Bool string_find_last_byte(String string, Uint8 byte, Size *index) {
 	const Uint8 *find = CAST(const Uint8*, our_memrrchr(string.contents, byte, string.length));
 	if (find) {
 		*index = find - string.contents;
@@ -103,13 +103,13 @@ Bool string_find_last_byte(String string, Uint8 byte, Uint64 *index) {
 	return false;
 }
 
-String string_slice(String string, Uint64 from, Uint64 to) {
+String string_slice(String string, Size from, Size to) {
 	return LIT(String, string.contents + from, to - from);
 }
 
-static void utf8_to_utf16_core(const char *const source, Uint16 *destination, Uint64 *const length) {
+static void utf8_to_utf16_core(const char *const source, Uint16 *destination, Size *const length) {
 	Uint32 code_point = 0;
-	Uint64 elements = 0;
+	Size elements = 0;
 	for (const char *element = source; *element; element++) {
 		const Uint8 ch = CAST(Uint8, *element);
 		if (ch <= 0x7f) {
@@ -144,7 +144,7 @@ static void utf8_to_utf16_core(const char *const source, Uint16 *destination, Ui
 }
 
 Bool _utf8_to_utf16(const char *source, Uint16 **const destination, Context *context) {
-	Uint64 length = 0;
+	Size length = 0;
 	utf8_to_utf16_core(source, 0, &length);
 
 	Allocator *allocator = context->allocator;

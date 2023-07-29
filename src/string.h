@@ -8,7 +8,7 @@ typedef struct String String;
 // This string isn't NUL terminated.
 struct String {
 	Uint8* contents;
-	Uint64 length;
+	Size length;
 };
 
 // Define a literal initializer for a String. This does not produce a compound-
@@ -33,7 +33,7 @@ struct String {
 
 extern const String STRING_NIL;
 
-String _string_copy_from_data(const Uint8 *data, Uint64 size, Context *context);
+String _string_copy_from_data(const Uint8 *data, Size size, Context *context);
 String _string_copy_from_null(const char *string, Context *context);
 
 String string_from_null(const char *string);
@@ -46,10 +46,10 @@ char* _string_to_null(String string, Context *context);
 Bool string_starts_with(String string, String prefix);
 Bool string_ends_with(String string, String suffix);
 
-Bool string_find_first_byte(String String, Uint8 byte, Uint64 *index);
-Bool string_find_last_byte(String string, Uint8 byte, Uint64 *index);
+Bool string_find_first_byte(String String, Uint8 byte, Size *index);
+Bool string_find_last_byte(String string, Uint8 byte, Size *index);
 
-String string_slice(String string, Uint64 from, Uint64 to);
+String string_slice(String string, Size from, Size to);
 
 Bool _utf8_to_utf16(const char *source, Uint16 **const destination, Context *context);
 

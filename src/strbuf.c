@@ -36,7 +36,7 @@ Bool strbuf_put_rune(StrBuf *strbuf, Rune ch) {
 
 Bool strbuf_put_string(StrBuf *strbuf, String string) {
 	Context *context = strbuf->context;
-	const Uint64 size = array_size(strbuf->contents);
+	const Size size = array_size(strbuf->contents);
 	if (array_expand(strbuf->contents, string.length)) {
 		memcpy(&strbuf->contents[size], string.contents, string.length);
 		return true;
@@ -50,7 +50,7 @@ Bool strbuf_put_formatted(StrBuf *strbuf, const char *fmt, ...) {
 	va_start(va, fmt);
 	const long bytes = vsnprintf(0, 0, fmt, va);
 	va_end(va);
-	const Uint64 size = array_size(strbuf->contents);
+	const Size size = array_size(strbuf->contents);
 	if (array_expand(strbuf->contents, bytes + 1)) {
 		va_list ap;
 		va_start(ap, fmt);

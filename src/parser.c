@@ -445,10 +445,10 @@ static Array(Field*) parse_field_list(Parser *parser) {
 		value = parse_expression(parser, false);
 	}
 
-	const Uint64 n_elements = array_size(list);
+	const Size n_elements = array_size(list);
 	if (type) {
 		// The list are identifiers which have type 'type'
-		for (Uint64 i = 0; i < n_elements; i++) {
+		for (Size i = 0; i < n_elements; i++) {
 			const Type *name = list[i];
 			Identifier *identifier = evaluate_identifier_type(name);
 			if (!identifier) {
@@ -458,7 +458,7 @@ static Array(Field*) parse_field_list(Parser *parser) {
 		}
 	} else {
 		// Generate identifiers with '__unnamed_%d'.
-		for (Uint64 i = 0; i < n_elements; i++) {
+		for (Size i = 0; i < n_elements; i++) {
 			StrBuf buf;
 			strbuf_init(&buf, context);
 			strbuf_put_formatted(&buf, "__unnamed_%d", CAST(Sint32, array_size(fields)));
@@ -497,8 +497,8 @@ static Array(Field*) parse_field_list(Parser *parser) {
 		if (accepted_assignment(parser, ASSIGNMENT_EQ)) {
 			value = parse_expression(parser, false);
 		}
-		const Uint64 n_names = array_size(names);
-		for (Uint64 i = 0; i < n_names; i++) {
+		const Size n_names = array_size(names);
+		for (Size i = 0; i < n_names; i++) {
 			array_push(fields, tree_new_field(parser->tree, type, names[i], value));
 		}
 		if (!accepted_separator(parser)) {
@@ -577,8 +577,8 @@ static ProcedureType *parse_procedure_type(Parser *parser) {
 
 	// Check if generic (needs to be monomorphized) procedure.
 	Bool is_generic = false;
-	Uint64 n_fields = array_size(fields);
-	for (Uint64 i = 0; i < n_fields; i++) {
+	Size n_fields = array_size(fields);
+	for (Size i = 0; i < n_fields; i++) {
 		const Field *field = fields[i];
 		if (field->name->poly) {
 			is_generic = true;
@@ -1662,9 +1662,9 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExp
 	expect_operator(parser, OPERATOR_COLON);
 
 	// Everything inside 'lhs' should evaluate as an identifier.
-	const Uint64 n_names = array_size(lhs->expressions);
+	const Size n_names = array_size(lhs->expressions);
 	Array(Identifier *) names = 0;
-	for (Uint64 i = 0; i < n_names; i++) {
+	for (Size i = 0; i < n_names; i++) {
 		const Expression *expression = lhs->expressions[i];
 		Identifier *identifier = evaluate_identifier_expression(expression);
 		if (!identifier) {

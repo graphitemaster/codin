@@ -13,8 +13,8 @@ static void pad(Sint32 depth) {
 Bool dump_list_expression(const ListExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(list\n");
-	const Uint64 n_elements = array_size(expression->expressions);
-	for (Uint64 i = 0; i < n_elements; i++) {
+	const Size n_elements = array_size(expression->expressions);
+	for (Size i = 0; i < n_elements; i++) {
 		const Expression *expr = expression->expressions[i];
 		dump_expression(expr, depth + 1);
 		if (i != n_elements - 1) {
@@ -84,11 +84,11 @@ Bool dump_call_expression(const CallExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(call\n");
 	dump_expression(expression->operand, depth + 1);
-	const Uint64 n_arguments = array_size(expression->arguments);
+	const Size n_arguments = array_size(expression->arguments);
 	if (n_arguments != 0) {
 		printf("\n");
 	}
-	for (Uint64 i = 0; i < n_arguments; i++) {
+	for (Size i = 0; i < n_arguments; i++) {
 		const Expression *argument = expression->arguments[i];
 		dump_expression(argument, depth + 1);
 		if (i != n_arguments - 1) {
@@ -144,8 +144,8 @@ Bool dump_fields(Array(Field*) const fields, Sint32 depth) {
 	pad(depth);
 	printf("(fields\n");
 	pad(depth + 1);
-	const Uint64 n_fields = array_size(fields);
-	for (Uint64 i = 0; i < n_fields; i++) {
+	const Size n_fields = array_size(fields);
+	for (Size i = 0; i < n_fields; i++) {
 		const Field *field = fields[i];
 		printf("(field\n");
 		pad(depth + 1);
@@ -393,11 +393,11 @@ Bool dump_block_statement(const BlockStatement *statement, Sint32 depth) {
 		pad(depth + 1);
 		printf("(flags %.*s)", SFMT(flags));
 	}
-	const Uint64 n_statements = array_size(statement->statements);
+	const Size n_statements = array_size(statement->statements);
 	if (n_statements != 0) {
 		printf("\n");
 	}
-	for (Uint64 i = 0; i < n_statements; i++) {
+	for (Size i = 0; i < n_statements; i++) {
 		const Statement *stmt = statement->statements[i];
 		dump_statement(stmt, depth + 1);
 		if (i != n_statements - 1) {
@@ -430,9 +430,9 @@ Bool dump_assignment_statement(const AssignmentStatement *statement, Sint32 dept
 }
 
 Bool dump_declaration_statement(const DeclarationStatement *statement, Sint32 depth) {
-	const Uint64 n_names = array_size(statement->names);
+	const Size n_names = array_size(statement->names);
  	Array(Expression*) const values = statement->values ? statement->values->expressions : 0;
-	for (Uint64 i = 0; i < n_names; i++) {
+	for (Size i = 0; i < n_names; i++) {
 		const Identifier *name = statement->names[i];
 		pad(depth);
 		printf("(decl\n");
@@ -491,11 +491,11 @@ Bool dump_when_statement(const WhenStatement *statement, Sint32 depth) {
 Bool dump_return_statement(const ReturnStatement *statement, Sint32 depth) {
 	pad(depth);
 	printf("(ret");
-	const Uint64 n_results = array_size(statement->results);
+	const Size n_results = array_size(statement->results);
 	if (n_results != 0) {
 		printf("\n");
 	}
-	for (Uint64 i = 0; i < n_results; i++) {
+	for (Size i = 0; i < n_results; i++) {
 		const Expression *result = statement->results[i];
 		dump_expression(result, depth + 1);
 		if (i != n_results - 1) {
@@ -565,8 +565,8 @@ Bool dump_statement(const Statement *statement, Sint32 depth) {
 }
 
 void dump(Tree *tree) {
-	const Uint64 n_statements = array_size(tree->statements);
-	for (Uint64 i = 0; i < n_statements; i++) {
+	const Size n_statements = array_size(tree->statements);
+	for (Size i = 0; i < n_statements; i++) {
 		const Statement *statement = tree->statements[i];
 		dump_statement(statement, 0);
 		printf("\n");

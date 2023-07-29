@@ -28,12 +28,12 @@ static int usage(const char *app) {
 	printf("Usage:\n");
 	printf("\t%s command [arguments]\n", app);
 	printf("Commands:\n");
-	Uint64 max = 0;
-	for (Uint32 i = 0; i < sizeof(COMMANDS)/sizeof *COMMANDS; i++) {
+	Size max = 0;
+	for (Size i = 0; i < sizeof(COMMANDS)/sizeof *COMMANDS; i++) {
 		const Command *command = &COMMANDS[i];
 		if (command->name.length > max) max = command->name.length;
 	}
-	for (Uint32 i = 0; i < sizeof(COMMANDS)/sizeof *COMMANDS; i++) {
+	for (Size i = 0; i < sizeof(COMMANDS)/sizeof *COMMANDS; i++) {
 		const Command *command = &COMMANDS[i];
 		printf("\t%.*s%*c\t%.*s\n",
 			SFMT(command->name),
