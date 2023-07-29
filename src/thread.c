@@ -203,3 +203,29 @@ void cond_broadcast(Cond *cond) {
 	WakeAllConditionVariable(handle);
 #endif
 }
+
+void waitgroup_init(WaitGroup *wg, Size count) {
+	mutex_init(&wg->mutex);
+	cond_init(&wg->cond);
+	wg->count = count;
+}
+
+void waitgroup_destroy(WaitGroup *wg) {
+	cond_destroy(&wg->cond);
+	mutex_destroy(&wg->mutex);
+}
+
+void waitgroup_signal(WaitGroup *wg) {
+	mutex_lock(&wg->mutex);
+	wg->count--;
+	cond_signal(&wg->cond);
+	mutex_unlock(&wg->mutex);
+}
+
+void waitgroup_wait(WaitGroup *wg) {
+	mutex_lock(&wg->mutex);
+	while (wg->count) {
+		cond_wait(&wg->cond, &wg->mutex);
+	}
+	mutex_unlock(&wg->mutex);
+}

@@ -522,6 +522,7 @@ struct Tree {
 void tree_init(Tree *tree, Context *context);
 void tree_dump(Tree *tree);
 
+// Expressions
 ListExpression *tree_new_list_expression(Tree *tree, Array(Expression*) expressions);
 UnaryExpression *tree_new_unary_expression(Tree *tree, OperatorKind operation, Expression *operand);
 BinaryExpression *tree_new_binary_expression(Tree *tree, OperatorKind operation, Expression *lhs, Expression *rhs);
@@ -538,6 +539,7 @@ LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, Str
 CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Expression *expression, Array(Expression*) expressions);
 IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier);
 
+// Statements
 EmptyStatement *tree_new_empty_statement(Tree *tree);
 ImportStatement *tree_new_import_statement(Tree *tree, String name, String package);
 ExpressionStatement *tree_new_expression_statement(Tree *tree, Expression *expression);
@@ -551,6 +553,7 @@ ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) result
 DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
 BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label);
 
+// Types
 IdentifierType *tree_new_identifier_type(Tree *tree, Identifier *identifier);
 ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);
 GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);

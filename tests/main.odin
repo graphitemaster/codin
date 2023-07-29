@@ -1,31 +1,10 @@
-package main
+package test
 
-// TODO:
-//  struct, union
-//  attributes (@static, @private, etc)
-//  switch (switch expr, switch x in type)
-//  expression directives (#partial, #assert, #panic, #unroll)
-//  procedure groups (proc { a, b, ... })
-//  foreign decls (foreign import, foreign {})
-
-import "core:fmt"
-m :: proc() -> int {
-	return 0
-}
-x :: proc() {
- x, y, z := 10, 20, 30.0
- x = cast(int)z
- z = transmute(f64)y
- y = auto_cast z
- when true {
-  defer x = 0
- } else {
-  defer y = 1
- }
- if true {
-  fmt.printf("Hello, world!\n")
- } else do x = 0
- for i in 0..<10 do x += m()
- a := enum { A, B }.A
- X :: enum { C, D }
+main :: proc() {
+  x: #soa #simd [4][4]int
+  #no_bounds_check x[0] = 1
+  #no_bounds_check if true {
+    x[1] = 0
+  }
+  call()
 }

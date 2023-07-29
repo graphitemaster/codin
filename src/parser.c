@@ -331,9 +331,15 @@ static Type *parse_type_or_identifier(Parser *parser) {
 	parser->expression_depth = depth;
 	parser->allow_type = allow_type;
 	if (expression) {
-		ExpressionType *type = tree_new_expression_type(parser->tree, expression);
+		// When TypeExpression we can strip the nesting.
+		Type *type = 0;
+		if (expression->kind == EXPRESSION_TYPE) {
+			type = RCAST(TypeExpression *, expression)->type;
+		} else {
+			type = RCAST(Type *, tree_new_expression_type(parser->tree, expression));
+		}
 		TRACE_LEAVE();
-		return RCAST(Type *, type);
+		return type;
 	}
 	TRACE_LEAVE();
 	return 0;
@@ -996,6 +1002,62 @@ static IdentifierExpression *parse_operand_const_identifier_expression(Parser *p
 	return expression;
 }
 
+static Expression *parse_directive_prefix(Parser *parser, Bool lhs) {
+	TRACE_ENTER();
+
+	Context *context = parser->context;
+
+	const Token token = expect_kind(parser, KIND_DIRECTIVE);
+	switch (token.as_directive) {
+	case DIRECTIVE_TYPE:
+		{
+			Type *type = parse_type(parser);
+			TypeExpression *expression = tree_new_type_expression(parser->tree, type);
+			TRACE_LEAVE();
+			return RCAST(Expression *, expression);
+		}
+	case DIRECTIVE_SIMD:
+		{
+			Type *type = parse_type(parser);
+			if (type->kind != TYPE_ARRAY) {
+				PARSE_ERROR("Can only apply '#simd' directive to array type");
+			}
+			TypeExpression *expression = tree_new_type_expression(parser->tree, type);
+			TRACE_LEAVE();
+			return RCAST(Expression *, expression);
+		}
+	case DIRECTIVE_SOA:
+		FALLTHROUGH();
+	case DIRECTIVE_SPARSE:
+		{
+			Type *type = parse_type(parser);
+			TypeExpression *expression = tree_new_type_expression(parser->tree, type);
+			TRACE_LEAVE();
+			return RCAST(Expression *, expression);
+		}
+	case DIRECTIVE_PARTIAL:
+		{
+			Expression *expression = parse_expression(parser, lhs);
+			TRACE_LEAVE();
+			return expression;
+		}
+	case DIRECTIVE_BOUNDS_CHECK:    FALLTHROUGH();
+	case DIRECTIVE_NO_BOUNDS_CHECK: FALLTHROUGH();
+	case DIRECTIVE_TYPE_ASSERT:     FALLTHROUGH();
+	case DIRECTIVE_NO_TYPE_ASSERT:
+		{
+			Expression *expression = parse_expression(parser, lhs);
+			TRACE_LEAVE();
+			return expression;
+		}
+	default:
+		break;
+	}
+
+	TRACE_LEAVE();
+	return 0;
+}
+
 static Expression *parse_operand(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
 	Context *context = parser->context;
@@ -1031,7 +1093,11 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 		}
 		break;
 	case KIND_DIRECTIVE:
-		UNIMPLEMENTED("directive");
+		{
+			Expression *expression = parse_directive_prefix(parser, lhs);
+			TRACE_LEAVE();
+			return expression;
+		}
 	case KIND_KEYWORD:
 		switch (token.as_keyword) {
 		case KEYWORD_DISTINCT:
@@ -1086,7 +1152,6 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 				TRACE_LEAVE();
 				return RCAST(Expression *, expression);
 			}
-			UNIMPLEMENTED("enum");
 		case KEYWORD_CONTEXT:
 			{
 				Identifier *identifier = tree_new_identifier(parser->tree, SCLIT("context"), false);
@@ -2367,15 +2432,13 @@ Tree *parse(String filename, Context *context) {
 
 	Allocator *allocator = context->allocator;
 	Tree *tree = CAST(Tree *, allocator->allocate(allocator, sizeof *tree));
-	Tree *generic = CAST(Tree *, allocator->allocate(allocator, sizeof *generic));
-	if (!tree || !generic) {
+	if (!tree) {
 		return 0;
 	}
 
 	tree_init(tree, context);
 
 	parser->tree = tree;
-	parser->generic = generic;
 
 	advancep(parser);
 

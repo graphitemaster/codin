@@ -38,6 +38,7 @@ Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
 	pool->context = context;
 	pool->threads = 0;
 	pool->work = 0;
+	pool->quit = false;
 
 	if (!array_resize(pool->threads, n_threads)) {
 		return false;

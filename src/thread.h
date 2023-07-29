@@ -7,6 +7,7 @@ typedef struct Context Context;
 typedef struct Thread Thread;
 typedef struct Mutex Mutex;
 typedef struct Cond Cond;
+typedef struct WaitGroup WaitGroup;
 
 struct ALIGN(16) Thread {
 	Uint8 storage[64];
@@ -18,6 +19,12 @@ struct ALIGN(16) Cond {
 
 struct ALIGN(16) Mutex { 
 	Uint8 storage[64];
+};
+
+struct WaitGroup {
+	Mutex mutex;
+	Cond cond;
+	Size count;
 };
 
 #define thread_create(thread, proc, data) \
@@ -36,5 +43,10 @@ void cond_destroy(Cond *cond);
 void cond_wait(Cond *cond, Mutex *mutex);
 void cond_signal(Cond *cond);
 void cond_broadcast(Cond *cond);
+
+void waitgroup_init(WaitGroup *wg, Size count);
+void waitgroup_destroy(WaitGroup *wg);
+void waitgroup_signal(WaitGroup *wg);
+void waitgroup_wait(WaitGroup *wg);
 
 #endif // CODIN_THREAD_H

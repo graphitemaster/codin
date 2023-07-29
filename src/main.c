@@ -8,6 +8,8 @@
 #include "parser.h"
 #include "context.h"
 #include "dump.h"
+#include "threadpool.h"
+#include "strbuf.h"
 
 typedef struct Command Command;
 
@@ -46,13 +48,77 @@ static int usage(const char *app) {
 	return 1;
 }
 
-static Bool dump_ast(Context *context, String file) {
-	Tree *tree = parse(file, context);
-	if (!tree) {
+typedef struct Work Work;
+
+struct Work {
+	Context *context;
+	WaitGroup *wg;
+	String file;
+	Tree *tree;
+};
+
+Work *work_create(String file, WaitGroup *wg, Context *context) {
+	Allocator *allocator = context->allocator;
+	Work *work = RCAST(Work *, allocator->allocate(allocator, sizeof *work));
+	work->context = context;
+	work->wg = wg;
+	work->file = string_copy(file);
+	work->tree = 0;
+	return work;
+}
+
+void work_destroy(void *data) {
+	Work *work = CAST(Work *, data);
+	Allocator *allocator = work->context->allocator;
+	allocator->deallocate(allocator, work);
+}
+
+static void worker(void *data) {
+	Work *work = RCAST(Work *, data);
+	work->tree = parse(work->file, work->context);
+	waitgroup_signal(work->wg);
+}
+
+static Bool dump_ast(Context *context, String path) {
+	Array(String) files = path_list(path);
+
+	ThreadPool pool;
+	if (!threadpool_init(&pool, 4, context)) {
 		return false;
 	}
 
-	dump(tree);
+	const Size n_files = array_size(files);
+
+	WaitGroup wg;
+	waitgroup_init(&wg, n_files);
+
+	Array(Work*) works = 0;
+
+	StrBuf buf;
+	strbuf_init(&buf, context);
+	for (Size i = 0; i < n_files; i++) {
+		strbuf_clear(&buf);
+
+		strbuf_put_string(&buf, path);
+		strbuf_put_rune(&buf, '/');
+		strbuf_put_string(&buf, files[i]);
+	
+		const String file = strbuf_result(&buf);
+		Work *work = work_create(file, &wg, context);
+		array_push(works, work);
+		threadpool_queue(&pool, worker, work, 0);
+	}
+
+	// Wait for everything to parse.
+	waitgroup_wait(&wg);
+	waitgroup_destroy(&wg);
+
+	for (Size i = 0; i < n_files; i++) {
+		dump(works[i]->tree);
+		work_destroy(works[i]);
+	}
+
+	threadpool_free(&pool);
 
 	return true;
 }
@@ -66,7 +132,7 @@ int main(int argc, char **argv) {
 	// Hack for now
 	argc = 2;
 	argv[0] = CCAST(char *, "dump-ast");
-	argv[1] = CCAST(char *, "tests/main.odin");
+	argv[1] = CCAST(char *, "tests");
 
 	if (argc <= 1) {
 		return usage(app);
