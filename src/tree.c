@@ -66,14 +66,6 @@ AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *opera
 	return expression;
 }
 
-ValueExpression *tree_new_value_expression(Tree *tree, Value *value) {
-	Allocator *allocator = tree->context->allocator;
-	ValueExpression *expression = CAST(ValueExpression *, allocator->allocate(allocator, sizeof *expression));
-	expression->base.kind = EXPRESSION_VALUE;
-	expression->value = value;
-	return expression;
-}
-
 ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, ListExpression *where_clauses,BlockStatement *body) {
 	Allocator *allocator = tree->context->allocator;
 	ProcedureExpression *expression = CAST(ProcedureExpression*, allocator->allocate(allocator, sizeof *expression));
@@ -109,6 +101,32 @@ SliceExpression *tree_new_slice_expression(Tree *tree, Expression *operand, Expr
 	expression->operand = operand;
 	expression->lhs = lhs;
 	expression->rhs = rhs;
+	return expression;
+}
+
+LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, String value) {
+	Allocator *allocator = tree->context->allocator;
+	LiteralExpression *expression = CAST(LiteralExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_LITERAL;
+	expression->kind = kind;
+	expression->value = value;
+	return expression;
+}
+
+CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Expression *expression, Array(Expression*) expressions) {
+	Allocator *allocator = tree->context->allocator;
+	CompoundLiteralExpression *expr = CAST(CompoundLiteralExpression*, allocator->allocate(allocator, sizeof *expression));
+	expr->base.kind = EXPRESSION_COMPOUND_LITERAL;
+	expr->expression = expression;
+	expr->expressions = expressions;
+	return expr;
+}
+
+IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier) {
+	Allocator *allocator = tree->context->allocator;
+	IdentifierExpression *expression = CAST(IdentifierExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_IDENTIFIER;
+	expression->identifier = identifier;
 	return expression;
 }
 
@@ -214,33 +232,6 @@ DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt) {
 	return statement;
 }
 
-// Values
-LiteralValue *tree_new_literal_value(Tree *tree, LiteralKind kind, String input) {
-	Allocator *allocator = tree->context->allocator;
-	LiteralValue *value = CAST(LiteralValue *, allocator->allocate(allocator, sizeof *value));
-	value->base.kind = VALUE_LITERAL;
-	value->kind = kind;
-	value->input = input;
-	return value;
-}
-
-CompoundLiteralValue *tree_new_compound_literal_value(Tree *tree, Expression *expression, Array(Expression*) expressions) {
-	Allocator *allocator = tree->context->allocator;
-	CompoundLiteralValue *value = CAST(CompoundLiteralValue *, allocator->allocate(allocator, sizeof *value));
-	value->base.kind = VALUE_COMPOUND_LITERAL;
-	value->expression = expression;
-	value->expressions = expressions;
-	return value;
-}
-
-IdentifierValue *tree_new_identifier_value(Tree *tree, Identifier *identifier) {
-	Allocator *allocator = tree->context->allocator;
-	IdentifierValue *value = CAST(IdentifierValue *, allocator->allocate(allocator, sizeof *value));
-	value->base.kind = VALUE_IDENTIFIER;
-	value->identifier = identifier;
-	return value;
-}
-
 Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly) {
 	Context *context = tree->context;
 	Allocator *allocator = context->allocator;
@@ -344,6 +335,15 @@ MatrixType *tree_new_matrix_type(Tree *tree, Expression *rows, Expression *colum
 	type->rows = rows;
 	type->columns = columns;
 	type->type = base_type;
+	return type;
+}
+
+ExpressionType *tree_new_expression_type(Tree *tree, Expression *expression) {
+	Allocator *allocator = tree->context->allocator;
+	ExpressionType *type = CAST(ExpressionType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_EXPRESSION;
+	ASSERT(expression);
+	type->expression = expression;
 	return type;
 }
 

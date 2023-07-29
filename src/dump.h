@@ -2,10 +2,6 @@
 #define CODIN_DUMP_H
 #include "tree.h"
 
-Bool dump_literal_value(const LiteralValue *value, Sint32 depth);
-Bool dump_compound_literal_value(const CompoundLiteralValue *value, Sint32 depth);
-Bool dump_identifier_value(const IdentifierValue *value, Sint32 depth);
-Bool dump_value(const Value *value, Sint32 depth);
 Bool dump_list_expression(const ListExpression *expression, Sint32 depth);
 Bool dump_unary_expression(const UnaryExpression *expression, Sint32 depth);
 Bool dump_binary_expression(const BinaryExpression *expression, Sint32 depth);
@@ -15,7 +11,10 @@ Bool dump_selector_expression(const SelectorExpression *expression, Sint32 depth
 Bool dump_call_expression(const CallExpression *expression, Sint32 depth);
 Bool dump_type(const Type *type, Sint32 depth);
 Bool dump_assertion_expression(const AssertionExpression *expression, Sint32 depth);
-Bool dump_value_expression(const ValueExpression *expression, Sint32 depth);
+Bool dump_literal_expression(const LiteralExpression *expression, Sint32 depth);
+Bool dump_compound_literal_expression(const CompoundLiteralExpression *expression, Sint32 depth);
+Bool dump_identifier_expression(const IdentifierExpression *expression, Sint32 depth);
+
 Bool dump_identifier_type(const IdentifierType *type, Sint32 depth);
 Bool dump_fields(Array(Field*) const fields, Sint32 depth);
 Bool dump_procedure_type(const ProcedureType *type, Sint32 depth);

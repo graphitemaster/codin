@@ -12,11 +12,9 @@ package main
 
 import "core:fmt"
 
-e :: proc() {
-  
+e :: proc() -> (x: [2]int) {
+  return {};
 }
-
-a: int;
 
 b :: proc(x: int) {
   e := 0;

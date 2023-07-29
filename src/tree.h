@@ -22,6 +22,9 @@ typedef struct ProcedureExpression ProcedureExpression;
 typedef struct TypeExpression TypeExpression;
 typedef struct IndexExpression IndexExpression;
 typedef struct SliceExpression SliceExpression;
+typedef struct LiteralExpression LiteralExpression;
+typedef struct CompoundLiteralExpression CompoundLiteralExpression;
+typedef struct IdentifierExpression IdentifierExpression;
 
 // Statements.
 typedef struct Statement Statement;
@@ -36,13 +39,6 @@ typedef struct ReturnStatement ReturnStatement;
 typedef struct ForStatement ForStatement;
 typedef struct DeferStatement DeferStatement;
 typedef struct BranchStatement BranchStatement;
-
-// Values.
-// TODO(dweiler): Remove value, should just be an expression?
-typedef struct Value Value;
-typedef struct LiteralValue LiteralValue;
-typedef struct CompoundLiteralValue CompoundLiteralValue;
-typedef struct IdentifierValue IdentifierValue;
 
 // Types.
 typedef struct Type Type;
@@ -60,10 +56,10 @@ typedef struct BitSetType BitSetType;
 typedef struct TypeidType TypeidType;
 typedef struct MapType MapType;
 typedef struct MatrixType MatrixType;
+typedef struct ExpressionType ExpressionType;
 
 // Misc.
 typedef struct Identifier Identifier;
-
 typedef struct Field Field;
 
 enum ExpressionKind {
@@ -75,11 +71,13 @@ enum ExpressionKind {
 	EXPRESSION_SELECTOR,
 	EXPRESSION_CALL,
 	EXPRESSION_ASSERTION,
-	EXPRESSION_VALUE,
 	EXPRESSION_PROCEDURE,
 	EXPRESSION_TYPE,
 	EXPRESSION_INDEX,
 	EXPRESSION_SLICE,
+	EXPRESSION_LITERAL,
+	EXPRESSION_COMPOUND_LITERAL,
+	EXPRESSION_IDENTIFIER,
 };
 
 enum StatementKind {
@@ -96,19 +94,13 @@ enum StatementKind {
 	STATEMENT_BRANCH, // break, continue, fallthrough
 };
 
-enum ValueKind {
-	VALUE_LITERAL,
-	VALUE_COMPOUND_LITERAL,
-	VALUE_IDENTIFIER,
-};
-
 enum ProcedureKind {
 	PROCEDURE_CONCRETE,
 	PROCEDURE_GENERIC,
 };
 
 enum TypeKind {
-	TYPE_IDENTIFIER,    // Unresolved type identifier.
+	TYPE_IDENTIFIER,    // Identifier which resolves to a Type*
 	TYPE_BUILTIN,       // b{8,16,32,64}, f{16,32,64}(le|be), (i|u)8, (i|u){16,32,64,128}(le|be), 
 	TYPE_PROCEDURE,     // proc
 	TYPE_POINTER,       // ^T
@@ -120,6 +112,7 @@ enum TypeKind {
 	TYPE_TYPEID,        // typeid
 	TYPE_MAP,           // map[K]V
 	TYPE_MATRIX,        // matrix[R,C]T
+	TYPE_EXPRESSION,    // Expression which evaluates to a Type*
 };
 
 enum BuiltinTypeKind {
@@ -171,7 +164,7 @@ typedef enum ProcedureFlag ProcedureFlag;
 
 typedef enum CallingConvention CallingConvention;
 
-inline String block_flags_to_string(BlockFlag flags) {
+static inline String block_flags_to_string(BlockFlag flags) {
 	switch (CAST(Sint32, flags)) {
 	case BLOCK_FLAG_BOUNDS_CHECK:
 		return SCLIT("'#bounds_check'");
@@ -254,11 +247,6 @@ struct AssertionExpression {
 	Type *type;
 };
 
-struct ValueExpression {
-	Expression base;
-	Value *value;
-};
-
 struct ProcedureExpression {
 	Expression base;
 	ProcedureType *type;
@@ -283,6 +271,23 @@ struct SliceExpression {
 	Expression *operand;
 	Expression *lhs;
 	Expression *rhs;
+};
+
+struct LiteralExpression {
+	Expression base;
+	LiteralKind kind;
+	String value;
+};
+
+struct CompoundLiteralExpression {
+	Expression base;
+	Expression *expression;
+	Array(Expression*) expressions;
+};
+
+struct IdentifierExpression {
+	Expression base;
+	Identifier *identifier;
 };
 
 // Statements.
@@ -355,28 +360,6 @@ struct BranchStatement {
 	Statement base;
 	KeywordKind branch;
 	Identifier *label; // Optional label.
-};
-
-// Values.
-struct Value {
-	ValueKind kind;
-};
-
-struct LiteralValue {
-	Value base;
-	LiteralKind kind;
-	String input;
-};
-
-struct CompoundLiteralValue {
-	Value base;
-	Expression *expression;
-	Array(Expression*) expressions;
-};
-
-struct IdentifierValue {
-	Value base;
-	Identifier *identifier;
 };
 
 // Types.
@@ -466,6 +449,14 @@ struct MatrixType {
 	Type *type;
 };
 
+struct ExpressionType {
+	Type base;
+	// Can be one of:
+	//	EXPRESSION_IDENTIFIER
+	//	EXPRESSION_TYPE
+	Expression *expression;
+};
+
 // Misc.
 struct Identifier {
 	String contents;
@@ -478,7 +469,7 @@ struct Field {
 	Expression *value;
 };
 
-inline String calling_convention_to_string(CallingConvention cc) {
+static inline String calling_convention_to_string(CallingConvention cc) {
 	#define CCONVENTION(name, ...) SLIT(name),
 	static const String TABLE[] = {
 		SLIT("invalid"),
@@ -505,11 +496,13 @@ TernaryExpression *tree_new_ternary_expression(Tree *tree, Expression *on_true, 
 SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand, Identifier *identifier);
 CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Expression*) arguments);
 AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Type *type);
-ValueExpression *tree_new_value_expression(Tree *tree, Value *value);
 ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, ListExpression *where_clauses, BlockStatement *body);
 TypeExpression *tree_new_type_expression(Tree *tree, Type *type);
 IndexExpression *tree_new_index_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs);
 SliceExpression *tree_new_slice_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs);
+LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, String value);
+CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Expression *expression, Array(Expression*) expressions);
+IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier);
 
 EmptyStatement *tree_new_empty_statement(Tree *tree);
 ImportStatement *tree_new_import_statement(Tree *tree, String name, String package);
@@ -522,11 +515,6 @@ ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *co
 ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) results);
 DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
 BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label);
-
-// Values should be usable in constant contexts provided everything inside them is constant.
-LiteralValue *tree_new_literal_value(Tree *tree, LiteralKind kind, String value);
-CompoundLiteralValue *tree_new_compound_literal_value(Tree *tree, Expression *expression, Array(Expression*) expressions);
-IdentifierValue *tree_new_identifier_value(Tree *tree, Identifier *identifier);
 
 Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly);
 
@@ -542,6 +530,7 @@ BitSetType *tree_new_bit_set_type(Tree *tree, Expression *expression, Type *unde
 TypeidType *tree_new_typeid_type(Tree *tree, Type *specialization);
 MapType *tree_new_map_type(Tree *tree, Type *key, Type *value);
 MatrixType *tree_new_matrix_type(Tree *tree, Expression *rows, Expression *columns, Type *type);
+ExpressionType *tree_new_expression_type(Tree *tree, Expression *expression);
 
 Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value);
 

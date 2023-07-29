@@ -323,8 +323,8 @@ static Expression *parse_expression(Parser *parser, Bool lhs);
 static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bool lhs);
 
 // IdentifierType when parsing an identifier.
+// ExpressionType when anything else.
 static Type *parse_type_or_identifier(Parser *parser) {
-	Context *context = parser->context;
 	TRACE_ENTER();
 	const Sint32 depth = parser->expression_depth;
 	const Bool allow_type = parser->allow_type;
@@ -335,22 +335,9 @@ static Type *parse_type_or_identifier(Parser *parser) {
 	parser->expression_depth = depth;
 	parser->allow_type = allow_type;
 	if (expression) {
-		switch (expression->kind) {
-		case EXPRESSION_VALUE:
-			{
-				Value *value = RCAST(ValueExpression *, expression)->value;
-				ASSERT(value->kind == VALUE_IDENTIFIER);
-				Identifier *identifier = RCAST(IdentifierValue *, value)->identifier;
-				IdentifierType *type = tree_new_identifier_type(parser->tree, identifier);
-				TRACE_LEAVE();
-				return RCAST(Type *, type);
-			}
-		case EXPRESSION_TYPE:
-			TRACE_LEAVE();
-			return RCAST(TypeExpression *, expression)->type;
-		default:
-			PARSE_ERROR("Unexpected expression");
-		}
+		ExpressionType *type = tree_new_expression_type(parser->tree, expression);
+		TRACE_LEAVE();
+		return RCAST(Type *, type);
 	}
 	TRACE_LEAVE();
 	return 0;
@@ -368,7 +355,7 @@ static Type *parse_type(Parser *parser) {
 	return type;
 }
 
-static CompoundLiteralValue *parse_compound_literal_value(Parser *parser, Expression *expression);
+static CompoundLiteralExpression *parse_compound_literal_expression(Parser *parser, Expression *expression);
 
 static Type *parse_variable_name_or_type(Parser *parser) {
 	Context *context = parser->context;
@@ -393,6 +380,34 @@ static Type *parse_variable_name_or_type(Parser *parser) {
 	Type *type = parse_type(parser);
 	TRACE_LEAVE();
 	return type;
+}
+
+static Identifier *evaluate_identifier_expression(const Expression *expression);
+
+static Identifier *evaluate_identifier_type(const Type *type) {
+	switch (type->kind) {
+	case TYPE_IDENTIFIER:
+		return RCAST(const IdentifierType *, type)->identifier;
+	case TYPE_EXPRESSION:
+		return evaluate_identifier_expression(RCAST(const ExpressionType *, type)->expression);
+	default:
+		printf("Unknown type\n");
+		return 0;
+	}
+	UNREACHABLE();
+}
+
+static Identifier *evaluate_identifier_expression(const Expression *expression) {
+	switch (expression->kind) {
+	case EXPRESSION_IDENTIFIER:
+		return RCAST(const IdentifierExpression *, expression)->identifier;
+	case EXPRESSION_TYPE:
+		return evaluate_identifier_type(RCAST(const TypeExpression *, expression)->type);
+	default:
+		printf("Unknown expression\n");
+		return 0;
+	}
+	UNREACHABLE();
 }
 
 static Array(Field*) parse_field_list(Parser *parser) {
@@ -441,10 +456,10 @@ static Array(Field*) parse_field_list(Parser *parser) {
 		// The list are identifiers which have type 'type'
 		for (Uint64 i = 0; i < n_elements; i++) {
 			const Type *name = list[i];
-			if (name->kind != TYPE_IDENTIFIER) {
+			Identifier *identifier = evaluate_identifier_type(name);
+			if (!identifier) {
 				PARSE_ERROR("Expected identifier");
 			}
-			Identifier *identifier = RCAST(const IdentifierType *, name)->identifier;
 			array_push(fields, tree_new_field(parser->tree, type, identifier, value));
 		}
 	} else {
@@ -734,34 +749,31 @@ static Statement *parse_directive_for_statement(Parser *parser, BlockFlag block_
 	return statement;
 }
 
-static ValueExpression *parse_operand_identifier(Parser *parser) {
+static IdentifierExpression *parse_operand_identifier_expression(Parser *parser) {
 	TRACE_ENTER();
 	Identifier *identifier = parse_identifier(parser, false);
-	IdentifierValue *value = tree_new_identifier_value(parser->tree, identifier);
-	ValueExpression *expression = tree_new_value_expression(parser->tree, RCAST(Value *, value));
+	IdentifierExpression *expression = tree_new_identifier_expression(parser->tree, identifier);
 	TRACE_LEAVE();
 	return expression;
 }
 
-static ValueExpression *parse_operand_literal(Parser *parser) {
+static LiteralExpression *parse_operand_literal_expression(Parser *parser) {
 	TRACE_ENTER();
 	const Token token = advancep(parser);
-	LiteralValue *value = tree_new_literal_value(parser->tree, token.as_literal, token.string);
-	ValueExpression *expression = tree_new_value_expression(parser->tree, RCAST(Value *, value));
+	LiteralExpression *expression = tree_new_literal_expression(parser->tree, token.as_literal, token.string);
 	TRACE_LEAVE();
 	return expression;
 }
 
-static ValueExpression *parse_operand_compound_literal(Parser *parser) {
+static CompoundLiteralExpression *parse_operand_compound_literal_expression(Parser *parser) {
 	TRACE_ENTER();
-	CompoundLiteralValue *value = parse_compound_literal_value(parser, 0);
-	ValueExpression *expression = tree_new_value_expression(parser->tree, RCAST(Value *, value));
+	CompoundLiteralExpression *expression = parse_compound_literal_expression(parser, 0);
 	TRACE_LEAVE();
 	return expression;
 }
 
 // bit_set[T; U]
-static TypeExpression *parse_operand_bit_set_type(Parser *parser) {
+static TypeExpression *parse_operand_bit_set_type_expression(Parser *parser) {
 	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_BIT_SET);
@@ -783,7 +795,7 @@ static TypeExpression *parse_operand_bit_set_type(Parser *parser) {
 }
 
 // typeid
-static TypeExpression *parse_operand_typeid_type(Parser *parser) {
+static TypeExpression *parse_operand_typeid_type_expression(Parser *parser) {
 	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_TYPEID);
@@ -797,10 +809,8 @@ static TypeExpression *parse_operand_typeid_type(Parser *parser) {
 }
 
 // map[K]V
-static TypeExpression *parse_operand_map_type(Parser *parser) {
+static TypeExpression *parse_operand_map_type_expression(Parser *parser) {
 	TRACE_ENTER();
-
-	Context *context = parser->context;
 
 	expect_keyword(parser, KEYWORD_MAP);
 
@@ -808,27 +818,8 @@ static TypeExpression *parse_operand_map_type(Parser *parser) {
 	Expression *key_expression = parse_expression(parser, true);
 	expect_operator(parser, OPERATOR_RBRACKET);
 	Type *value = parse_type(parser);
-
-	Type *key = 0;
-	switch (key_expression->kind) {
-	case EXPRESSION_VALUE:
-		{
-			Value *value = RCAST(ValueExpression *, key_expression)->value;
-			ASSERT(value->kind == VALUE_IDENTIFIER);
-			Identifier *identifier = RCAST(IdentifierValue *, value)->identifier;
-			IdentifierType *type = tree_new_identifier_type(parser->tree, identifier);
-			key = RCAST(Type *, type);
-			break;
-		}
-	case EXPRESSION_TYPE:
-		key = RCAST(TypeExpression *, key_expression)->type;
-		break;
-	default:
-		// The type could be an expression itself.
-		PARSE_ERROR("Unexpected expression");
-	}
-
-	MapType *type = tree_new_map_type(parser->tree, key, value);
+	ExpressionType *key = tree_new_expression_type(parser->tree, key_expression);
+	MapType *type = tree_new_map_type(parser->tree, RCAST(Type *, key), value);
 	TypeExpression *expression = tree_new_type_expression(parser->tree, RCAST(Type *, type));
 
 	TRACE_LEAVE();
@@ -837,7 +828,7 @@ static TypeExpression *parse_operand_map_type(Parser *parser) {
 }
 
 // matrix[R,C]T
-static TypeExpression *parse_operand_matrix_type(Parser *parser) {
+static TypeExpression *parse_operand_matrix_type_expression(Parser *parser) {
 	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_MATRIX);
@@ -859,7 +850,7 @@ static TypeExpression *parse_operand_matrix_type(Parser *parser) {
 }
 
 // ^T
-static TypeExpression *parse_operand_pointer_type(Parser *parser) {
+static TypeExpression *parse_operand_pointer_type_expression(Parser *parser) {
 	TRACE_ENTER();
 
 	expect_operator(parser, OPERATOR_POINTER);
@@ -873,7 +864,7 @@ static TypeExpression *parse_operand_pointer_type(Parser *parser) {
 }
 
 // [^]T
-static TypeExpression *parse_operand_multi_pointer_type(Parser *parser) {
+static TypeExpression *parse_operand_multi_pointer_type_expression(Parser *parser) {
 	TRACE_ENTER();
 
 	expect_operator(parser, OPERATOR_POINTER);
@@ -888,7 +879,7 @@ static TypeExpression *parse_operand_multi_pointer_type(Parser *parser) {
 }
 
 // [?]T or [N]T
-static TypeExpression *parse_operand_array_type(Parser *parser, Bool parse_count) {
+static TypeExpression *parse_operand_array_type_expression(Parser *parser, Bool parse_count) {
 	TRACE_ENTER();
 
 	Expression *count = 0;
@@ -911,7 +902,7 @@ static TypeExpression *parse_operand_array_type(Parser *parser, Bool parse_count
 }
 
 // [dynamic]T
-static TypeExpression *parse_operand_dynamic_array_type(Parser *parser) {
+static TypeExpression *parse_operand_dynamic_array_type_expression(Parser *parser) {
 	TRACE_ENTER();
 
 	expect_operator(parser, OPERATOR_RBRACKET);
@@ -925,7 +916,7 @@ static TypeExpression *parse_operand_dynamic_array_type(Parser *parser) {
 }
 
 // []T
-static TypeExpression *parse_operand_slice_type(Parser *parser) {
+static TypeExpression *parse_operand_slice_type_expression(Parser *parser) {
 	TRACE_ENTER();
 
 	SliceType *type = tree_new_slice_type(parser->tree, parse_type(parser));
@@ -937,14 +928,13 @@ static TypeExpression *parse_operand_slice_type(Parser *parser) {
 }
 
 // $ident
-static ValueExpression *parse_operand_const_value(Parser *parser) {
+static IdentifierExpression *parse_operand_const_identifier_expression(Parser *parser) {
 	TRACE_ENTER();
 
 	expect_kind(parser, KIND_CONST);
 
 	Identifier *identifier = parse_identifier(parser, true);
-	IdentifierValue *value = tree_new_identifier_value(parser->tree, identifier);
-	ValueExpression *expression = tree_new_value_expression(parser->tree, RCAST(Value *, value));
+	IdentifierExpression *expression = tree_new_identifier_expression(parser->tree, identifier);
 
 	TRACE_LEAVE();
 
@@ -958,7 +948,7 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 	switch (token.kind) {
 	case KIND_IDENTIFIER:
 		{
-			ValueExpression *expression = parse_operand_identifier(parser);
+			IdentifierExpression *expression = parse_operand_identifier_expression(parser);
 			TRACE_LEAVE();
 			return RCAST(Expression *, expression);
 		}
@@ -970,7 +960,7 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 		case LITERAL_RUNE:      FALLTHROUGH();
 		case LITERAL_STRING:
 			{
-				ValueExpression *expression = parse_operand_literal(parser);
+				LiteralExpression *expression = parse_operand_literal_expression(parser);
 				TRACE_LEAVE();
 				return RCAST(Expression *, expression);
 			}
@@ -980,7 +970,7 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 		break;
 	case KIND_LBRACE:
 		if (!lhs) {
-			ValueExpression *expression = parse_operand_compound_literal(parser);
+			CompoundLiteralExpression *expression = parse_operand_compound_literal_expression(parser);
 			TRACE_LEAVE();
 			return RCAST(Expression *, expression);
 		}
@@ -1005,25 +995,25 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 			}
 		case KEYWORD_BIT_SET:
 			{
-				TypeExpression *expression = parse_operand_bit_set_type(parser);
+				TypeExpression *expression = parse_operand_bit_set_type_expression(parser);
 				TRACE_LEAVE();
 				return RCAST(Expression *, expression);
 			}
 		case KEYWORD_TYPEID:
 			{
-				TypeExpression *expression = parse_operand_typeid_type(parser);
+				TypeExpression *expression = parse_operand_typeid_type_expression(parser);
 				TRACE_LEAVE();
 				return RCAST(Expression *, expression);
 			}
 		case KEYWORD_MAP:
 			{
-				TypeExpression *expression = parse_operand_map_type(parser);
+				TypeExpression *expression = parse_operand_map_type_expression(parser);
 				TRACE_LEAVE();
 				return RCAST(Expression *, expression);
 			}
 		case KEYWORD_MATRIX:
 			{
-				TypeExpression *expression = parse_operand_matrix_type(parser);
+				TypeExpression *expression = parse_operand_matrix_type_expression(parser);
 				TRACE_LEAVE();
 				return RCAST(Expression *, expression);
 			}
@@ -1065,7 +1055,7 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 		case OPERATOR_POINTER:
 			{
 				// ^T
-				TypeExpression *expression = parse_operand_pointer_type(parser);
+				TypeExpression *expression = parse_operand_pointer_type_expression(parser);
 				TRACE_LEAVE();
 				return RCAST(Expression *, expression);
 			}
@@ -1077,27 +1067,27 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 
 				if (is_operator(parser->this_token, OPERATOR_POINTER)) {
 					// [^]T
-					TypeExpression *expression = parse_operand_multi_pointer_type(parser);
+					TypeExpression *expression = parse_operand_multi_pointer_type_expression(parser);
 					TRACE_LEAVE();
 					return RCAST(Expression *, expression);
 				} else if (is_operator(parser->this_token, OPERATOR_QUESTION)) {
 					// [?]T
-					TypeExpression *expression = parse_operand_array_type(parser, false);
+					TypeExpression *expression = parse_operand_array_type_expression(parser, false);
 					TRACE_LEAVE();
 					return RCAST(Expression *, expression);
 				} else if (accepted_keyword(parser, KEYWORD_DYNAMIC)) {
 					// [dynamic]T
-					TypeExpression *expression = parse_operand_dynamic_array_type(parser);
+					TypeExpression *expression = parse_operand_dynamic_array_type_expression(parser);
 					TRACE_LEAVE();
 					return RCAST(Expression *, expression);
 				} else if (!is_operator(parser->this_token, OPERATOR_RBRACKET)) {
 					// [N]T
-					TypeExpression *expression = parse_operand_array_type(parser, true);
+					TypeExpression *expression = parse_operand_array_type_expression(parser, true);
 					TRACE_LEAVE();
 					return RCAST(Expression *, expression);
 				} else if (accepted_operator(parser, OPERATOR_RBRACKET)) {
 					// []T
-					TypeExpression *expression = parse_operand_slice_type(parser);
+					TypeExpression *expression = parse_operand_slice_type_expression(parser);
 					TRACE_LEAVE();
 					return RCAST(Expression *, expression);
 				}
@@ -1109,7 +1099,7 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 	case KIND_CONST:
 		{
 			// $ident
-			ValueExpression *expression = parse_operand_const_value(parser);
+			IdentifierExpression *expression = parse_operand_const_identifier_expression(parser);
 			TRACE_LEAVE();
 			return RCAST(Expression *, expression);
 		}
@@ -1187,7 +1177,7 @@ static Token expect_closing(Parser *parser, Kind kind) {
 	return expect_kind(parser, kind);
 }
 
-static CompoundLiteralValue *parse_compound_literal_value(Parser *parser, Expression *expression) {
+static CompoundLiteralExpression *parse_compound_literal_expression(Parser *parser, Expression *expression) {
 	Context *context = parser->context;
 	TRACE_ENTER();
 	Array(Expression*) elements = 0;
@@ -1200,9 +1190,9 @@ static CompoundLiteralValue *parse_compound_literal_value(Parser *parser, Expres
 	}
 	parser->expression_depth = depth;
 	expect_closing(parser, KIND_RBRACE);
-	CompoundLiteralValue *value = tree_new_compound_literal_value(parser->tree, expression, elements);
+	CompoundLiteralExpression *expr = tree_new_compound_literal_expression(parser->tree, expression, elements);
 	TRACE_LEAVE();
-	return value;
+	return expr;
 }
 
 static Expression *parse_index_expression(Parser *parser, Expression *operand) {
@@ -1350,8 +1340,8 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 			break;
 		case KIND_LBRACE:
 			if (!lhs && parser->expression_depth >= 0) {
-				CompoundLiteralValue *value = parse_compound_literal_value(parser, operand);
-				operand = RCAST(Expression *, tree_new_value_expression(parser->tree, RCAST(Value *, value)));
+				CompoundLiteralExpression *expression = parse_compound_literal_expression(parser, operand);
+				operand = RCAST(Expression *, expression);
 			} else {
 				goto L_exit;
 			}
@@ -1673,19 +1663,16 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExp
 
 	expect_operator(parser, OPERATOR_COLON);
 
-	// Everything inside 'lhs' should be an ValueExpression of type IdentifierValue.
+	// Everything inside 'lhs' should evaluate as an identifier.
 	const Uint64 n_names = array_size(lhs->expressions);
 	Array(Identifier *) names = 0;
 	for (Uint64 i = 0; i < n_names; i++) {
 		const Expression *expression = lhs->expressions[i];
-		if (expression->kind != EXPRESSION_VALUE) {
+		Identifier *identifier = evaluate_identifier_expression(expression);
+		if (!identifier) {
 			PARSE_ERROR("Expected identifier");
 		}
-		const Value *value = RCAST(const ValueExpression *, expression)->value;
-		if (value->kind != VALUE_IDENTIFIER) {
-			PARSE_ERROR("Expected identifier");
-		}
-		array_push(names, RCAST(const IdentifierValue *, value)->identifier);
+		array_push(names, identifier);
 	}
 
 	DeclarationStatement *statement = parse_declaration_statement_tail(parser, names);
@@ -2217,8 +2204,6 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 	return 0;
 }
 
-	void infer(Tree *tree);
-
 Tree *parse(String filename, Context *context) {
 	Parser parse;
 	Parser *parser = &parse;
@@ -2278,4 +2263,4 @@ Tree *parse(String filename, Context *context) {
 	TRACE_LEAVE();
 
 	return tree;
-} 
+}

@@ -10,34 +10,6 @@ static void pad(Sint32 depth) {
 	if (dots > 0) printf(" ");
 }
 
-Bool dump_literal_value(const LiteralValue *value, Sint32 depth) {
-	pad(depth);
-	const String kind = literal_to_string(value->kind);
-	printf("(lit '%.*s' %.*s)", SFMT(kind), SFMT(value->input));
-	return true;
-}
-
-Bool dump_compound_literal_value(const CompoundLiteralValue *value, Sint32 depth) {
-	pad(depth);
-	(void)value;
-	return false;
-}
-
-Bool dump_identifier_value(const IdentifierValue *value, Sint32 depth) {
-	pad(depth);
-	printf("'(ident %.*s')", SFMT(value->identifier->contents));
-	return true;
-}
-
-Bool dump_value(const Value *value, Sint32 depth) {
-	switch (value->kind) {
-	case VALUE_LITERAL:          return dump_literal_value(RCAST(const LiteralValue *, value), depth);
-	case VALUE_COMPOUND_LITERAL: return dump_compound_literal_value(RCAST(const CompoundLiteralValue *, value), depth);
-	case VALUE_IDENTIFIER:       return dump_identifier_value(RCAST(const IdentifierValue *, value), depth);
-	}
-	return false;
-}
-
 Bool dump_list_expression(const ListExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(list\n");
@@ -137,8 +109,23 @@ Bool dump_assertion_expression(const AssertionExpression *expression, Sint32 dep
 	return true;
 }
 
-Bool dump_value_expression(const ValueExpression *expression, Sint32 depth) {
-	return dump_value(expression->value, depth);
+Bool dump_literal_expression(const LiteralExpression *expression, Sint32 depth) {
+	pad(depth);
+	const String kind = literal_to_string(expression->kind);
+	printf("(lit '%.*s' %.*s)", SFMT(kind), SFMT(expression->value));
+	return true;
+}
+
+Bool dump_compound_literal_expression(const CompoundLiteralExpression *expression, Sint32 depth) {
+	pad(depth);
+	(void)expression;
+	return false;
+}
+
+Bool dump_identifier_expression(const IdentifierExpression *expression, Sint32 depth) {
+	pad(depth);
+	printf("'(ident %.*s')", SFMT(expression->identifier->contents));
+	return true;
 }
 
 Bool dump_identifier_type(const IdentifierType *type, Sint32 depth) {
@@ -289,6 +276,10 @@ Bool dump_matrix_type(const MatrixType *type, Sint32 depth) {
 	return true;
 }
 
+Bool dump_expression_type(const ExpressionType *type, Sint32 depth) {
+	return type->expression ? dump_expression(type->expression, depth) : false;
+}
+
 Bool dump_procedure_expression(const ProcedureExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(proc\n");
@@ -320,6 +311,7 @@ Bool dump_type(const Type *type, Sint32 depth) {
 	case TYPE_TYPEID:        return dump_typeid_type(RCAST(const TypeidType *, type), depth);
 	case TYPE_MAP:           return dump_map_type(RCAST(const MapType *, type), depth);
 	case TYPE_MATRIX:        return dump_matrix_type(RCAST(const MatrixType *, type), depth);
+	case TYPE_EXPRESSION:    return dump_expression_type(RCAST(const ExpressionType *, type), depth);
 	}
 	return false;
 }
@@ -364,19 +356,21 @@ Bool dump_slice_expression(const SliceExpression *expression, Sint32 depth) {
 
 Bool dump_expression(const Expression *expression, Sint32 depth) {
 	switch (expression->kind) {
-	case EXPRESSION_LIST:      return dump_list_expression(RCAST(const ListExpression *, expression), depth);
-	case EXPRESSION_UNARY:     return dump_unary_expression(RCAST(const UnaryExpression *, expression), depth);
-	case EXPRESSION_BINARY:    return dump_binary_expression(RCAST(const BinaryExpression *, expression), depth);
-	case EXPRESSION_TERNARY:   return dump_ternary_expression(RCAST(const TernaryExpression *, expression), depth);
-	case EXPRESSION_CAST:      return dump_cast_expression(RCAST(const CastExpression *, expression), depth);
-	case EXPRESSION_SELECTOR:  return dump_selector_expression(RCAST(const SelectorExpression *, expression), depth);
-	case EXPRESSION_CALL:      return dump_call_expression(RCAST(const CallExpression *, expression), depth);
-	case EXPRESSION_ASSERTION: return dump_assertion_expression(RCAST(const AssertionExpression *, expression), depth);
-	case EXPRESSION_VALUE:     return dump_value_expression(RCAST(const ValueExpression *, expression), depth);
-	case EXPRESSION_PROCEDURE: return dump_procedure_expression(RCAST(const ProcedureExpression *, expression), depth);
-	case EXPRESSION_TYPE:      return dump_type_expression(RCAST(const TypeExpression *, expression), depth);
-	case EXPRESSION_INDEX:     return dump_index_expression(RCAST(const IndexExpression *, expression), depth);
-	case EXPRESSION_SLICE:     return dump_slice_expression(RCAST(const SliceExpression *, expression), depth);
+	case EXPRESSION_LIST:             return dump_list_expression(RCAST(const ListExpression *, expression), depth);
+	case EXPRESSION_UNARY:            return dump_unary_expression(RCAST(const UnaryExpression *, expression), depth);
+	case EXPRESSION_BINARY:           return dump_binary_expression(RCAST(const BinaryExpression *, expression), depth);
+	case EXPRESSION_TERNARY:          return dump_ternary_expression(RCAST(const TernaryExpression *, expression), depth);
+	case EXPRESSION_CAST:             return dump_cast_expression(RCAST(const CastExpression *, expression), depth);
+	case EXPRESSION_SELECTOR:         return dump_selector_expression(RCAST(const SelectorExpression *, expression), depth);
+	case EXPRESSION_CALL:             return dump_call_expression(RCAST(const CallExpression *, expression), depth);
+	case EXPRESSION_ASSERTION:        return dump_assertion_expression(RCAST(const AssertionExpression *, expression), depth);
+	case EXPRESSION_PROCEDURE:        return dump_procedure_expression(RCAST(const ProcedureExpression *, expression), depth);
+	case EXPRESSION_TYPE:             return dump_type_expression(RCAST(const TypeExpression *, expression), depth);
+	case EXPRESSION_INDEX:            return dump_index_expression(RCAST(const IndexExpression *, expression), depth);
+	case EXPRESSION_SLICE:            return dump_slice_expression(RCAST(const SliceExpression *, expression), depth);
+	case EXPRESSION_LITERAL:          return dump_literal_expression(RCAST(const LiteralExpression *, expression), depth);
+	case EXPRESSION_COMPOUND_LITERAL: return dump_compound_literal_expression(RCAST(const CompoundLiteralExpression *, expression), depth);
+	case EXPRESSION_IDENTIFIER:       return dump_identifier_expression(RCAST(const IdentifierExpression *, expression), depth);
 	}
 	return false;
 }
