@@ -39,6 +39,16 @@ TernaryExpression *tree_new_ternary_expression(Tree *tree, Expression *on_true, 
 	return expression;
 }
 
+CastExpression *tree_new_cast_expression(Tree *tree, OperatorKind kind, Type *type, Expression *expression) {
+	Allocator *allocator = tree->context->allocator;
+	CastExpression *expr = CAST(CastExpression*, allocator->allocate(allocator, sizeof *expression));
+	expr->base.kind = EXPRESSION_CAST;
+	expr->kind = kind;
+	expr->type = type;
+	expr->expression = expression;
+	return expr;
+}
+
 SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand, Identifier *identifier) {
 	Allocator *allocator = tree->context->allocator;
 	SelectorExpression *expression = CAST(SelectorExpression*, allocator->allocate(allocator, sizeof *expression));

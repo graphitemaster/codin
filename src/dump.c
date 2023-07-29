@@ -59,9 +59,10 @@ Bool dump_ternary_expression(const TernaryExpression *expression, Sint32 depth) 
 
 Bool dump_cast_expression(const CastExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(cast");
+	printf("(cast\n");
 	if (expression->type) {
-		printf(" '%.*s'", SFMT(expression->type->contents));
+		dump_type(expression->type, depth + 1);
+		printf("\n");
 	}
 	dump_expression(expression->expression, depth + 1);
 	printf(")");
@@ -71,8 +72,10 @@ Bool dump_cast_expression(const CastExpression *expression, Sint32 depth) {
 Bool dump_selector_expression(const SelectorExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(sel\n");
-	dump_expression(expression->operand, depth + 1);
-	printf("\n");
+	if (expression->operand) {
+		dump_expression(expression->operand, depth + 1);
+		printf("\n");
+	}
 	const String target = expression->identifier->contents;
 	pad(depth + 1);
 	printf("'%.*s'", SFMT(target));

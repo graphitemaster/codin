@@ -214,7 +214,10 @@ struct BinaryExpression {
 // <cond> ? <on_true> : <on_false>
 struct TernaryExpression {
 	Expression base;
-	KeywordKind operation; // KEYWORD_IF, KEYWORD_WHEN
+	// One of:
+	//	KEYWORD_IF
+	//	KEYWORD_WHEN
+	KeywordKind operation;
 	Expression *on_true;
 	Expression *cond;
 	Expression *on_false;
@@ -225,7 +228,12 @@ struct TernaryExpression {
 // T(expr)
 struct CastExpression {
 	Expression base;
-	Identifier *type; // When nullptr this is an implicit cast expression.
+	// One of:
+	// 	OPERATOR_CAST
+	//	OPERATOR_AUTO_CAST
+	//	OPERATOR_TRANSMUTE
+	OperatorKind kind;
+	Type *type;
 	Expression *expression;
 };
 
@@ -233,7 +241,7 @@ struct CastExpression {
 // <operand>.<identifier>
 struct SelectorExpression {
 	Expression base;
-	Expression *operand; // When nullptr this is an implicit selector expression.
+	Expression *operand;
 	Identifier *identifier;
 };
 
@@ -510,6 +518,7 @@ ListExpression *tree_new_list_expression(Tree *tree, Array(Expression*) expressi
 UnaryExpression *tree_new_unary_expression(Tree *tree, OperatorKind operation, Expression *operand);
 BinaryExpression *tree_new_binary_expression(Tree *tree, OperatorKind operation, Expression *lhs, Expression *rhs);
 TernaryExpression *tree_new_ternary_expression(Tree *tree, Expression *on_true, KeywordKind operation, Expression *cond, Expression *on_false);
+CastExpression *tree_new_cast_expression(Tree *tree, OperatorKind kind, Type *type, Expression *expression);
 SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand, Identifier *identifier);
 CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Expression*) arguments);
 AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Type *type);

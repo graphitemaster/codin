@@ -1361,35 +1361,71 @@ L_exit:
 	return operand;
 }
 
+static CastExpression *parse_cast_expression(Parser *parser, Bool lhs) {
+	TRACE_ENTER();
+	const Token token = advancep(parser);
+	Type *type = 0;
+	if (token.as_operator != OPERATOR_AUTO_CAST) {
+		expect_operator(parser, OPERATOR_LPAREN);
+		type = parse_type(parser);
+		expect_operator(parser, OPERATOR_RPAREN);
+	}
+	Expression *operand = parse_unary_expression(parser, lhs);
+	CastExpression *expression = tree_new_cast_expression(parser->tree, token.as_operator, type, operand);
+	TRACE_LEAVE();
+	return expression;
+}
+
+static UnaryExpression *parse_unary_stem_expression(Parser *parser, Bool lhs) {
+	TRACE_ENTER();
+	const Token token = advancep(parser);
+	Expression *operand = parse_unary_expression(parser, lhs);
+	UnaryExpression *expression = tree_new_unary_expression(parser->tree, token.as_operator, operand);
+	TRACE_LEAVE();
+	return expression;
+}
+
+static SelectorExpression *parse_implicit_selector_expression(Parser *parser) {
+	TRACE_ENTER();
+	expect_operator(parser, OPERATOR_PERIOD);
+	Identifier *identifier = parse_identifier(parser, false);
+	SelectorExpression *expression = tree_new_selector_expression(parser->tree, 0, identifier);
+	TRACE_LEAVE();
+	return expression;
+}
+
 static Expression *parse_unary_expression(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
-
-	Context *context = parser->context;
 
 	const Token token = parser->this_token;
 	switch (token.kind) {
 	case KIND_OPERATOR:
 		switch (token.as_operator) {
-		case OPERATOR_TRANSMUTE:
-			UNIMPLEMENTED("transmute");
-		case OPERATOR_CAST:
-			UNIMPLEMENTED("cast");
+		case OPERATOR_TRANSMUTE: FALLTHROUGH();
 		case OPERATOR_AUTO_CAST: FALLTHROUGH();
-		case OPERATOR_ADD:       FALLTHROUGH();
-		case OPERATOR_SUB:       FALLTHROUGH();
-		case OPERATOR_XOR:       FALLTHROUGH();
-		case OPERATOR_AND:       FALLTHROUGH();
+		case OPERATOR_CAST:
+			{
+				CastExpression *expression = parse_cast_expression(parser, lhs);
+				TRACE_LEAVE();
+				return RCAST(Expression *, expression);
+			}
+		case OPERATOR_ADD: FALLTHROUGH();
+		case OPERATOR_SUB: FALLTHROUGH();
+		case OPERATOR_XOR: FALLTHROUGH();
+		case OPERATOR_AND: FALLTHROUGH();
 		case OPERATOR_NOT:
 			{
-				const Token token = advancep(parser);
-				Expression *operand = parse_unary_expression(parser, lhs);
-				UnaryExpression *expression = tree_new_unary_expression(parser->tree, token.as_operator, operand);
+				UnaryExpression *expression = parse_unary_stem_expression(parser, lhs);
 				TRACE_LEAVE();
 				return RCAST(Expression *, expression);
 			}
 			break;
 		case OPERATOR_PERIOD:
-			UNIMPLEMENTED("Implicit selector");
+			{
+				SelectorExpression *expression = parse_implicit_selector_expression(parser);
+				TRACE_LEAVE();
+				return RCAST(Expression *, expression);
+			}
 		default:
 			break;
 		}
