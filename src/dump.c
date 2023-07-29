@@ -124,7 +124,7 @@ Bool dump_compound_literal_expression(const CompoundLiteralExpression *expressio
 
 Bool dump_identifier_expression(const IdentifierExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("'(ident %.*s')", SFMT(expression->identifier->contents));
+	printf("(ident '%.*s')", SFMT(expression->identifier->contents));
 	return true;
 }
 
@@ -276,8 +276,16 @@ Bool dump_matrix_type(const MatrixType *type, Sint32 depth) {
 	return true;
 }
 
+Bool dump_distinct_type(const DistinctType *type, Sint32 depth) {
+	pad(depth);
+	printf("(distinct\n");
+	dump_type(type->type, depth + 1);
+	printf(")");
+	return true;
+}
+
 Bool dump_expression_type(const ExpressionType *type, Sint32 depth) {
-	return type->expression ? dump_expression(type->expression, depth) : false;
+	return dump_expression(type->expression, depth);
 }
 
 Bool dump_procedure_expression(const ProcedureExpression *expression, Sint32 depth) {
@@ -311,6 +319,7 @@ Bool dump_type(const Type *type, Sint32 depth) {
 	case TYPE_TYPEID:        return dump_typeid_type(RCAST(const TypeidType *, type), depth);
 	case TYPE_MAP:           return dump_map_type(RCAST(const MapType *, type), depth);
 	case TYPE_MATRIX:        return dump_matrix_type(RCAST(const MatrixType *, type), depth);
+	case TYPE_DISTINCT:      return dump_distinct_type(RCAST(const DistinctType *, type), depth);
 	case TYPE_EXPRESSION:    return dump_expression_type(RCAST(const ExpressionType *, type), depth);
 	}
 	return false;
@@ -377,8 +386,9 @@ Bool dump_expression(const Expression *expression, Sint32 depth) {
 
 Bool dump_block_statement(const BlockStatement *statement, Sint32 depth) {
 	pad(depth);
-	printf("(block\n");
+	printf("(block");
 	if (statement->flags) {
+		printf("\n");
 		const String flags = block_flags_to_string(statement->flags);
 		pad(depth + 1);
 		printf("(flags %.*s)", SFMT(flags));
@@ -425,7 +435,9 @@ Bool dump_declaration_statement(const DeclarationStatement *statement, Sint32 de
 	for (Uint64 i = 0; i < n_names; i++) {
 		const Identifier *name = statement->names[i];
 		pad(depth);
-		printf("(decl '%.*s'", SFMT(name->contents));
+		printf("(decl\n");
+		pad(depth + 1);
+		printf("'%.*s'", SFMT(name->contents));
 		if (statement->type) {
 			printf("\n");
 			dump_type(statement->type, depth + 1);
@@ -451,6 +463,20 @@ Bool dump_if_statement(const IfStatement *statement, Sint32 depth) {
 		dump_statement(statement->init, 0);
 	}
 	printf("\n");
+	dump_expression(statement->cond, depth + 1);
+	printf("\n");
+	dump_block_statement(statement->body, depth + 1);
+	if (statement->elif) {
+		printf("\n");
+		dump_block_statement(statement->elif, depth + 1);
+	}
+	printf(")");
+	return true;
+}
+
+Bool dump_when_statement(const WhenStatement *statement, Sint32 depth) {
+	pad(depth);
+	printf("(when\n");
 	dump_expression(statement->cond, depth + 1);
 	printf("\n");
 	dump_block_statement(statement->body, depth + 1);
@@ -529,6 +555,7 @@ Bool dump_statement(const Statement *statement, Sint32 depth) {
 	case STATEMENT_ASSIGNMENT:  return dump_assignment_statement(RCAST(const AssignmentStatement *, statement), depth);
 	case STATEMENT_DECLARATION: return dump_declaration_statement(RCAST(const DeclarationStatement *, statement), depth);
 	case STATEMENT_IF:          return dump_if_statement(RCAST(const IfStatement *, statement), depth);
+	case STATEMENT_WHEN:        return dump_when_statement(RCAST(const WhenStatement *, statement), depth);
 	case STATEMENT_RETURN:      return dump_return_statement(RCAST(const ReturnStatement *, statement), depth);
 	case STATEMENT_FOR:         return dump_for_statement(RCAST(const ForStatement *, statement), depth);
 	case STATEMENT_DEFER:       return dump_defer_statement(RCAST(const DeferStatement *, statement), depth);

@@ -1,7 +1,6 @@
 package main
 
 // TODO:
-//  distinct
 //  struct, union, enum
 //  attributes (@static, @private, etc)
 //  switch
@@ -12,13 +11,8 @@ package main
 
 import "core:fmt"
 
-e :: proc() -> (x: [2]int) {
-  return {};
-}
-
-b :: proc(x: int) {
-  e := 0;
-  {
-    f := 0;
-  }
+when true {
+  x := 10
+} else {
+  y := 20
 }

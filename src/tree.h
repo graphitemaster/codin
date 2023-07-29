@@ -35,6 +35,7 @@ typedef struct BlockStatement BlockStatement;
 typedef struct AssignmentStatement AssignmentStatement;
 typedef struct DeclarationStatement DeclarationStatement;
 typedef struct IfStatement IfStatement;
+typedef struct WhenStatement WhenStatement;
 typedef struct ReturnStatement ReturnStatement;
 typedef struct ForStatement ForStatement;
 typedef struct DeferStatement DeferStatement;
@@ -56,6 +57,7 @@ typedef struct BitSetType BitSetType;
 typedef struct TypeidType TypeidType;
 typedef struct MapType MapType;
 typedef struct MatrixType MatrixType;
+typedef struct DistinctType DistinctType;
 typedef struct ExpressionType ExpressionType;
 
 // Misc.
@@ -88,6 +90,7 @@ enum StatementKind {
 	STATEMENT_ASSIGNMENT,
 	STATEMENT_DECLARATION,
 	STATEMENT_IF,
+	STATEMENT_WHEN,
 	STATEMENT_RETURN,
 	STATEMENT_FOR,
 	STATEMENT_DEFER,
@@ -112,6 +115,7 @@ enum TypeKind {
 	TYPE_TYPEID,        // typeid
 	TYPE_MAP,           // map[K]V
 	TYPE_MATRIX,        // matrix[R,C]T
+	TYPE_DISTINCT,      // distinct T
 	TYPE_EXPRESSION,    // Expression which evaluates to a Type*
 };
 
@@ -338,6 +342,13 @@ struct IfStatement {
 	BlockStatement *elif;
 };
 
+struct WhenStatement {
+	Statement base;
+	Expression *cond;
+	BlockStatement *body;
+	BlockStatement *elif;
+};
+
 struct ReturnStatement {
 	Statement base;
 	Array(Expression*) results;
@@ -449,6 +460,11 @@ struct MatrixType {
 	Type *type;
 };
 
+struct DistinctType {
+	Type base;
+	Type *type;
+};
+
 struct ExpressionType {
 	Type base;
 	// Can be one of:
@@ -511,6 +527,7 @@ BlockStatement *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Stat
 AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, ListExpression *lhs, ListExpression *rhs);
 DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values);
 IfStatement *tree_new_if_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, BlockStatement *elif);
+WhenStatement *tree_new_when_statement(Tree *tree, Expression *cond, BlockStatement *body, BlockStatement *elif);
 ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, Statement *post);
 ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) results);
 DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
@@ -530,6 +547,7 @@ BitSetType *tree_new_bit_set_type(Tree *tree, Expression *expression, Type *unde
 TypeidType *tree_new_typeid_type(Tree *tree, Type *specialization);
 MapType *tree_new_map_type(Tree *tree, Type *key, Type *value);
 MatrixType *tree_new_matrix_type(Tree *tree, Expression *rows, Expression *columns, Type *type);
+DistinctType *tree_new_distinct_type(Tree *tree, Type *type);
 ExpressionType *tree_new_expression_type(Tree *tree, Expression *expression);
 
 Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value);

@@ -196,6 +196,16 @@ IfStatement *tree_new_if_statement(Tree *tree, Statement *init, Expression *cond
 	return statement;
 }
 
+WhenStatement *tree_new_when_statement(Tree *tree, Expression *cond, BlockStatement *body, BlockStatement *elif) {
+	Allocator *allocator = tree->context->allocator;
+	WhenStatement *statement = CAST(WhenStatement *, allocator->allocate(allocator, sizeof *statement));
+	statement->base.kind = STATEMENT_WHEN;
+	statement->body = body;
+	statement->cond = cond;
+	statement->elif = elif;
+	return statement;
+}
+
 ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, Statement *post) {
 	Allocator *allocator = tree->context->allocator;
 	ForStatement *statement = CAST(ForStatement *, allocator->allocate(allocator, sizeof *statement));
@@ -334,6 +344,15 @@ MatrixType *tree_new_matrix_type(Tree *tree, Expression *rows, Expression *colum
 	type->base.kind = TYPE_MATRIX;
 	type->rows = rows;
 	type->columns = columns;
+	type->type = base_type;
+	return type;
+}
+
+// distinct T
+DistinctType *tree_new_distinct_type(Tree *tree, Type *base_type) {
+	Allocator *allocator = tree->context->allocator;
+	DistinctType *type = CAST(DistinctType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_DISTINCT;
 	type->type = base_type;
 	return type;
 }

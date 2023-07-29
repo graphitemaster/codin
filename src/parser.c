@@ -927,6 +927,20 @@ static TypeExpression *parse_operand_slice_type_expression(Parser *parser) {
 	return expression;
 }
 
+// distinct T
+static TypeExpression *parse_operand_distinct_type(Parser *parser) {
+	TRACE_ENTER();
+
+	expect_keyword(parser, KEYWORD_DISTINCT);
+
+	DistinctType *type = tree_new_distinct_type(parser->tree, parse_type(parser));
+	TypeExpression *expression = tree_new_type_expression(parser->tree, RCAST(Type *, type));
+
+	TRACE_LEAVE();
+
+	return expression;
+}
+
 // $ident
 static IdentifierExpression *parse_operand_const_identifier_expression(Parser *parser) {
 	TRACE_ENTER();
@@ -980,7 +994,11 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 	case KIND_KEYWORD:
 		switch (token.as_keyword) {
 		case KEYWORD_DISTINCT:
-			UNIMPLEMENTED("distinct");
+			{
+				TypeExpression *expression = parse_operand_distinct_type(parser);
+				TRACE_LEAVE();
+				return RCAST(Expression *, expression);
+			}
 		case KEYWORD_PROC:
 			{
 				Expression *expression = 0;
@@ -1023,8 +1041,6 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 			UNIMPLEMENTED("union");
 		case KEYWORD_ENUM:
 			UNIMPLEMENTED("enum");
-		case KEYWORD_ASM:
-			UNIMPLEMENTED("asm");
 		case KEYWORD_CONTEXT:
 			UNIMPLEMENTED("context");
 		default:
@@ -1882,6 +1898,58 @@ static IfStatement *parse_if_statement(Parser *parser, BlockFlag block_flags) {
 	return statement;
 }
 
+static WhenStatement *parse_when_statement(Parser *parser) {
+	Context *context = parser->context;
+
+	TRACE_ENTER();
+
+	expect_keyword(parser, KEYWORD_WHEN);
+
+	const Sint32 expression_depth = parser->expression_depth;
+	parser->expression_depth = -1;
+
+	Expression *cond = parse_expression(parser, false);
+
+	parser->expression_depth = expression_depth;
+
+	if (!cond) {
+		PARSE_ERROR("Expected condition in 'when' statement");
+	}
+
+	BlockStatement *body = 0;
+	const BlockFlag flags = CAST(BlockFlag, 0);
+	if (accepted_keyword(parser, KEYWORD_DO)) {
+		body = parse_do_body(parser, flags);
+	} else {
+		body = parse_block_statement(parser, flags, true);
+	}
+
+	advance_possible_newline_within(parser);
+
+	BlockStatement *elif = 0;
+	if (is_keyword(parser->this_token, KEYWORD_ELSE)) {
+		expect_keyword(parser, KEYWORD_ELSE);
+		if (is_keyword(parser->this_token, KEYWORD_WHEN)) {
+			WhenStatement *statement = parse_when_statement(parser);
+			Array(Statement) *statements = 0;
+			array_push(statements, RCAST(Statement *, statement));
+			elif = tree_new_block_statement(parser->tree, flags, statements);
+		} else if (is_keyword(parser->this_token, KEYWORD_DO)) {
+			elif = parse_do_body(parser, flags);
+		} else if (is_kind(parser->this_token, KIND_LBRACE)) {
+			elif = parse_block_statement(parser, flags, true);
+		} else {
+			PARSE_ERROR("Unexpected statement in 'when' else block");
+		}
+	}
+
+	WhenStatement *statement = tree_new_when_statement(parser->tree, cond, body, elif);
+
+	TRACE_LEAVE();
+
+	return CAST(BlockStatement *, statement);
+}
+
 static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
 
@@ -2104,7 +2172,11 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 				return RCAST(Statement *, statement);
 			}
 		case KEYWORD_WHEN:
-			UNIMPLEMENTED("when");
+			{
+				WhenStatement *statement = parse_when_statement(parser);
+				TRACE_LEAVE();
+				return RCAST(Statement *, statement);
+			}
 		case KEYWORD_IMPORT:
 			{
 				ImportStatement *statement = parse_import_statement(parser);
