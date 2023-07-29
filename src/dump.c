@@ -151,20 +151,20 @@ Bool dump_fields(Array(Field*) const fields, Sint32 depth) {
 	for (Size i = 0; i < n_fields; i++) {
 		const Field *field = fields[i];
 		printf("(field\n");
-		pad(depth + 1);
+		pad(depth + 2);
 		printf("'%.*s'", SFMT(field->name->contents));
 		if (field->type) {
 			printf("\n");
-			dump_type(field->type, depth + 1);
+			dump_type(field->type, depth + 2);
 		}
 		if (field->value) {
 			printf("\n");
-			dump_expression(field->value, depth + 1);
+			dump_expression(field->value, depth + 2);
 		}
 		printf(")");
 		if (i != n_fields - 1) {
 			printf("\n");
-			pad(depth);
+			pad(depth + 1);
 		}
 	}
 	printf(")");
@@ -287,6 +287,18 @@ Bool dump_distinct_type(const DistinctType *type, Sint32 depth) {
 	return true;
 }
 
+Bool dump_enum_type(const EnumType *type, Sint32 depth) {
+	pad(depth);
+	printf("(enum\n");
+	if (type->base_type) {
+		dump_type(type->base_type, depth + 1);
+		printf("\n");
+	}
+	dump_fields(type->fields, depth + 1);
+	printf(")");
+	return true;
+}
+
 Bool dump_expression_type(const ExpressionType *type, Sint32 depth) {
 	return dump_expression(type->expression, depth);
 }
@@ -323,6 +335,7 @@ Bool dump_type(const Type *type, Sint32 depth) {
 	case TYPE_MAP:           return dump_map_type(RCAST(const MapType *, type), depth);
 	case TYPE_MATRIX:        return dump_matrix_type(RCAST(const MatrixType *, type), depth);
 	case TYPE_DISTINCT:      return dump_distinct_type(RCAST(const DistinctType *, type), depth);
+	case TYPE_ENUM:          return dump_enum_type(RCAST(const EnumType *, type), depth);
 	case TYPE_EXPRESSION:    return dump_expression_type(RCAST(const ExpressionType *, type), depth);
 	}
 	return false;

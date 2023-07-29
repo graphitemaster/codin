@@ -367,6 +367,16 @@ DistinctType *tree_new_distinct_type(Tree *tree, Type *base_type) {
 	return type;
 }
 
+// enum
+EnumType *tree_new_enum_type(Tree *tree, Type *base_type, Array(Field*) fields) {
+	Allocator *allocator = tree->context->allocator;
+	EnumType *type = CAST(EnumType *, allocator->allocate(allocator, sizeof *type));
+	type->base.kind = TYPE_ENUM;
+	type->base_type = base_type;
+	type->fields = fields;
+	return type;
+}
+
 ExpressionType *tree_new_expression_type(Tree *tree, Expression *expression) {
 	Allocator *allocator = tree->context->allocator;
 	ExpressionType *type = CAST(ExpressionType *, allocator->allocate(allocator, sizeof *type));

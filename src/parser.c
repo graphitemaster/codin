@@ -752,13 +752,6 @@ static LiteralExpression *parse_operand_literal_expression(Parser *parser) {
 	return expression;
 }
 
-static CompoundLiteralExpression *parse_operand_compound_literal_expression(Parser *parser) {
-	TRACE_ENTER();
-	CompoundLiteralExpression *expression = parse_compound_literal_expression(parser, 0);
-	TRACE_LEAVE();
-	return expression;
-}
-
 // bit_set[T; U]
 static TypeExpression *parse_operand_bit_set_type_expression(Parser *parser) {
 	TRACE_ENTER();
@@ -928,6 +921,67 @@ static TypeExpression *parse_operand_distinct_type(Parser *parser) {
 	return expression;
 }
 
+static Expression *parse_value(Parser *parser) {
+	TRACE_ENTER();
+	if (is_kind(parser->this_token, KIND_LBRACE)) {
+		CompoundLiteralExpression *expression = parse_compound_literal_expression(parser, 0);
+		TRACE_LEAVE();
+		return RCAST(Expression *, expression);
+	}
+	Expression *value = parse_expression(parser, false);
+	TRACE_LEAVE();
+	return value;
+}
+
+static TypeExpression *parse_operand_enum_type_expression(Parser *parser) {
+	TRACE_ENTER();
+
+	Context *context = parser->context;
+
+	expect_keyword(parser, KEYWORD_ENUM);
+
+	Type *base_type = 0;
+	if (!is_kind(parser->this_token, KIND_LBRACE)) {
+		base_type = parse_type(parser);
+	}
+
+	advance_possible_newline_within(parser);
+
+	Array(Field*) fields = 0;
+	expect_kind(parser, KIND_LBRACE);
+	while (!is_kind(parser->this_token, KIND_RBRACE) &&
+	       !is_kind(parser->this_token, KIND_EOF))
+	{
+		Expression *name = parse_value(parser);
+		if (name->kind != EXPRESSION_IDENTIFIER) {
+			PARSE_ERROR("Expected identifier for enumerator");
+		}
+
+		Expression *value = 0;
+		if (is_assignment(parser->this_token, ASSIGNMENT_EQ)) {
+			expect_assignment(parser, ASSIGNMENT_EQ);
+			value = parse_value(parser);
+		}
+	
+		Identifier *identifier = RCAST(IdentifierExpression *, name)->identifier;
+	
+		Field *field = tree_new_field(parser->tree, 0, identifier, value);
+		array_push(fields, field);
+	
+		if (!accepted_separator(parser)) {
+			break;
+		}
+	}
+	expect_kind(parser, KIND_RBRACE);
+	
+	EnumType *type = tree_new_enum_type(parser->tree, base_type, fields);
+	TypeExpression *expression = tree_new_type_expression(parser->tree, RCAST(Type *, type));
+
+	TRACE_LEAVE();
+
+	return expression;
+}
+
 // $ident
 static IdentifierExpression *parse_operand_const_identifier_expression(Parser *parser) {
 	TRACE_ENTER();
@@ -971,7 +1025,7 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 		break;
 	case KIND_LBRACE:
 		if (!lhs) {
-			CompoundLiteralExpression *expression = parse_operand_compound_literal_expression(parser);
+			CompoundLiteralExpression *expression = parse_compound_literal_expression(parser, 0);
 			TRACE_LEAVE();
 			return RCAST(Expression *, expression);
 		}
@@ -1027,9 +1081,19 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 		case KEYWORD_UNION:
 			UNIMPLEMENTED("union");
 		case KEYWORD_ENUM:
+			{
+				TypeExpression *expression = parse_operand_enum_type_expression(parser);
+				TRACE_LEAVE();
+				return RCAST(Expression *, expression);
+			}
 			UNIMPLEMENTED("enum");
 		case KEYWORD_CONTEXT:
-			UNIMPLEMENTED("context");
+			{
+				Identifier *identifier = tree_new_identifier(parser->tree, SCLIT("context"), false);
+				IdentifierExpression *expression = tree_new_identifier_expression(parser->tree, identifier);
+				TRACE_LEAVE();
+				return RCAST(Expression *, expression);
+			}
 		default:
 			break;
 		}

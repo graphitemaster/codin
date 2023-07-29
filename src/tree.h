@@ -58,6 +58,7 @@ typedef struct TypeidType TypeidType;
 typedef struct MapType MapType;
 typedef struct MatrixType MatrixType;
 typedef struct DistinctType DistinctType;
+typedef struct EnumType EnumType;
 typedef struct ExpressionType ExpressionType;
 
 // Misc.
@@ -66,20 +67,20 @@ typedef struct Field Field;
 
 enum ExpressionKind {
 	EXPRESSION_LIST,
-	EXPRESSION_UNARY,     // <op> operand
-	EXPRESSION_BINARY,    // lhs <op> rhs
-	EXPRESSION_TERNARY,   // lhs <if|when> cond else rhs
-	EXPRESSION_CAST,
-	EXPRESSION_SELECTOR,  // base.field or .enumerator
-	EXPRESSION_CALL,
-	EXPRESSION_ASSERTION, // operand.(T) or operand.?
-	EXPRESSION_PROCEDURE, // proc() {}
-	EXPRESSION_TYPE,
-	EXPRESSION_INDEX,     // x[n] x[a, b]
-	EXPRESSION_SLICE,     // x[:] x[n:] x[:n] x[a:b]
-	EXPRESSION_LITERAL,
-	EXPRESSION_COMPOUND_LITERAL,
-	EXPRESSION_IDENTIFIER,
+	EXPRESSION_UNARY,            // <op> operand
+	EXPRESSION_BINARY,           // lhs <op> rhs
+	EXPRESSION_TERNARY,          // lhs <if|when> cond else rhs
+	EXPRESSION_CAST,             // auto_cast operand, cast(T)operand, transmute(T)operand
+	EXPRESSION_SELECTOR,         // base.field or .enumerator
+	EXPRESSION_CALL,             // operand(..args)
+	EXPRESSION_ASSERTION,        // operand.(T) or operand.?
+	EXPRESSION_PROCEDURE,        // proc() {}
+	EXPRESSION_TYPE,             // T
+	EXPRESSION_INDEX,            // x[n], x[:], x[n:], x[:n], x[a:b], x[a,b]
+	EXPRESSION_SLICE,            // []T
+	EXPRESSION_LITERAL,          // int, float, rune, string
+	EXPRESSION_COMPOUND_LITERAL, // T{...}
+	EXPRESSION_IDENTIFIER,       // ident
 };
 
 enum StatementKind {
@@ -116,6 +117,7 @@ enum TypeKind {
 	TYPE_MAP,           // map[K]V
 	TYPE_MATRIX,        // matrix[R,C]T
 	TYPE_DISTINCT,      // distinct T
+	TYPE_ENUM,          // enum
 	TYPE_EXPRESSION,    // Expression which evaluates to a Type*
 };
 
@@ -474,6 +476,12 @@ struct DistinctType {
 	Type *type;
 };
 
+struct EnumType {
+	Type base;
+	Type *base_type; // The T in 'enum T'
+	Array(Field*) fields;
+};
+
 struct ExpressionType {
 	Type base;
 	// Can be one of:
@@ -556,6 +564,7 @@ TypeidType *tree_new_typeid_type(Tree *tree, Type *specialization);
 MapType *tree_new_map_type(Tree *tree, Type *key, Type *value);
 MatrixType *tree_new_matrix_type(Tree *tree, Expression *rows, Expression *columns, Type *type);
 DistinctType *tree_new_distinct_type(Tree *tree, Type *type);
+EnumType *tree_new_enum_type(Tree *tree, Type *base_type, Array(Field*) fields);
 ExpressionType *tree_new_expression_type(Tree *tree, Expression *expression);
 
 Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value);

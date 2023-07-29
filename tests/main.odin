@@ -1,19 +1,17 @@
 package main
 
 // TODO:
-//  struct, union, enum
+//  struct, union
 //  attributes (@static, @private, etc)
-//  switch
-//  expression directives (partial, assert, panic, unroll)
-//  procedure groups
-//  foreign decls
+//  switch (switch expr, switch x in type)
+//  expression directives (#partial, #assert, #panic, #unroll)
+//  procedure groups (proc { a, b, ... })
+//  foreign decls (foreign import, foreign {})
 
 import "core:fmt"
-
 m :: proc() -> int {
-  return 0
+	return 0
 }
-
 x :: proc() {
  x, y, z := 10, 20, 30.0
  x = cast(int)z
@@ -28,4 +26,6 @@ x :: proc() {
   fmt.printf("Hello, world!\n")
  } else do x = 0
  for i in 0..<10 do x += m()
+ a := enum { A, B }.A
+ X :: enum { C, D }
 }
