@@ -387,15 +387,10 @@ static Type *parse_variable_name_or_type(Parser *parser) {
 static Identifier *evaluate_identifier_expression(const Expression *expression);
 
 static Identifier *evaluate_identifier_type(const Type *type) {
-	switch (type->kind) {
-	case TYPE_IDENTIFIER:
-		return RCAST(const IdentifierType *, type)->identifier;
-	case TYPE_EXPRESSION:
-		return evaluate_identifier_expression(RCAST(const ExpressionType *, type)->expression);
-	default:
+	if (type->kind != TYPE_EXPRESSION) {
 		return 0;
 	}
-	UNREACHABLE();
+	return evaluate_identifier_expression(RCAST(const ExpressionType *, type)->expression);
 }
 
 static Identifier *evaluate_identifier_expression(const Expression *expression) {
@@ -1434,9 +1429,7 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 					case OPERATOR_QUESTION:
 						// .?
 						expect_operator(parser, OPERATOR_QUESTION);
-						ident = tree_new_identifier(parser->tree, SCLIT("?"), false);
-						type = RCAST(Type *, tree_new_identifier_type(parser->tree, ident));
-						operand = RCAST(Expression *, tree_new_assertion_expression(parser->tree, operand, type));
+						operand = RCAST(Expression *, tree_new_assertion_expression(parser->tree, operand, 0));
 						break;
 					default:
 						break;

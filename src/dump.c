@@ -131,12 +131,6 @@ Bool dump_identifier_expression(const IdentifierExpression *expression, Sint32 d
 	return true;
 }
 
-Bool dump_identifier_type(const IdentifierType *type, Sint32 depth) {
-	pad(depth);
-	printf("(ident '%.*s')", SFMT(type->identifier->contents));
-	return true;
-}
-
 Bool dump_builtin_type(const BuiltinType *type, Sint32 depth) {
 	pad(depth);
 	printf("(builtin '%.*s')", SFMT(type->identifier));
@@ -322,7 +316,6 @@ Bool dump_procedure_expression(const ProcedureExpression *expression, Sint32 dep
 
 Bool dump_type(const Type *type, Sint32 depth) {
 	switch (type->kind) {
-	case TYPE_IDENTIFIER:    return dump_identifier_type(RCAST(const IdentifierType *, type), depth);
 	case TYPE_BUILTIN:       return dump_builtin_type(RCAST(const BuiltinType *, type), depth);
 	case TYPE_PROCEDURE:     return dump_procedure_type(RCAST(const ProcedureType *, type), depth);
 	case TYPE_POINTER:       return dump_pointer_type(RCAST(const PointerType *, type), depth);

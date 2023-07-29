@@ -15,7 +15,6 @@ Bool dump_literal_expression(const LiteralExpression *expression, Sint32 depth);
 Bool dump_compound_literal_expression(const CompoundLiteralExpression *expression, Sint32 depth);
 Bool dump_identifier_expression(const IdentifierExpression *expression, Sint32 depth);
 
-Bool dump_identifier_type(const IdentifierType *type, Sint32 depth);
 Bool dump_fields(Array(Field*) const fields, Sint32 depth);
 Bool dump_procedure_type(const ProcedureType *type, Sint32 depth);
 Bool dump_pointer_type(const PointerType *type, Sint32 depth);

@@ -44,7 +44,6 @@ typedef struct BranchStatement BranchStatement;
 // Types.
 typedef struct Type Type;
 typedef struct BuiltinType BuiltinType;
-typedef struct IdentifierType IdentifierType;
 typedef struct ProcedureType ProcedureType;
 typedef struct ConcreteProcedureType ConcreteProcedureType;
 typedef struct GenericProcedureType GenericProcedureType;
@@ -104,7 +103,6 @@ enum ProcedureKind {
 };
 
 enum TypeKind {
-	TYPE_IDENTIFIER,    // Identifier which resolves to a Type*
 	TYPE_BUILTIN,       // b{8,16,32,64}, f{16,32,64}(le|be), (i|u)8, (i|u){16,32,64,128}(le|be), 
 	TYPE_PROCEDURE,     // proc
 	TYPE_POINTER,       // ^T
@@ -554,7 +552,6 @@ DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
 BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label);
 
 // Types
-IdentifierType *tree_new_identifier_type(Tree *tree, Identifier *identifier);
 ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);
 GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);
 PointerType *tree_new_pointer_type(Tree *Tree, Type *type);

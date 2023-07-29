@@ -262,13 +262,6 @@ Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly) {
 }
 
 // Types
-IdentifierType *tree_new_identifier_type(Tree *tree, Identifier *identifier) {
-	Allocator *allocator = tree->context->allocator;
-	IdentifierType *type = CAST(IdentifierType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_IDENTIFIER;
-	type->identifier = identifier;
-	return type;
-}
 
 // ^T
 PointerType *tree_new_pointer_type(Tree *tree, Type *value_type) {
