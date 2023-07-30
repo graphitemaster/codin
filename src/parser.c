@@ -6,7 +6,7 @@
 #include "report.h"
 #include "utility.h"
 
-#define TRACE 1
+#define TRACE 0
 
 #define PARSE_ERROR(...) \
 	do { \
@@ -82,6 +82,7 @@ static Bool parser_init(Parser *parser, String filename, Context *context) {
 	parser->expression_depth = 0;
 	parser->allow_newline = false;
 	parser->allow_type = false;
+	parser->this_procedure = 0;
 
 	return true;
 }

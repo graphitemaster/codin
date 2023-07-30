@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "context.h"
+#include "thread.h"
 
 static const Size DEFAULT_CAPACITY = 4096;
 static const Float32 RESIZE_THRESHOLD = 0.75;
@@ -16,6 +17,7 @@ struct DefaultAllocator {
 	Size deleted;
 	Size capacity;
 	void **items;
+	Mutex mutex;
 };
 
 static DefaultAllocator *create_default_allocator(Size capacity) {
@@ -32,6 +34,8 @@ static DefaultAllocator *create_default_allocator(Size capacity) {
 		return 0;
 	}
 
+	mutex_init(&allocator->mutex);
+
 	return allocator;
 }
 
@@ -47,11 +51,14 @@ static void destroy_default_allocator(DefaultAllocator *allocator) {
 		allocator->deleted++;
 	}
 	free(allocator->items);
+
+	mutex_destroy(&allocator->mutex);
+
 	free(allocator);
 }
 
-static Bool default_allocator_add(DefaultAllocator *allocator, void *item);
-static Bool default_allocator_maybe_rehash(DefaultAllocator *allocator) {
+static Bool default_allocator_add_unlocked(DefaultAllocator *allocator, void *item);
+static Bool default_allocator_maybe_rehash_unlocked(DefaultAllocator *allocator) {
 	if (allocator->size + allocator->deleted < CAST(Float32, allocator->capacity) * RESIZE_THRESHOLD) {
 		return true;
 	}
@@ -72,18 +79,14 @@ static Bool default_allocator_maybe_rehash(DefaultAllocator *allocator) {
 
 	for (Size i = 0; i < old_capacity; i++) {
 		// NOTE(dweiler): This cannot fail since the capacity is strictly greater.
-		default_allocator_add(allocator, old_items[i]);
+		default_allocator_add_unlocked(allocator, old_items[i]);
 	}
 
+	mutex_unlock(&allocator->mutex);
 	return true;
 }
 
-static Bool default_allocator_add(DefaultAllocator *allocator, void *item) {
-	// Don't allow adding nullptr or tombstone sentinels.
-	if (!item || item == TOMBSTONE) {
-		return false;
-	}
-
+static Bool default_allocator_add_unlocked(DefaultAllocator *allocator, void *item) {
 	Uint64 hash = RCAST(Uint64, item); // TODO(dweiler): MixInt
 	const Size mask = allocator->capacity - 1;
 
@@ -105,13 +108,28 @@ static Bool default_allocator_add(DefaultAllocator *allocator, void *item) {
 	allocator->size++;
 	allocator->items[index] = item;
 
-	return default_allocator_maybe_rehash(allocator);
+	return default_allocator_maybe_rehash_unlocked(allocator);
+}
+
+static Bool default_allocator_add(DefaultAllocator *allocator, void *item) {
+	if (!item || item == TOMBSTONE) {
+		return false;
+	}
+
+	mutex_lock(&allocator->mutex);
+	const Bool result = default_allocator_add_unlocked(allocator, item);
+	mutex_unlock(&allocator->mutex);
+	return result;
 }
 
 static Bool default_allocator_remove(DefaultAllocator *allocator, void *item) {
 	Uint64 hash = RCAST(Uint64, item); // TODO(dweiler): MixInt
+
+	mutex_lock(&allocator->mutex);
+
 	const Size mask = allocator->capacity - 1;
 	Size index = mask & (PRIME1 * hash);
+
 	for (;;) {
 		void *element = allocator->items[index];
 		if (element) {
@@ -119,6 +137,7 @@ static Bool default_allocator_remove(DefaultAllocator *allocator, void *item) {
 				allocator->items[index] = TOMBSTONE;
 				allocator->size--;
 				allocator->deleted++;
+				mutex_unlock(&allocator->mutex);
 				return true;
 			} else {
 				index = mask & (index + PRIME2);
@@ -127,6 +146,9 @@ static Bool default_allocator_remove(DefaultAllocator *allocator, void *item) {
 			break;
 		}
 	}
+
+	mutex_unlock(&allocator->mutex);
+
 	return false;
 }
 
