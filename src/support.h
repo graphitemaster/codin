@@ -100,7 +100,7 @@ typedef int32_t Rune; // Unicode codepoint.
 NORETURN void report_assertion(const char *expression, const char *file, int line);
 
 #define ASSERT(expression) \
-  ((void)((expression) ? (void)0 : report_assertion(#expression, __FILE__, __LINE__)))
+  CAST(void, (expression) ? CAST(void, 0) : report_assertion(#expression, __FILE__, __LINE__))
 
 // Support bitwise operators on enumerators in C++ like C.
 #if defined(__cplusplus)
