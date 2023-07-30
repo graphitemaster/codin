@@ -19,19 +19,23 @@ Bool strbuf_put_byte(StrBuf *strbuf, Uint8 byte) {
 }
 
 Bool strbuf_put_rune(StrBuf *strbuf, Rune ch) {
-	return strbuf_put_byte(strbuf, ch);
-	
-	// Decode UTF-8 Rune into individual code-points.
-	const Uint8 b0 = ch & 0xff;
-	const Uint8 b1 = (ch >> 8) & 0xff;
-	const Uint8 b2 = (ch >> 16) & 0xff;
-	const Uint8 b3 = (ch >> 24) & 0xff;
-	Bool ok = true;
-	if ((b0 & 0xC0) != 0x80) ok = ok && strbuf_put_byte(strbuf, b0);
-	if ((b1 & 0xC0) != 0x80) ok = ok && strbuf_put_byte(strbuf, b1);
-	if ((b2 & 0xC0) != 0x80) ok = ok && strbuf_put_byte(strbuf, b2);
-	if ((b3 & 0xC0) != 0x80) ok = ok && strbuf_put_byte(strbuf, b3);
-	return ok;
+	// Decode Rune into individual UTF-8 bytes.
+	if (ch <= 0x7f) {
+		return strbuf_put_byte(strbuf, ch);
+	} else if (ch <= 0x7ff) {
+		return strbuf_put_byte(strbuf, (ch >> 6) & 0x1f)
+			  && strbuf_put_byte(strbuf, ch & 0x3f);
+	} else if (ch <= 0xffff) {
+		return strbuf_put_byte(strbuf, ((ch >> 12) & 0x0f))
+		    && strbuf_put_byte(strbuf, ((ch >> 6) & 0x3f))
+		    && strbuf_put_byte(strbuf, ch & 0x3f);
+	} else {
+		return strbuf_put_byte(strbuf, ((ch >> 18) & 0x07))
+		    && strbuf_put_byte(strbuf, ((ch >> 12) & 0x3f))
+				&& strbuf_put_byte(strbuf, ((ch >> 6) & 0x3f))
+				&& strbuf_put_byte(strbuf, ch & 0x3f);
+	}
+	UNREACHABLE();
 }
 
 Bool strbuf_put_string(StrBuf *strbuf, String string) {

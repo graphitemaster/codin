@@ -53,6 +53,11 @@ String string_slice(String string, Size from, Size to);
 
 Bool _utf8_to_utf16(const char *source, Uint16 **const destination, Context *context);
 
+#define UTF8_ACCEPT 0
+#define UTF8_REJECT 12
+
+Uint32 utf8_decode(Uint32 *state, Rune *codep, Uint32 byte);
+
 #define utf8_to_utf16(source, destination) \
 	_utf8_to_utf16((source), (destination), context)
 

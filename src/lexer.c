@@ -134,8 +134,17 @@ static Rune advancel(Lexer *lexer) {
 			LEX_ERROR("Unexpected EOF");
 			input->cur++;
 		} else if (rune & 0x80) {
-			// TODO(dweiler): UTF-8.
-			// input->cur += utf8_len(input->end - input->cur);
+			const Size len = input->end - input->cur;
+			Uint32 state = 0;
+			for (Size i = 0; i < len; i++) {
+				Rune rune;
+				if (!utf8_decode(&state, &rune, *input->cur)) {
+					input->cur++;
+				}
+			}
+			if (state != UTF8_ACCEPT) {
+				LEX_ERROR("Malformed UTF-8");
+			}
 		} else {
 			input->cur++;
 		}
