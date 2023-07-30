@@ -24,7 +24,7 @@ Bool strbuf_put_rune(StrBuf *strbuf, Rune ch) {
 		return strbuf_put_byte(strbuf, ch);
 	} else if (ch <= 0x7ff) {
 		return strbuf_put_byte(strbuf, (ch >> 6) & 0x1f)
-			  && strbuf_put_byte(strbuf, ch & 0x3f);
+		    && strbuf_put_byte(strbuf, ch & 0x3f);
 	} else if (ch <= 0xffff) {
 		return strbuf_put_byte(strbuf, ((ch >> 12) & 0x0f))
 		    && strbuf_put_byte(strbuf, ((ch >> 6) & 0x3f))
@@ -32,8 +32,8 @@ Bool strbuf_put_rune(StrBuf *strbuf, Rune ch) {
 	} else {
 		return strbuf_put_byte(strbuf, ((ch >> 18) & 0x07))
 		    && strbuf_put_byte(strbuf, ((ch >> 12) & 0x3f))
-				&& strbuf_put_byte(strbuf, ((ch >> 6) & 0x3f))
-				&& strbuf_put_byte(strbuf, ch & 0x3f);
+		    && strbuf_put_byte(strbuf, ((ch >> 6) & 0x3f))
+		    && strbuf_put_byte(strbuf, ch & 0x3f);
 	}
 	UNREACHABLE();
 }
