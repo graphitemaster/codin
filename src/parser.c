@@ -20,6 +20,13 @@
 #define UNIMPLEMENTED(what) \
 	PARSE_ERROR("Unimplemented: %s", (what))
 
+// Simple operator precedence climbing.
+#define OPERATOR(ident, match, prec, ...) (prec),
+static const Uint8 PRECEDENCE[] = {
+	#include "lexemes.h"
+	0,
+};
+
 static Bool source_read(Source *source, String filename, Context *context) {
 	Array(Uint8) contents = readfile(filename);
 	if (!contents) {
@@ -71,7 +78,7 @@ static Bool parser_init(Parser *parser, String filename, Context *context) {
 		return false;
 	}
 
-	if (!lexer_init(&parser->lexer, parser->context, &parser->source)) {
+	if (!lexer_init(&parser->lexer, context, &parser->source)) {
 		return false;
 	}
 
@@ -295,7 +302,6 @@ static CallingConvention string_to_calling_convention(String input) {
 	#define CCONVENTION(string, enum) \
 		else if (string_compare(input, SCLIT(string))) return CCONV_ ## enum;
 	#include "lexemes.h"
-	#undef CCONVENTION
 	return CCONV_INVALID;
 }
 
@@ -1499,13 +1505,13 @@ static Expression *parse_index_expression(Parser *parser, Expression *operand) {
 	parser->expression_depth++;
 
 	// [
-	const Token token = expect_operator(parser, OPERATOR_LBRACKET);
+	expect_operator(parser, OPERATOR_LBRACKET);
 
 	// [lhs
-	if (!is_operator(token, OPERATOR_ELLIPSIS)
-	 && !is_operator(token, OPERATOR_RANGEFULL)
-	 && !is_operator(token, OPERATOR_RANGEHALF)
-	 && !is_operator(token, OPERATOR_COLON))
+	if (!is_operator(parser->this_token, OPERATOR_ELLIPSIS)
+	 && !is_operator(parser->this_token, OPERATOR_RANGEFULL)
+	 && !is_operator(parser->this_token, OPERATOR_RANGEHALF)
+	 && !is_operator(parser->this_token, OPERATOR_COLON))
 	{
 		lhs = parse_expression(parser, false);
 	}
@@ -1524,7 +1530,9 @@ static Expression *parse_index_expression(Parser *parser, Expression *operand) {
 	 || is_operator(parser->this_token, OPERATOR_COLON))
 	{
 		interval = advancep(parser); 
-		if (!is_operator(interval, OPERATOR_RBRACKET) && !is_kind(interval, KIND_EOF)) {
+		if (!is_operator(parser->this_token, OPERATOR_RBRACKET)
+		 && !is_kind(parser->this_token, KIND_EOF))
+		{
 			rhs = parse_expression(parser, false);
 		}
 	}
@@ -1762,14 +1770,6 @@ static Expression *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec
 	Context *context = parser->context;
 
 	Expression *expr = parse_unary_expression(parser, lhs);
-
-	// Simple operator precedence climbing.
-	#define OPERATOR(ident, match, prec, ...) (prec),
-	static const int PRECEDENCE[] = {
-		#include "lexemes.h"
-		0,
-	};
-
 	for (;;) {
 		const Token token = parser->this_token;
 		const Token last = parser->last_token;

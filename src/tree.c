@@ -263,29 +263,31 @@ Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly) {
 
 // Types
 
+static Type *new_type(Tree *tree, TypeKind kind, Size sizeof_type) {
+	Allocator *allocator = tree->context->allocator;
+	Type *type = CAST(Type *, allocator->allocate(allocator, sizeof_type));
+	type->kind = kind;
+	type->poly = false;
+	return type;
+}
+
 // ^T
 PointerType *tree_new_pointer_type(Tree *tree, Type *value_type) {
-	Allocator *allocator = tree->context->allocator;
-	PointerType *type = CAST(PointerType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_POINTER;
+	PointerType *type = RCAST(PointerType *, new_type(tree, TYPE_POINTER, sizeof *type));
 	type->type = value_type;
 	return type;
 }
 
 // [^]T
 MultiPointerType *tree_new_multi_pointer_type(Tree *tree, Type *value_type) {
-	Allocator *allocator = tree->context->allocator;
-	MultiPointerType *type = CAST(MultiPointerType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_MULTI_POINTER;
+	MultiPointerType *type = RCAST(MultiPointerType *, new_type(tree, TYPE_MULTI_POINTER, sizeof *type));
 	type->type = value_type;
 	return type;
 }
 
 // []T
 SliceType *tree_new_slice_type(Tree *tree, Type *value_type) {
-	Allocator *allocator = tree->context->allocator;
-	SliceType *type = CAST(SliceType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_SLICE;
+	SliceType *type = RCAST(SliceType *, new_type(tree, TYPE_SLICE, sizeof *type));
 	type->type = value_type;
 	return type;
 }
@@ -293,9 +295,7 @@ SliceType *tree_new_slice_type(Tree *tree, Type *value_type) {
 // [N]T
 // [?]T
 ArrayType *tree_new_array_type(Tree *tree, Type *value_type, Expression *count) {
-	Allocator *allocator = tree->context->allocator;
-	ArrayType *type = CAST(ArrayType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_ARRAY;
+	ArrayType *type = RCAST(ArrayType *, new_type(tree, TYPE_ARRAY, sizeof *type));
 	type->type = value_type;
 	type->count = count;
 	return type;
@@ -303,9 +303,7 @@ ArrayType *tree_new_array_type(Tree *tree, Type *value_type, Expression *count) 
 
 // [dynamic]T
 DynamicArrayType *tree_new_dynamic_array_type(Tree *tree, Type *value_type) {
-	Allocator *allocator = tree->context->allocator;
-	DynamicArrayType *type = CAST(DynamicArrayType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_DYNAMIC_ARRAY;
+	DynamicArrayType *type = RCAST(DynamicArrayType *, new_type(tree, TYPE_DYNAMIC_ARRAY, sizeof *type));
 	type->type = value_type;
 	return type;
 }
@@ -313,9 +311,7 @@ DynamicArrayType *tree_new_dynamic_array_type(Tree *tree, Type *value_type) {
 // bit_set[T]
 // bit_set[T; U]
 BitSetType *tree_new_bit_set_type(Tree *tree, Expression *expression, Type *underlying) {
-	Allocator *allocator = tree->context->allocator;
-	BitSetType *type = CAST(BitSetType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_BIT_SET;
+	BitSetType *type = RCAST(BitSetType *, new_type(tree, TYPE_BIT_SET, sizeof *type));
 	type->expression = expression;
 	type->underlying = underlying;
 	return type;
@@ -323,18 +319,14 @@ BitSetType *tree_new_bit_set_type(Tree *tree, Expression *expression, Type *unde
 
 // typeid
 TypeidType *tree_new_typeid_type(Tree *tree, Type *specialization) {
-	Allocator *allocator = tree->context->allocator;
-	TypeidType *type = CAST(TypeidType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_TYPEID;
+	TypeidType *type = RCAST(TypeidType *, new_type(tree, TYPE_TYPEID, sizeof *type));
 	type->specialization = specialization;
 	return type;
 }
 
 // map[K]V
 MapType *tree_new_map_type(Tree *tree, Type *key, Type *value) {
-	Allocator *allocator = tree->context->allocator;
-	MapType *type = CAST(MapType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_MAP;
+	MapType *type = RCAST(MapType *, new_type(tree, TYPE_MAP, sizeof *type));
 	type->key = key;
 	type->value = value;
 	return type;
@@ -342,9 +334,7 @@ MapType *tree_new_map_type(Tree *tree, Type *key, Type *value) {
 
 // matrix[R,C]T
 MatrixType *tree_new_matrix_type(Tree *tree, Expression *rows, Expression *columns, Type *base_type) {
-	Allocator *allocator = tree->context->allocator;
-	MatrixType *type = CAST(MatrixType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_MATRIX;
+	MatrixType *type = RCAST(MatrixType *, new_type(tree, TYPE_MATRIX, sizeof *type));
 	type->rows = rows;
 	type->columns = columns;
 	type->type = base_type;
@@ -353,18 +343,14 @@ MatrixType *tree_new_matrix_type(Tree *tree, Expression *rows, Expression *colum
 
 // distinct T
 DistinctType *tree_new_distinct_type(Tree *tree, Type *base_type) {
-	Allocator *allocator = tree->context->allocator;
-	DistinctType *type = CAST(DistinctType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_DISTINCT;
+	DistinctType *type = RCAST(DistinctType *, new_type(tree, TYPE_DISTINCT, sizeof *type));
 	type->type = base_type;
 	return type;
 }
 
 // enum
 EnumType *tree_new_enum_type(Tree *tree, Type *base_type, Array(Field*) fields) {
-	Allocator *allocator = tree->context->allocator;
-	EnumType *type = CAST(EnumType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_ENUM;
+	EnumType *type = RCAST(EnumType *, new_type(tree, TYPE_ENUM, sizeof *type));
 	type->base_type = base_type;
 	type->fields = fields;
 	return type;
@@ -372,9 +358,7 @@ EnumType *tree_new_enum_type(Tree *tree, Type *base_type, Array(Field*) fields) 
 
 // struct
 ConcreteStructType *tree_new_concrete_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) fields, ListExpression *where_clauses) {
-	Allocator *allocator = tree->context->allocator;
-	ConcreteStructType *type = CAST(ConcreteStructType *, allocator->allocate(allocator, sizeof *type));
-	type->base.base.kind = TYPE_STRUCT;
+	ConcreteStructType *type = RCAST(ConcreteStructType *, new_type(tree, TYPE_STRUCT, sizeof *type));
 	type->base.kind = STRUCT_CONCRETE;
 	type->base.flags = flags;
 	type->base.align = align;
@@ -385,9 +369,7 @@ ConcreteStructType *tree_new_concrete_struct_type(Tree *tree, StructFlag flags, 
 
 // struct()
 GenericStructType *tree_new_generic_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) parameters, Array(Field*) fields, ListExpression *where_clauses) {
-	Allocator *allocator = tree->context->allocator;
-	GenericStructType *type = CAST(GenericStructType *, allocator->allocate(allocator, sizeof *type));
-	type->base.base.kind = TYPE_STRUCT;
+	GenericStructType *type = RCAST(GenericStructType *, new_type(tree, TYPE_STRUCT, sizeof *type));
 	type->base.kind = STRUCT_GENERIC;
 	type->base.flags = flags;
 	type->base.align = align;
@@ -397,11 +379,9 @@ GenericStructType *tree_new_generic_struct_type(Tree *tree, StructFlag flags, Ex
 	return type;
 }
 
-// union()
+// union
 ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Type*) variants, ListExpression *where_clauses) {
-	Allocator *allocator = tree->context->allocator;
-	ConcreteUnionType *type = CAST(ConcreteUnionType *, allocator->allocate(allocator, sizeof *type));
-	type->base.base.kind = TYPE_UNION;
+	ConcreteUnionType *type = RCAST(ConcreteUnionType *, new_type(tree, TYPE_UNION, sizeof *type));
 	type->base.kind = UNION_GENERIC;
 	type->base.flags = flags;
 	type->base.align = align;
@@ -410,10 +390,9 @@ ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Exp
 	return type;
 }
 
+// union()
 GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Field*) parameters, Array(Type*) variants, ListExpression *where_clauses) {
-	Allocator *allocator = tree->context->allocator;
-	GenericUnionType *type = CAST(GenericUnionType *, allocator->allocate(allocator, sizeof *type));
-	type->base.base.kind = TYPE_UNION;
+	GenericUnionType *type = RCAST(GenericUnionType *, new_type(tree, TYPE_UNION, sizeof *type));
 	type->base.kind = UNION_GENERIC;
 	type->base.flags = flags;
 	type->base.align = align;
@@ -424,18 +403,13 @@ GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expre
 }
 
 ExpressionType *tree_new_expression_type(Tree *tree, Expression *expression) {
-	Allocator *allocator = tree->context->allocator;
-	ExpressionType *type = CAST(ExpressionType *, allocator->allocate(allocator, sizeof *type));
-	type->base.kind = TYPE_EXPRESSION;
-	ASSERT(expression);
+	ExpressionType *type = RCAST(ExpressionType *, new_type(tree, TYPE_EXPRESSION, sizeof *type));
 	type->expression = expression;
 	return type;
 }
 
 ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention) {
-	Allocator *allocator = tree->context->allocator;
-	ConcreteProcedureType *type = CAST(ConcreteProcedureType *, allocator->allocate(allocator, sizeof *type));
-	type->base.base.kind = TYPE_PROCEDURE;
+	ConcreteProcedureType *type = RCAST(ConcreteProcedureType *, new_type(tree, TYPE_PROCEDURE, sizeof *type));
 	type->base.kind = PROCEDURE_CONCRETE;
 	type->base.convention = convention;
 	type->base.params = params;
@@ -445,9 +419,7 @@ ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*
 }
 
 GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention) {
-	Allocator *allocator = tree->context->allocator;
-	GenericProcedureType *type = CAST(GenericProcedureType*, allocator->allocate(allocator, sizeof *type));
-	type->base.base.kind = TYPE_PROCEDURE;
+	GenericProcedureType *type = RCAST(GenericProcedureType *, new_type(tree, TYPE_PROCEDURE, sizeof *type));
 	type->base.kind = PROCEDURE_GENERIC;
 	type->base.convention = convention;
 	type->base.params = params;

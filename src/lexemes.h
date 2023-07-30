@@ -80,48 +80,48 @@ LITERAL(RUNE,      "rune")
 LITERAL(STRING,    "string")
 
 // Operators
-//       ENUM,         MATCH,       PRECEDENCE,    ASI
-OPERATOR(NOT,          "!",         0,             false)
-OPERATOR(POINTER,      "^",         0,             true)
-OPERATOR(ARROW,        "->",        0,             false)
-OPERATOR(LPAREN,       "(",         0,             false)
-OPERATOR(RPAREN,       ")",         0,             true)
-OPERATOR(LBRACKET,     "[",         0,             false)
-OPERATOR(RBRACKET,     "]",         0,             true)
-OPERATOR(COLON,        ":",         0,             false)
-OPERATOR(PERIOD,       ".",         0,             false)
-OPERATOR(COMMA,        ",",         0,             false)
-OPERATOR(IN,           "in",        0,             false)  // Produces a value, therefore an operator.
-OPERATOR(NOT_IN,       "not_in",    0,             false)  // Produces a value, therefore an operator.
-OPERATOR(AUTO_CAST,    "auto_cast", 0,             false)  // Produces a value, therefore an operator.
-OPERATOR(CAST,         "cast",      0,             false)  // Produces a value, therefore an operator.
-OPERATOR(TRANSMUTE,    "transmute", 0,             false)  // Produces a value, therefore an operator.
-OPERATOR(OR_ELSE,      "or_else",   1,             false)  // Produces a value, therefore an operator.
-OPERATOR(OR_RETURN,    "or_return", 0,             true)   // Produces a value, therefore an operator.
-OPERATOR(QUESTION,     "?",         1,             true)
-OPERATOR(ELLIPSIS,     "..",        2,             false)
-OPERATOR(RANGEFULL,    "..=",       2,             false)
-OPERATOR(RANGEHALF,    "..<",       2,             false)
-OPERATOR(CMPOR,        "||",        3,             false)
-OPERATOR(CMPAND,       "&&",        4,             false)
-OPERATOR(CMPEQ,        "==",        5,             false)
-OPERATOR(NOTEQ,        "!=",        5,             false)
-OPERATOR(LT,           "<",         5,             false)
-OPERATOR(GT,           ">",         5,             false)
-OPERATOR(LTEQ,         "<=",        5,             false)
-OPERATOR(GTEQ,         ">=",        5,             false)
-OPERATOR(ADD,          "+",         6,             false)
-OPERATOR(SUB,          "-",         6,             false)
-OPERATOR(OR,           "|",         6,             false)
-OPERATOR(XOR,          "~",         6,             false)
-OPERATOR(QUO,          "/",         7,             false)
-OPERATOR(MUL,          "*",         7,             false)
-OPERATOR(MOD,          "%",         7,             false)
-OPERATOR(MODMOD,       "%%",        7,             false)
-OPERATOR(AND,          "&",         7,             false)
-OPERATOR(ANDNOT,       "&~",        7,             false)
-OPERATOR(SHL,          "<<",        7,             false)
-OPERATOR(SHR,          ">>",        7,             false)
+//       ENUM,         MATCH,       PRECEDENCE,    NAMED, ASI
+OPERATOR(NOT,          "!",         0,             false, false)
+OPERATOR(POINTER,      "^",         0,             false, true)
+OPERATOR(ARROW,        "->",        0,             false, false)
+OPERATOR(LPAREN,       "(",         0,             false, false)
+OPERATOR(RPAREN,       ")",         0,             false, true)
+OPERATOR(LBRACKET,     "[",         0,             false, false)
+OPERATOR(RBRACKET,     "]",         0,             false, true)
+OPERATOR(COLON,        ":",         0,             false, false)
+OPERATOR(PERIOD,       ".",         0,             false, false)
+OPERATOR(COMMA,        ",",         0,             false, false)
+OPERATOR(IN,           "in",        0,             true,  false)  // Produces a value, therefore an operator.
+OPERATOR(NOT_IN,       "not_in",    0,             true,  false)  // Produces a value, therefore an operator.
+OPERATOR(AUTO_CAST,    "auto_cast", 0,             true,  false)  // Produces a value, therefore an operator.
+OPERATOR(CAST,         "cast",      0,             true,  false)  // Produces a value, therefore an operator.
+OPERATOR(TRANSMUTE,    "transmute", 0,             true,  false)  // Produces a value, therefore an operator.
+OPERATOR(OR_ELSE,      "or_else",   1,             true,  false)  // Produces a value, therefore an operator.
+OPERATOR(OR_RETURN,    "or_return", 1,             true,  true)   // Produces a value, therefore an operator.
+OPERATOR(QUESTION,     "?",         1,             false, true)
+OPERATOR(ELLIPSIS,     "..",        2,             false, false)
+OPERATOR(RANGEFULL,    "..=",       2,             false, false)
+OPERATOR(RANGEHALF,    "..<",       2,             false, false)
+OPERATOR(CMPOR,        "||",        3,             false, false)
+OPERATOR(CMPAND,       "&&",        4,             false, false)
+OPERATOR(CMPEQ,        "==",        5,             false, false)
+OPERATOR(NOTEQ,        "!=",        5,             false, false)
+OPERATOR(LT,           "<",         5,             false, false)
+OPERATOR(GT,           ">",         5,             false, false)
+OPERATOR(LTEQ,         "<=",        5,             false, false)
+OPERATOR(GTEQ,         ">=",        5,             false, false)
+OPERATOR(ADD,          "+",         6,             false, false)
+OPERATOR(SUB,          "-",         6,             false, false)
+OPERATOR(OR,           "|",         6,             false, false)
+OPERATOR(XOR,          "~",         6,             false, false)
+OPERATOR(QUO,          "/",         7,             false, false)
+OPERATOR(MUL,          "*",         7,             false, false)
+OPERATOR(MOD,          "%",         7,             false, false)
+OPERATOR(MODMOD,       "%%",        7,             false, false)
+OPERATOR(AND,          "&",         7,             false, false)
+OPERATOR(ANDNOT,       "&~",        7,             false, false)
+OPERATOR(SHL,          "<<",        7,             false, false)
+OPERATOR(SHR,          ">>",        7,             false, false)
 
 // Keywords
 //      ENUM,        MATCH,            ASI
@@ -132,7 +132,7 @@ KEYWORD(TYPEID,      "typeid",         true)
 KEYWORD(WHERE,       "where",          false) 
 KEYWORD(WHEN,        "when",           false) // Can be an operator in (x when y else z)
 KEYWORD(IF,          "if",             false) // Can be an operator in (x if y else z)
-KEYWORD(ELSE,        "else",           false) // Can be an operator in above examples.
+KEYWORD(ELSE,        "else",           false)
 KEYWORD(FOR,         "for",            false)
 KEYWORD(SWITCH,      "switch",         false)
 KEYWORD(DO,          "do",             false)

@@ -55,7 +55,6 @@ enum DirectiveKind {
 	#include "lexemes.h"
 	DIRECTIVE_COUNT,
 };
-#undef DIRECTIVE
 
 typedef enum DirectiveKind DirectiveKind;
 
@@ -72,8 +71,6 @@ struct Location {
 	int column;
 	int line;
 };
-
-#define LOCATION_NIL { 0, 0 }
 
 struct Token {
 	Kind kind;

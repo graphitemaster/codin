@@ -10,6 +10,51 @@
 const Token TOKEN_NIL = { KIND_INVALID, { 0, 0 }, { 0, 0 }, { CAST(LiteralKind, 0), } };
 const Source SOURCE_NIL = { { 0, 0 }, { 0, 0 } };
 
+// Automatic semicolon insertion tables.
+#define KIND(enum, name, asi) asi,
+static const Bool KIND_ASI[] = {
+	#include "lexemes.h"
+};
+
+#define OPERATOR(enum, match, precedence, named, asi) asi,
+static const Bool OPERATOR_ASI[] = {
+	#include "lexemes.h"
+};
+
+#define KEYWORD(enum, match, asi) asi,
+static const Bool KEYWORD_ASI[] = {
+	#include "lexemes.h"
+};
+
+// Keyword LUT
+#define KEYWORD(ident, match, ...) SLIT(match),
+static const String KEYWORDS[] = {
+	#include "lexemes.h"
+};
+
+// Directive LUT
+#define DIRECTIVE(ident, match) SLIT(match),
+static const String DIRECTIVES[] = {
+	#include "lexemes.h"
+};
+
+// Named operator LUT.
+//
+// We use a preprocessing trick here to extract the named operators
+// out of the global table.
+//
+// Since this table will only contain named operators we need the
+// OperatorKind enumerator to return in operator_find as the loop
+// index will no longer match like it does for KEYWORDS.
+#define OPERATOR_IS_NAMED_true(ident, match) \
+	{ SLIT(match), OPERATOR_ ## ident },
+#define OPERATOR_IS_NAMED_false(...)
+#define OPERATOR(ident, match, prec, named, ...) \
+	OPERATOR_IS_NAMED_ ## named(ident, match)
+static const struct NamedOperator { String s; OperatorKind e; } NAMED_OPERATORS[] = {
+	#include "lexemes.h"
+};
+
 #define LEX_ERROR(...) \
 	do { \
 		report_error(lexer->input.source, &lexer->location, __VA_ARGS__); \
@@ -18,36 +63,36 @@ const Source SOURCE_NIL = { { 0, 0 }, { 0, 0 } };
 
 // Searches for a keyword
 static Bool keyword_find(String string, KeywordKind *result) {
-	if (0) {}
-	#define KEYWORD(ident, content, ...) \
-		else if (string_compare(string, SCLIT(content))) { \
-			*result = KEYWORD_ ## ident; \
-			return true; \
+	// The KEYWORDS table matches the KeywordKind order, so we can just
+	// return the result of the loop counter here as an optimization.
+	for (Size i = 0; i < sizeof KEYWORDS / sizeof *KEYWORDS; i++) {
+		if (string_compare(string, KEYWORDS[i])) {
+			*result = CAST(KeywordKind, i);
+			return true;
 		}
-	#include "lexemes.h"
+	}
 	return false;
 }
 
 // Searches for a operator
 static Bool operator_find(String string, OperatorKind *result) {
-	if (0) {}
-	#define OPERATOR(ident, content, ...) \
-		else if (string_compare(string, SCLIT(content))) { \
-			*result = OPERATOR_ ## ident; \
-			return true; \
+	for (Size i = 0; i < sizeof NAMED_OPERATORS / sizeof *NAMED_OPERATORS; i++) {
+		const struct NamedOperator *op = &NAMED_OPERATORS[i];
+		if (string_compare(string, op->s)) {
+			*result = op->e;
+			return true;
 		}
-	#include "lexemes.h"
+	}
 	return false;
 }
 
 static Bool directive_find(String string, DirectiveKind *result) {
-	if (0) {}
-	#define DIRECTIVE(ident, content, ...) \
-		else if (string_compare(string, SCLIT(content))) { \
-			*result = DIRECTIVE_ ## ident; \
-			return true; \
+	for (Size i = 0; i < sizeof DIRECTIVES / sizeof *DIRECTIVES; i++) {
+		if (string_compare(string, DIRECTIVES[i])) {
+			*result = CAST(DirectiveKind, i);
+			return true;
 		}
-	#include "lexemes.h"
+	}
 	return false;
 }
 
@@ -134,7 +179,7 @@ static void scan(Lexer* lexer, Sint32 base) {
 }
 
 static FORCE_INLINE Token mkkind(const Lexer *lexer, Kind kind) {
-	Token token;
+	Token token = {};
 	token.kind = kind;
 	token.location = lexer->location;
 	return token;
@@ -233,6 +278,13 @@ L_exponent:
 	return token;
 }
 
+static Bool scan_escape(Lexer *lexer) {
+	if (!is_digit(lexer->rune)) {
+		advancel(lexer);
+	}
+	return true;
+}
+
 Bool lexer_init(Lexer *lexer, Context *context, const Source *source) {
 	const String *const string = &source->contents;
 	if (string->length == 0) {
@@ -275,6 +327,7 @@ Token lexer_peek(Lexer *lexer) {
 
 static Token lexer_tokenize(Lexer *lexer) {
 	Context *context = lexer->context;
+
 	if (lexer->peek.kind != KIND_INVALID) {
 		const Token token = lexer->peek;
 		lexer->peek.kind = KIND_INVALID;
@@ -311,7 +364,7 @@ static Token lexer_tokenize(Lexer *lexer) {
 	// Single character dispatch
 	advancel(lexer);
 
-	#define USE_COMPUTED_GOTO
+	// #define USE_COMPUTED_GOTO
 
 	#if defined(USE_COMPUTED_GOTO)
 	// Can we use a threaded dispatch table.
@@ -378,8 +431,26 @@ static Token lexer_tokenize(Lexer *lexer) {
 		LEX_ERROR("Unimplemented: line continuation");
 	CASE(SQUOTE, '\''):
 		// Rune literal.
-		token.kind = KIND_LITERAL;
-		LEX_ERROR("Unimplemented: rune literal");
+		{
+			token.kind = KIND_LITERAL;
+			token.as_literal = LITERAL_RUNE;
+			Rune quote = rune;
+			for (;;) {
+				Rune ch = lexer->rune;
+				if (ch == '\n' || ch < 0) {
+					LEX_ERROR("Unterminated rune literal");
+				}
+				advancel(lexer);
+				if (ch == quote) {
+					break;
+				}
+				if (ch == '\\' && !scan_escape(lexer)) {
+					LEX_ERROR("Malformed rune literal");
+				}
+			}
+			token.string.length = lexer->here - token.string.contents;
+			return token;
+		}
 	CASE(GRAVE, '`'):
 		// Raw string literal
 		// FALLTHROUGH();
@@ -437,7 +508,7 @@ static Token lexer_tokenize(Lexer *lexer) {
 		switch (lexer->rune) {
 		case '=':
 			advancel(lexer);
-			return mkassign(lexer, ASSIGNMENT_EQ);
+			return mkassign(lexer, ASSIGNMENT_QUO);
 		case '%':
 			if (advancel(lexer) == '=') {
 				advancel(lexer);
@@ -457,9 +528,9 @@ static Token lexer_tokenize(Lexer *lexer) {
 	CASE(EQUAL, '='):
 		if (lexer->rune == '=') {
 			advancel(lexer);
-			return mkassign(lexer, ASSIGNMENT_EQ);
-		} else {
 			return mkop(lexer, OPERATOR_CMPEQ);
+		} else {
+			return mkassign(lexer, ASSIGNMENT_EQ);
 		}
 	CASE(TILDE, '~'):
 		if (lexer->rune == '=') {
@@ -476,10 +547,13 @@ static Token lexer_tokenize(Lexer *lexer) {
 			return mkop(lexer, OPERATOR_NOT);
 		}
 	CASE(PLUS, '+'):
-		if (lexer->rune == '=') {
+		switch (lexer->rune) {
+		case '=':
 			advancel(lexer);
-			return mkassign(lexer, ASSIGNMENT_AND);
-		} else {
+			return mkassign(lexer, ASSIGNMENT_ADD);
+		case '+':
+			LEX_ERROR("The increment operator '++' does not exist");
+		default:
 			return mkop(lexer, OPERATOR_ADD);
 		}
 	CASE(MINUS, '-'):
@@ -689,26 +763,7 @@ String token_to_string(Token token) {
 }
 
 Token lexer_next(Lexer *lexer) {
-	Token token = lexer_tokenize(lexer);
-
-	#define KIND(enum, name, asi) asi,
-	static const Bool KIND_ASI[] = {
-		#include "lexemes.h"
-	};
-	#undef KIND
-
-	#define OPERATOR(enum, match, precedence, asi) asi,
-	static const Bool OPERATOR_ASI[] = {
-		#include "lexemes.h"
-	};
-	#undef OPERATOR
-
-	#define KEYWORD(enum, match, asi) asi,
-	static const Bool KEYWORD_ASI[] = {
-		#include "lexemes.h"
-	};
-	#undef KEYWORD
-
+	const Token token = lexer_tokenize(lexer);
 	switch (token.kind) {
 	case KIND_OPERATOR:
 		lexer->asi = OPERATOR_ASI[token.as_operator];

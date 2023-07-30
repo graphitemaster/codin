@@ -1,12 +1,12 @@
 #include "threadpool.h"
 
-struct Work {
+struct ThreadPoolWork {
 	void (*function)(void *user);
 	void *user;
 	void (*dispose)(void *user);
 };
 
-static int worker(void *user) {
+static int threadpool_worker(void *user) {
 	ThreadPool *pool = CAST(ThreadPool*, user);
 	for (;;) {
 		mutex_lock(&pool->mutex);
@@ -20,7 +20,7 @@ static int worker(void *user) {
 		}
 	
 		Array *meta = array_meta(pool->work);
-		Work work = pool->work[--meta->size];
+		ThreadPoolWork work = pool->work[--meta->size];
 		mutex_unlock(&pool->mutex);
 
 		work.function(work.user);
@@ -45,7 +45,7 @@ Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
 	}
 
 	for (Size i = 0; i < n_threads; i++) {
-		thread_create(&pool->threads[i], worker, pool);
+		thread_create(&pool->threads[i], threadpool_worker, pool);
 	}
 
 	return true;
@@ -71,7 +71,7 @@ Bool threadpool_free(ThreadPool *pool) {
 
 	const Size n_work = array_size(pool->work);
 	for (Size i = 0; i < n_work; i++) {
-		Work *work = &pool->work[i];
+		ThreadPoolWork *work = &pool->work[i];
 		if (work->dispose) {
 			work->dispose(work->user);
 		}
@@ -85,7 +85,7 @@ Bool threadpool_queue(ThreadPool *pool, void (*function)(void*), void *user, voi
 	Context *context = pool->context;
 
 	mutex_lock(&pool->mutex);
-	const Work work = LIT(Work, function, user, dispose);
+	const ThreadPoolWork work = LIT(ThreadPoolWork, function, user, dispose);
 	if (!array_push(pool->work, work)) {
 		if (dispose) {
 			dispose(user);

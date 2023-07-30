@@ -6,12 +6,12 @@
 
 typedef struct Context Context;
 typedef struct ThreadPool ThreadPool;
-typedef struct Work Work;
+typedef struct ThreadPoolWork ThreadPoolWork;
 
 struct ThreadPool {
 	Context *context;
 	Array(Thread) threads;
-	Array(Work) work;
+	Array(ThreadPoolWork) work;
 	Cond cond;
 	Mutex mutex;
 	Bool quit;

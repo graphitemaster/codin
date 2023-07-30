@@ -185,7 +185,6 @@ enum CallingConvention {
 	CCONV_INVALID,
 	#include "lexemes.h"
 };
-#undef CCONVENTION
 
 typedef enum ExpressionKind ExpressionKind;
 typedef enum StatementKind StatementKind;
@@ -576,7 +575,6 @@ static inline String calling_convention_to_string(CallingConvention cc) {
 		SLIT("invalid"),
 		#include "lexemes.h"
 	};
-	#undef CCONVENTION
 	return TABLE[cc];
 };
 

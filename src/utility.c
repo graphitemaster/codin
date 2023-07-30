@@ -3,6 +3,13 @@
 #include "utility.h"
 #include "strbuf.h"
 
+#if defined(OS_POSIX)
+#include <sys/time.h>
+#elif defined(OS_WINDOWS)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 static Bool sizefile(FILE *fp, Uint64 *size) {
 	if (fseek(fp, 0, SEEK_END) != 0) {
 		return false;
@@ -223,4 +230,17 @@ Float32 f16_to_f32(Float16 f) {
 	if (exp == 0x00000000) o.u += 0x00000001, o.f -= 0x1p-14;
 	o.u |= (f & 0x8000) << 16;
 	return o.f;
+}
+
+Float64 qpc() {
+#if defined(OS_POSIX)
+	struct timeval t;
+	gettimeofday(&t, 0);
+	return t.tv_sec + t.tv_usec*1e-6;
+#elif defined(OS_WINDOWS)
+	LARGE_INTEGER t, f;
+	QueryPerformanceCounter(&t);
+	QueryPerformanceFrequency(&f);
+	return CAST(Float64, t.QuadPart) / CAST(Float64, f.QuadPart);
+#endif
 }

@@ -10,6 +10,7 @@
 #include "dump.h"
 #include "threadpool.h"
 #include "strbuf.h"
+#include "utility.h"
 
 typedef struct Command Command;
 
@@ -51,16 +52,17 @@ static int usage(const char *app) {
 typedef struct Work Work;
 
 struct Work {
-	Context *context;
+	Allocator *allocator;
 	WaitGroup *wg;
 	String file;
 	Tree *tree;
+	Float64 beg, end;
 };
 
 Work *work_create(String file, WaitGroup *wg, Context *context) {
 	Allocator *allocator = context->allocator;
 	Work *work = RCAST(Work *, allocator->allocate(allocator, sizeof *work));
-	work->context = context;
+	work->allocator = allocator;
 	work->wg = wg;
 	work->file = string_copy(file);
 	work->tree = 0;
@@ -69,17 +71,34 @@ Work *work_create(String file, WaitGroup *wg, Context *context) {
 
 void work_destroy(void *data) {
 	Work *work = CAST(Work *, data);
-	Allocator *allocator = work->context->allocator;
+	Allocator *allocator = work->allocator;
 	allocator->deallocate(allocator, work);
 }
 
 static void worker(void *data) {
 	Work *work = RCAST(Work *, data);
-	work->tree = parse(work->file, work->context);
+
+	Context context;
+	context.allocator = work->allocator;
+	if (setjmp(context.jmp) != 0) {
+		work->tree = 0;
+		waitgroup_signal(work->wg);
+		return;
+	}
+
+	work->beg = qpc();
+	work->tree = parse(work->file, &context);
+	work->end = qpc();
+
 	waitgroup_signal(work->wg);
 }
 
-static Bool dump_ast(Context *context, String path) {
+static Bool dump_ast(String path) {
+	Context ctx;
+	ctx.allocator = &DEFAULT_ALLOCATOR;
+
+	Context *context = &ctx;
+
 	Array(String) files = path_list(path);
 
 	ThreadPool pool;
@@ -114,8 +133,12 @@ static Bool dump_ast(Context *context, String path) {
 	waitgroup_destroy(&wg);
 
 	for (Size i = 0; i < n_files; i++) {
-		dump(works[i]->tree);
-		work_destroy(works[i]);
+		Work *work = works[i];
+		if (work->tree) {
+			printf("Took %.54g sec\n", work->end - work->beg);
+			dump(work->tree);
+		}
+		work_destroy(work);
 	}
 
 	threadpool_free(&pool);
@@ -138,24 +161,12 @@ int main(int argc, char **argv) {
 		return usage(app);
 	}
 
-	Allocator *allocator = &DEFAULT_ALLOCATOR;
-
-	Context context;
-	context.allocator = allocator;
-
-	if (setjmp(context.jmp) != 0) {
-		allocator->finalize(allocator);
-		return 1;
-	}
-
 	Bool result = false;
 	if (!strcmp(argv[0], "dump-ast")) {
-		result = dump_ast(&context, string_from_null(argv[1]));
+		result = dump_ast(string_from_null(argv[1]));
 	} else {
 		return usage(app);
 	}
-
-	allocator->finalize(allocator);
 
 	return result ? 1 : 0;
 }
