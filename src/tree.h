@@ -59,6 +59,12 @@ typedef struct MatrixType MatrixType;
 typedef struct DistinctType DistinctType;
 typedef struct EnumType EnumType;
 typedef struct ExpressionType ExpressionType;
+typedef struct StructType StructType;
+typedef struct ConcreteStructType ConcreteStructType;
+typedef struct GenericStructType GenericStructType;
+typedef struct UnionType UnionType;
+typedef struct ConcreteUnionType ConcreteUnionType;
+typedef struct GenericUnionType GenericUnionType;
 
 // Misc.
 typedef struct Identifier Identifier;
@@ -102,6 +108,16 @@ enum ProcedureKind {
 	PROCEDURE_GENERIC,
 };
 
+enum StructKind {
+	STRUCT_CONCRETE,
+	STRUCT_GENERIC,
+};
+
+enum UnionKind {
+	UNION_CONCRETE,
+	UNION_GENERIC,
+};
+
 enum TypeKind {
 	TYPE_BUILTIN,       // b{8,16,32,64}, f{16,32,64}(le|be), (i|u)8, (i|u){16,32,64,128}(le|be), 
 	TYPE_PROCEDURE,     // proc
@@ -116,6 +132,8 @@ enum TypeKind {
 	TYPE_MATRIX,        // matrix[R,C]T
 	TYPE_DISTINCT,      // distinct T
 	TYPE_ENUM,          // enum
+	TYPE_STRUCT,        // struct
+	TYPE_UNION,         // union
 	TYPE_EXPRESSION,    // Expression which evaluates to a Type*
 };
 
@@ -150,6 +168,18 @@ enum ProcedureFlag {
 	PROC_FLAG_FORCE_INLINE              = 1 << 5,
 };
 
+enum StructFlag {
+	STRUCT_FLAG_PACKED     = 1 << 0, // #packed
+	STRUCT_FLAG_UNCOPYABLE = 1 << 1, // #no_copy
+	STRUCT_FLAG_UNION      = 1 << 2, // #raw_union
+};
+
+enum UnionFlag {
+	UNION_FLAG_NO_NIL     = 1 << 0,
+	UNION_FLAG_SHARED_NIL = 1 << 1,
+	UNION_FLAG_MAYBE      = 1 << 2,
+};
+
 #define CCONVENTION(name, enumerator) CCONV_ ## enumerator,
 enum CallingConvention {
 	CCONV_INVALID,
@@ -160,12 +190,16 @@ enum CallingConvention {
 typedef enum ExpressionKind ExpressionKind;
 typedef enum StatementKind StatementKind;
 typedef enum ProcedureKind ProcedureKind;
+typedef enum StructKind StructKind;
+typedef enum UnionKind UnionKind;
 typedef enum TypeKind TypeKind;
 typedef enum BuiltinTypeKind BuiltinTypeKind;
 typedef enum Endianess Endianess;
 
 typedef enum BlockFlag BlockFlag;
 typedef enum ProcedureFlag ProcedureFlag;
+typedef enum StructFlag StructFlag;
+typedef enum UnionFlag UnionFlag;
 
 typedef enum CallingConvention CallingConvention;
 
@@ -488,6 +522,42 @@ struct ExpressionType {
 	Expression *expression;
 };
 
+struct StructType {
+	Type base;
+	StructKind kind;
+	StructFlag flags;
+	Expression *align;
+	Array(Field*) fields;
+	ListExpression *where_clauses;
+};
+
+struct ConcreteStructType {
+	StructType base;
+};
+
+struct GenericStructType {
+	StructType base;
+	Array(Field*) parameters;
+};
+
+struct UnionType {
+	Type base;
+	UnionKind kind;
+	UnionFlag flags;
+	Expression *align;
+	Array(Type*) variants;
+	ListExpression *where_clauses;
+};
+
+struct ConcreteUnionType {
+	UnionType base;
+};
+
+struct GenericUnionType {
+	UnionType base;
+	Array(Field*) parameters;
+};
+
 // Misc.
 struct Identifier {
 	String contents;
@@ -566,6 +636,10 @@ MatrixType *tree_new_matrix_type(Tree *tree, Expression *rows, Expression *colum
 DistinctType *tree_new_distinct_type(Tree *tree, Type *type);
 EnumType *tree_new_enum_type(Tree *tree, Type *base_type, Array(Field*) fields);
 ExpressionType *tree_new_expression_type(Tree *tree, Expression *expression);
+ConcreteStructType *tree_new_concrete_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) fields, ListExpression *where_clauses);
+GenericStructType *tree_new_generic_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) parameters, Array(Field*) fields, ListExpression *where_clauses);
+ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Type*) variants, ListExpression *where_clauses);
+GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Field*) parameters, Array(Type*) variants, ListExpression *where_clauses);
 
 Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value);
 Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly);

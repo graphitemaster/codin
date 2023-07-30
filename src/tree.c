@@ -370,6 +370,59 @@ EnumType *tree_new_enum_type(Tree *tree, Type *base_type, Array(Field*) fields) 
 	return type;
 }
 
+// struct
+ConcreteStructType *tree_new_concrete_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) fields, ListExpression *where_clauses) {
+	Allocator *allocator = tree->context->allocator;
+	ConcreteStructType *type = CAST(ConcreteStructType *, allocator->allocate(allocator, sizeof *type));
+	type->base.base.kind = TYPE_STRUCT;
+	type->base.kind = STRUCT_CONCRETE;
+	type->base.flags = flags;
+	type->base.align = align;
+	type->base.fields = fields;
+	type->base.where_clauses = where_clauses;
+	return type;
+}
+
+// struct()
+GenericStructType *tree_new_generic_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) parameters, Array(Field*) fields, ListExpression *where_clauses) {
+	Allocator *allocator = tree->context->allocator;
+	GenericStructType *type = CAST(GenericStructType *, allocator->allocate(allocator, sizeof *type));
+	type->base.base.kind = TYPE_STRUCT;
+	type->base.kind = STRUCT_GENERIC;
+	type->base.flags = flags;
+	type->base.align = align;
+	type->base.fields = fields;
+	type->base.where_clauses = where_clauses;
+	type->parameters = parameters;
+	return type;
+}
+
+// union()
+ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Type*) variants, ListExpression *where_clauses) {
+	Allocator *allocator = tree->context->allocator;
+	ConcreteUnionType *type = CAST(ConcreteUnionType *, allocator->allocate(allocator, sizeof *type));
+	type->base.base.kind = TYPE_UNION;
+	type->base.kind = UNION_GENERIC;
+	type->base.flags = flags;
+	type->base.align = align;
+	type->base.variants = variants;
+	type->base.where_clauses = where_clauses;
+	return type;
+}
+
+GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Field*) parameters, Array(Type*) variants, ListExpression *where_clauses) {
+	Allocator *allocator = tree->context->allocator;
+	GenericUnionType *type = CAST(GenericUnionType *, allocator->allocate(allocator, sizeof *type));
+	type->base.base.kind = TYPE_UNION;
+	type->base.kind = UNION_GENERIC;
+	type->base.flags = flags;
+	type->base.align = align;
+	type->base.variants = variants;
+	type->base.where_clauses = where_clauses;
+	type->parameters = parameters;
+	return type;
+}
+
 ExpressionType *tree_new_expression_type(Tree *tree, Expression *expression) {
 	Allocator *allocator = tree->context->allocator;
 	ExpressionType *type = CAST(ExpressionType *, allocator->allocate(allocator, sizeof *type));

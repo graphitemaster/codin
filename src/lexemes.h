@@ -189,6 +189,7 @@ DIRECTIVE(LOAD,                     "load")
 DIRECTIVE(LOAD_HASH,                "load_hash")
 DIRECTIVE(DEFINED,                  "defined")
 DIRECTIVE(CONFIG,                   "config")
+DIRECTIVE(MAYBE,                    "maybe")
 
 /*
 // This is actually impossible to lex within the Odin language because @ can

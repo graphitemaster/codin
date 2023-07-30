@@ -297,6 +297,40 @@ Bool dump_expression_type(const ExpressionType *type, Sint32 depth) {
 	return dump_expression(type->expression, depth);
 }
 
+Bool dump_struct_type(const StructType *type, Sint32 depth) {
+	pad(depth);
+	printf("(struct\n");
+	if (type->align) {
+		pad(depth + 1);
+		printf("(align\n");
+		dump_expression(type->align, depth + 2);
+		printf(")\n");
+	}
+	dump_fields(type->fields, depth + 1);
+	printf(")");
+	return true;
+}
+
+Bool dump_union_type(const UnionType *type, Sint32 depth) {
+	pad(depth);
+	printf("(union\n");
+	if (type->align) {
+		pad(depth + 1);
+		printf("(align\n");
+		dump_expression(type->align, depth + 2);
+		printf(")\n");
+	}
+	const Size n_variants = array_size(type->variants);
+	for (Size i = 0; i < n_variants; i++) {
+		dump_type(type->variants[i], depth + 1);
+		if (i != n_variants - 1) {
+			printf("\n");
+		}
+	}
+	printf(")");
+	return true;
+}
+
 Bool dump_procedure_expression(const ProcedureExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(proc\n");
@@ -330,6 +364,8 @@ Bool dump_type(const Type *type, Sint32 depth) {
 	case TYPE_DISTINCT:      return dump_distinct_type(RCAST(const DistinctType *, type), depth);
 	case TYPE_ENUM:          return dump_enum_type(RCAST(const EnumType *, type), depth);
 	case TYPE_EXPRESSION:    return dump_expression_type(RCAST(const ExpressionType *, type), depth);
+	case TYPE_STRUCT:        return dump_struct_type(RCAST(const StructType *, type), depth);
+	case TYPE_UNION:         return dump_union_type(RCAST(const UnionType *, type), depth);
 	}
 	return false;
 }
