@@ -54,22 +54,22 @@ KIND(UNDEFINED,    "undefined",   true)  // '---' is not an operator
 //
 // These are different from operators because assignments are statements.
 //
-//   ENUM,           NAME
-ASSIGNMENT(EQ,       "eq")     // '=' is n ot an operator
-ASSIGNMENT(ADDEQ,    "add")    // '+=' is not an operator
-ASSIGNMENT(SUBEQ,    "sub")    // '-=' is not an operator
-ASSIGNMENT(MULEQ,    "mul")    // '*=' is not an operator
-ASSIGNMENT(QUOEQ,    "quot")   // '/=' is not an operator
-ASSIGNMENT(MODEQ,    "mod")    // '%=' is not an operator
-ASSIGNMENT(MODMODEQ, "rem")    // '%%=' is not an operator
-ASSIGNMENT(ANDEQ,    "and")    // '&=' is not an operator
-ASSIGNMENT(OREQ,     "or")     // '|=' is not an operator
-ASSIGNMENT(XOREQ,    "xor")    // '~=' is not an operator
-ASSIGNMENT(ANDNOTEQ, "andnot") // '&~=' is not an operator
-ASSIGNMENT(SHLEQ,    "lshift") // '<<=' is not an operator
-ASSIGNMENT(SHREQ,    "rshift") // '>>=' is not an operator
-ASSIGNMENT(CMPANDEQ, "andeq")  // '&&=' is not an operator
-ASSIGNMENT(CMPOREQ,  "oreq")   // '||=' is not an operator
+//   ENUM,         NAME
+ASSIGNMENT(EQ,     "eq")     // '='
+ASSIGNMENT(ADD,    "add")    // '+='
+ASSIGNMENT(SUB,    "sub")    // '-='
+ASSIGNMENT(MUL,    "mul")    // '*='
+ASSIGNMENT(QUO,    "quot")   // '/='
+ASSIGNMENT(MOD,    "mod")    // '%='
+ASSIGNMENT(REM,    "rem")    // '%%='
+ASSIGNMENT(AND,    "and")    // '&='
+ASSIGNMENT(OR,     "or")     // '|='
+ASSIGNMENT(XOR,    "xor")    // '~='
+ASSIGNMENT(ANDNOT, "andnot") // '&~='
+ASSIGNMENT(SHL,    "shl")    // '<<='
+ASSIGNMENT(SHR,    "shr")    // '>>='
+ASSIGNMENT(CMPAND, "and")    // '&&='
+ASSIGNMENT(CMPOR,  "or")     // '||='
 
 // Literal kinds
 //      ENUM,      NAME

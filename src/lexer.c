@@ -18,8 +18,9 @@ const Source SOURCE_NIL = { { 0, 0 }, { 0, 0 } };
 
 // Searches for a keyword
 static Bool keyword_find(String string, KeywordKind *result) {
+	if (0) {}
 	#define KEYWORD(ident, content, ...) \
-		if (string_compare(string, SCLIT(content))) { \
+		else if (string_compare(string, SCLIT(content))) { \
 			*result = KEYWORD_ ## ident; \
 			return true; \
 		}
@@ -29,8 +30,9 @@ static Bool keyword_find(String string, KeywordKind *result) {
 
 // Searches for a operator
 static Bool operator_find(String string, OperatorKind *result) {
+	if (0) {}
 	#define OPERATOR(ident, content, ...) \
-		if (string_compare(string, SCLIT(content))) { \
+		else if (string_compare(string, SCLIT(content))) { \
 			*result = OPERATOR_ ## ident; \
 			return true; \
 		}
@@ -39,8 +41,9 @@ static Bool operator_find(String string, OperatorKind *result) {
 }
 
 static Bool directive_find(String string, DirectiveKind *result) {
+	if (0) {}
 	#define DIRECTIVE(ident, content, ...) \
-		if (string_compare(string, SCLIT(content))) { \
+		else if (string_compare(string, SCLIT(content))) { \
 			*result = DIRECTIVE_ ## ident; \
 			return true; \
 		}
@@ -48,7 +51,7 @@ static Bool directive_find(String string, DirectiveKind *result) {
 	return false;
 }
 
-static Bool is_char(Rune ch) {
+static FORCE_INLINE Bool is_char(Rune ch) {
 	if (ch < 0x80) {
 		if (ch == '_') {
 			return true;
@@ -59,7 +62,7 @@ static Bool is_char(Rune ch) {
 	return false;
 }
 
-static Bool is_digit(Rune ch) {
+static FORCE_INLINE Bool is_digit(Rune ch) {
 	if (ch < 0x80) {
 		return (CAST(Uint32, ch) - '0') < 10;
 	}
@@ -69,10 +72,7 @@ static Bool is_digit(Rune ch) {
 
 static Uint8 peekl(Lexer *lexer) {
 	const Input *input = &lexer->input;
-	if (input->cur < input->end) {
-		return *input->cur;
-	}
-	return 0;
+	return input->cur < input->end ? *input->cur : 0;
 }
 
 static Rune advancel(Lexer *lexer) {
@@ -283,13 +283,9 @@ static Token lexer_tokenize(Lexer *lexer) {
 
 	skip_whitespace(lexer, lexer->asi);
 
-	Token token;
-	token.kind = KIND_INVALID;
-
+	Token token = mkkind(lexer, KIND_INVALID);
 	token.string.contents = CCAST(Uint8*, lexer->here);
 	token.string.length = 1; // One rune.
-
-	token.location = lexer->location;
 
 	const Rune rune = lexer->rune;
 	if (is_char(rune)) {
@@ -307,272 +303,316 @@ static Token lexer_tokenize(Lexer *lexer) {
 		if (operator_find(token.string, &token.as_operator)) {
 			token.kind = KIND_OPERATOR;
 		}
-	} else if (rune >= '0' && rune <= '9') {
-		token = scan_numeric(lexer, false);
-	} else {
-		advancel(lexer);
-		switch (rune) {
-		case RUNE_EOF:
-			token.kind = KIND_EOF;
-			if (lexer->asi) {
-				lexer->asi = false;
-				token.string = SCLIT("\n");
-				token.kind = KIND_SEMICOLON;
-				return token;
-			}
-			break;
-		case '\n':
+		return token;
+	} else if (is_digit(rune)) {
+		return scan_numeric(lexer, false);
+	}
+
+	// Single character dispatch
+	advancel(lexer);
+
+	#define USE_COMPUTED_GOTO
+
+	#if defined(USE_COMPUTED_GOTO)
+	// Can we use a threaded dispatch table.
+	static const void *DISPATCH_TABLE[] = {
+		[CAST(Uint8, RUNE_EOF)] = &&L_EOF,
+		['\n']                  = &&L_LF,
+		['\\']                  = &&L_BSLASH,
+		['\'']                  = &&L_SQUOTE,
+		['"']                   = &&L_DQUOTE,
+		['`']                   = &&L_GRAVE,
+		['.']                   = &&L_PERIOD,
+		['{']                   = &&L_LBRACE,
+		['}']                   = &&L_RBRACE,
+		[';']                   = &&L_SEMI,
+		['@']                   = &&L_AT,
+		['$']                   = &&L_DOLLAR,
+		['?']                   = &&L_QUESTION,
+		['^']                   = &&L_CARET,
+		[',']                   = &&L_COMMA,
+		[':']                   = &&L_COLON,
+		['(']                   = &&L_LPAREN,
+		[')']                   = &&L_RPAREN,
+		['[']                   = &&L_LBRACKET,
+		[']']                   = &&L_RBRACKET,
+		['%']                   = &&L_PERCENT,
+		['*']                   = &&L_STAR,
+		['=']                   = &&L_EQUAL,
+		['~']                   = &&L_TILDE,
+		['!']                   = &&L_EXCLAIM,
+		['+']                   = &&L_PLUS,
+		['-']                   = &&L_MINUS,
+		['#']                   = &&L_POUND,
+		['/']                   = &&L_FSLASH,
+		['<']                   = &&L_LT,
+		['>']                   = &&L_GT,
+		['&']                   = &&L_AND,
+		['|']                   = &&L_OR,
+	};
+	#define CASE(_name, char) L ## _ ## _name
+	#define SWITCH(code) goto *DISPATCH_TABLE[CAST(Uint8, code)];
+	#else
+	#define CASE(_name, char) case char
+	#define SWITCH(code) switch (code)
+	#endif
+
+	SWITCH(rune) {
+	CASE(EOF, RUNE_EOF):
+		token.kind = KIND_EOF;
+		if (lexer->asi) {
 			lexer->asi = false;
 			token.string = SCLIT("\n");
 			token.kind = KIND_SEMICOLON;
 			return token;
-		case '\\':
-			lexer->asi = false;
-			// TODO(dweiler): Implement.
-			break;
-		case '\'':
-			// Rune literal.
+		}
+		return token;
+	CASE(LF, '\n'):
+		lexer->asi = false;
+		token.string = SCLIT("\n");
+		token.kind = KIND_SEMICOLON;
+		return token;
+	CASE(BSLASH, '\\'):
+		// Line continuation.
+		lexer->asi = false;
+		LEX_ERROR("Unimplemented: line continuation");
+	CASE(SQUOTE, '\''):
+		// Rune literal.
+		token.kind = KIND_LITERAL;
+		LEX_ERROR("Unimplemented: rune literal");
+	CASE(GRAVE, '`'):
+		// Raw string literal
+		// FALLTHROUGH();
+	CASE(DQUOTE, '"'):
+		{
+			const Rune quote = rune;
+			for (;;) {
+				const Rune r = lexer->rune;
+				if ((rune == '"' && r == '\n') || r == EOF) {
+					LEX_ERROR("Unterminated string literal");
+					break;
+				}
+				advancel(lexer);
+				if (r == quote) break;
+				if (rune != '"' && r == '\\') {
+					unescape(lexer);
+				}
+			}
 			token.kind = KIND_LITERAL;
-			// TODO(dweiler): Implement.
-			break;
-		case '`':
-			// Raw string literal
-			FALLTHROUGH();
-		case '"':
-			{
-				Rune quote = rune;
-				for (;;) {
-					const Rune r = lexer->rune;
-					if ((rune == '"' && r == '\n') || r == EOF) {
-						LEX_ERROR("Unterminated string literal");
-						break;
-					}
-					advancel(lexer);
-					if (r == quote) break;
-					if (rune != '"' && r == '\\') {
-						unescape(lexer);
-					}
-				}
-				token.kind = KIND_LITERAL;
-				token.as_literal = LITERAL_STRING;
-				token.string.length = lexer->here - token.string.contents;
-				return token;
-			}
-			break;
-		case '.':
-			if (lexer->rune >= '0' && lexer->rune <= '9') {
-				return scan_numeric(lexer, true);
-			} else if (lexer->rune == '.') {
-				switch (advancel(lexer)) {
-				case '<':
-					advancel(lexer);
-					return mkop(lexer, OPERATOR_RANGEHALF);
-				case '=':
-					advancel(lexer);
-					return mkop(lexer, OPERATOR_RANGEFULL);
-				default:
-					return mkop(lexer, OPERATOR_ELLIPSIS);
-				}
-			}
-			break;
-		case '{': return mkkind(lexer, KIND_LBRACE);
-		case '}': return mkkind(lexer, KIND_RBRACE);
-		case ';': return mkkind(lexer, KIND_SEMICOLON);
-		case '@': return mkkind(lexer, KIND_ATTRIBUTE);
-		case '$': return mkkind(lexer, KIND_CONST);
-		case '?': return mkop(lexer, OPERATOR_QUESTION);
-		case '^': return mkop(lexer, OPERATOR_POINTER);
-		case ',': return mkop(lexer, OPERATOR_COMMA);
-		case ':': return mkop(lexer, OPERATOR_COLON);
-		case '(': return mkop(lexer, OPERATOR_LPAREN);
-		case ')': return mkop(lexer, OPERATOR_RPAREN);
-		case '[': return mkop(lexer, OPERATOR_LBRACKET);
-		case ']': return mkop(lexer, OPERATOR_RBRACKET);
-		case '%':
-			switch (lexer->rune) {
-			case '=':
-				advancel(lexer);
-				return mkassign(lexer, ASSIGNMENT_EQ);
-			case '%':
-				if (advancel(lexer) == '=') {
-					advancel(lexer);
-					return mkassign(lexer, ASSIGNMENT_MODMODEQ);
-				}
-				return mkop(lexer, OPERATOR_MODMOD);
-			default:
-				return mkop(lexer, OPERATOR_MOD);
-			}
-		case '*':
-			if (lexer->rune == '=') {
-				advancel(lexer);
-				return mkassign(lexer, ASSIGNMENT_MULEQ);
-			} else {
-				return mkop(lexer, OPERATOR_MUL);
-			}
-		case '=':
-			if (lexer->rune == '=') {
-				advancel(lexer);
-				return mkassign(lexer, ASSIGNMENT_EQ);
-			} else {
-				return mkop(lexer, OPERATOR_CMPEQ);
-			}
-		case '~':
-			if (lexer->rune == '=') {
-				advancel(lexer);
-				return mkassign(lexer, ASSIGNMENT_XOREQ);
-			} else {
-				return mkop(lexer, OPERATOR_XOR);
-			}
-		case '!':
-			if (lexer->rune == '=') {
-				advancel(lexer);
-				return mkop(lexer, OPERATOR_NOTEQ);
-			} else {
-				return mkop(lexer, OPERATOR_NOT);
-			}
-		case '+':
-			if (lexer->rune == '=') {
-				advancel(lexer);
-				return mkassign(lexer, ASSIGNMENT_ANDEQ);
-			} else {
-				return mkop(lexer, OPERATOR_ADD);
-			}
-		case '-':
-			switch (lexer->rune) {
-			case '=':
-				advancel(lexer);
-				return mkassign(lexer, ASSIGNMENT_SUBEQ);
-			case '-':
-				if (advancel(lexer) == '-') {
-					advancel(lexer);
-					return mkkind(lexer, KIND_UNDEFINED);
-				} else {
-					LEX_ERROR("The decrement operator '--' does not exist");
-				}
-			case '>':
-				advancel(lexer);
-				return mkop(lexer, OPERATOR_ARROW);
-			default:
-				return mkop(lexer, OPERATOR_SUB);
-			}
-			break;
-		case '#':
-			while (is_char(lexer->rune)) {
-				advancel(lexer);
-			}
-			token.string.contents += 1; // Skip '#'
+			token.as_literal = LITERAL_STRING;
 			token.string.length = lexer->here - token.string.contents;
-			if (directive_find(token.string, &token.as_directive)) {
-				token.kind = KIND_DIRECTIVE;
-			} else {
-				token.kind = KIND_INVALID;
-			}
 			return token;
-		case '/':
-			switch (lexer->rune) {
-			case '=':
-				advancel(lexer);
-				return mkassign(lexer, ASSIGNMENT_QUOEQ);
-			// Line comment.
-			case '/':
-				skip_line(lexer);
-				return mkkind(lexer, KIND_COMMENT);
-			// Block comment
-			case '*':
-				advancel(lexer);
-				// Support nested block comments.
-				for (int i = 1; i > 0; /**/) switch (lexer->rune) {
-				case RUNE_EOF:
-					i = 0;
-					break;
-				case '/':
-					if (advancel(lexer) == '*') {
-						advancel(lexer);
-						i++;
-					}
-					break;
-				case '*':
-					if (advancel(lexer) == '/') {
-						advancel(lexer);
-						i--;
-					}
-					break;
-				default:
-					advancel(lexer);
-					break;
-				}
-				return mkkind(lexer, KIND_COMMENT);
-			default:
-				return mkop(lexer, OPERATOR_QUO);
-			}
-			break;
-		case '<':
-			switch (lexer->rune) {
-			case '=':
-				advancel(lexer);
-				return mkop(lexer, OPERATOR_LTEQ);
+		}
+	CASE(PERIOD, '.'):
+		if (is_digit(lexer->rune)) {
+			return scan_numeric(lexer, true);
+		} else if (lexer->rune == '.') {
+			switch (advancel(lexer)) {
 			case '<':
 				advancel(lexer);
-				if (advancel(lexer) == '=') {
-					advancel(lexer);
-					return mkassign(lexer, ASSIGNMENT_SHLEQ);
-				}
-				return mkop(lexer, OPERATOR_SHL);
+				return mkop(lexer, OPERATOR_RANGEHALF);
+			case '=':
+				advancel(lexer);
+				return mkop(lexer, OPERATOR_RANGEFULL);
 			default:
-				return mkop(lexer, OPERATOR_LT);
+				return mkop(lexer, OPERATOR_ELLIPSIS);
 			}
-			break;
+		} else {
+			return mkop(lexer, OPERATOR_PERIOD);
+		}
+	CASE(LBRACE,   '{'): return mkkind(lexer, KIND_LBRACE);
+	CASE(RBRACE,   '}'): return mkkind(lexer, KIND_RBRACE);
+	CASE(SEMI,     ';'): return mkkind(lexer, KIND_SEMICOLON);
+	CASE(AT,       '@'): return mkkind(lexer, KIND_ATTRIBUTE);
+	CASE(DOLLAR,   '$'): return mkkind(lexer, KIND_CONST);
+	CASE(QUESTION, '?'): return mkop(lexer, OPERATOR_QUESTION);
+	CASE(CARET,    '^'): return mkop(lexer, OPERATOR_POINTER);
+	CASE(COMMA,    ','): return mkop(lexer, OPERATOR_COMMA);
+	CASE(COLON,    ':'): return mkop(lexer, OPERATOR_COLON);
+	CASE(LPAREN,   '('): return mkop(lexer, OPERATOR_LPAREN);
+	CASE(RPAREN,   ')'): return mkop(lexer, OPERATOR_RPAREN);
+	CASE(LBRACKET, '['): return mkop(lexer, OPERATOR_LBRACKET);
+	CASE(RBRACKET, ']'): return mkop(lexer, OPERATOR_RBRACKET);
+	CASE(PERCENT,  '%'):
+		switch (lexer->rune) {
+		case '=':
+			advancel(lexer);
+			return mkassign(lexer, ASSIGNMENT_EQ);
+		case '%':
+			if (advancel(lexer) == '=') {
+				advancel(lexer);
+				return mkassign(lexer, ASSIGNMENT_REM);
+			}
+			return mkop(lexer, OPERATOR_MODMOD);
+		default:
+			return mkop(lexer, OPERATOR_MOD);
+		}
+	CASE(STAR, '*'):
+		if (lexer->rune == '=') {
+			advancel(lexer);
+			return mkassign(lexer, ASSIGNMENT_MUL);
+		} else {
+			return mkop(lexer, OPERATOR_MUL);
+		}
+	CASE(EQUAL, '='):
+		if (lexer->rune == '=') {
+			advancel(lexer);
+			return mkassign(lexer, ASSIGNMENT_EQ);
+		} else {
+			return mkop(lexer, OPERATOR_CMPEQ);
+		}
+	CASE(TILDE, '~'):
+		if (lexer->rune == '=') {
+			advancel(lexer);
+			return mkassign(lexer, ASSIGNMENT_XOR);
+		} else {
+			return mkop(lexer, OPERATOR_XOR);
+		}
+	CASE(EXCLAIM, '!'):
+		if (lexer->rune == '=') {
+			advancel(lexer);
+			return mkop(lexer, OPERATOR_NOTEQ);
+		} else {
+			return mkop(lexer, OPERATOR_NOT);
+		}
+	CASE(PLUS, '+'):
+		if (lexer->rune == '=') {
+			advancel(lexer);
+			return mkassign(lexer, ASSIGNMENT_AND);
+		} else {
+			return mkop(lexer, OPERATOR_ADD);
+		}
+	CASE(MINUS, '-'):
+		switch (lexer->rune) {
+		case '=':
+			advancel(lexer);
+			return mkassign(lexer, ASSIGNMENT_SUB);
+		case '-':
+			if (advancel(lexer) == '-') {
+				advancel(lexer);
+				return mkkind(lexer, KIND_UNDEFINED);
+			} else {
+				LEX_ERROR("The decrement operator '--' does not exist");
+			}
 		case '>':
-			switch (lexer->rune) {
-			case '=':
-				advancel(lexer);
-				return mkop(lexer, OPERATOR_GTEQ);
-			case '>':
-				if (advancel(lexer) == '=') {
+			advancel(lexer);
+			return mkop(lexer, OPERATOR_ARROW);
+		default:
+			return mkop(lexer, OPERATOR_SUB);
+		}
+	CASE(POUND, '#'):
+		while (is_char(lexer->rune)) {
+			advancel(lexer);
+		}
+		token.string.contents += 1; // Skip '#'
+		token.string.length = lexer->here - token.string.contents;
+		if (directive_find(token.string, &token.as_directive)) {
+			token.kind = KIND_DIRECTIVE;
+		} else {
+			token.kind = KIND_INVALID;
+		}
+		return token;
+	CASE(FSLASH, '/'):
+		switch (lexer->rune) {
+		case '=':
+			advancel(lexer);
+			return mkassign(lexer, ASSIGNMENT_QUO);
+		// Line comment.
+		case '/':
+			skip_line(lexer);
+			return mkkind(lexer, KIND_COMMENT);
+		// Block comment
+		case '*':
+			advancel(lexer);
+			// Support nested block comments.
+			for (int i = 1; i > 0; /**/) switch (lexer->rune) {
+			case RUNE_EOF:
+				return mkkind(lexer, KIND_EOF);
+			case '/':
+				if (advancel(lexer) == '*') {
 					advancel(lexer);
-					return mkassign(lexer, ASSIGNMENT_SHREQ);
+					i++;
 				}
-				return mkop(lexer, OPERATOR_SHR);
+				break;
+			case '*':
+				if (advancel(lexer) == '/') {
+					advancel(lexer);
+					i--;
+				}
+				break;
 			default:
-				return mkop(lexer, OPERATOR_GT);
+				advancel(lexer);
 			}
+			return mkkind(lexer, KIND_COMMENT);
+		default:
+			return mkop(lexer, OPERATOR_QUO);
+		}
+	CASE(LT, '<'):
+		switch (lexer->rune) {
+		case '=':
+			advancel(lexer);
+			return mkop(lexer, OPERATOR_LTEQ);
+		case '<':
+			advancel(lexer);
+			if (advancel(lexer) == '=') {
+				advancel(lexer);
+				return mkassign(lexer, ASSIGNMENT_SHL);
+			}
+			return mkop(lexer, OPERATOR_SHL);
+		default:
+			return mkop(lexer, OPERATOR_LT);
+		}
+	CASE(GT, '>'):
+		switch (lexer->rune) {
+		case '=':
+			advancel(lexer);
+			return mkop(lexer, OPERATOR_GTEQ);
+		case '>':
+			if (advancel(lexer) == '=') {
+				advancel(lexer);
+				return mkassign(lexer, ASSIGNMENT_SHR);
+			}
+			return mkop(lexer, OPERATOR_SHR);
+		default:
+			return mkop(lexer, OPERATOR_GT);
+		}
+	CASE(AND, '&'):
+		switch (lexer->rune) {
+		case '~':
+			if (advancel(lexer) == '=') {
+				advancel(lexer);
+				return mkassign(lexer, ASSIGNMENT_ANDNOT);
+			}
+			return mkop(lexer, OPERATOR_ANDNOT);
+		case '=':
+			advancel(lexer);
+			return mkassign(lexer, ASSIGNMENT_AND);
 		case '&':
-			switch (lexer->rune) {
-			case '~':
-				if (advancel(lexer) == '=') {
-					advancel(lexer);
-					return mkassign(lexer, ASSIGNMENT_ANDNOTEQ);
-				}
-				return mkop(lexer, OPERATOR_ANDNOT);
-			case '=':
+			if (advancel(lexer) == '=') {
 				advancel(lexer);
-				return mkassign(lexer, ASSIGNMENT_ANDEQ);
-			case '&':
-				if (advancel(lexer) == '=') {
-					advancel(lexer);
-					return mkassign(lexer, ASSIGNMENT_ANDEQ);
-				}
-				return mkop(lexer, OPERATOR_CMPAND);
-			default:
-				return mkop(lexer, OPERATOR_AND);
+				return mkassign(lexer, ASSIGNMENT_AND);
 			}
+			return mkop(lexer, OPERATOR_CMPAND);
+		default:
+			return mkop(lexer, OPERATOR_AND);
+		}
+	CASE(OR, '|'):
+		switch (lexer->rune) {
+		case '=':
+			advancel(lexer);
+			return mkassign(lexer, ASSIGNMENT_OR);
 		case '|':
-			switch (lexer->rune) {
-			case '=':
+			if (advancel(lexer) == '=') {
 				advancel(lexer);
-				return mkassign(lexer, ASSIGNMENT_OREQ);
-			case '|':
-				if (advancel(lexer) == '=') {
-					advancel(lexer);
-					return mkassign(lexer, ASSIGNMENT_CMPOREQ);
-				}
-				return mkop(lexer, OPERATOR_CMPOR);
-			default:
-				return mkop(lexer, OPERATOR_OR);
+				return mkassign(lexer, ASSIGNMENT_CMPOR);
 			}
+			return mkop(lexer, OPERATOR_CMPOR);
+		default:
+			return mkop(lexer, OPERATOR_OR);
 		}
 	}
-	return token;
+
+	UNREACHABLE();
 }
 
 // Simple helper routines
