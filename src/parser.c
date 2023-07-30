@@ -6,7 +6,7 @@
 #include "report.h"
 #include "utility.h"
 
-#define TRACE 0
+// #define TRACE
 
 #define PARSE_ERROR(...) \
 	do { \
@@ -45,7 +45,6 @@ struct Parser {
 	Source source;
 	Lexer lexer;
 	Tree *tree;
-	Tree *generic;
 	Token this_token; // This token is being processed
 	Token last_token; // Last token processed
 	ProcedureType *this_procedure;
@@ -53,25 +52,27 @@ struct Parser {
 	Sint32 expression_depth;
 	Bool allow_newline;
 	Bool allow_type;
-	// Array(Location) location_stack;
 };
 
+#if defined(TRACE)
 static void parser_trace_enter(Parser *parser, const char *function) {
-	if (TRACE) {
-		if (parser->trace_depth) {
-			printf("%*c", parser->trace_depth * 2, ' ');
-		}
-		puts(function);
+	if (parser->trace_depth) {
+		printf("%*c", parser->trace_depth * 2, ' ');
 	}
+	puts(function);
 	parser->trace_depth++;
 }
 
-static void parser_trace_leave(Parser *parser) {
+static FORCE_INLINE void parser_trace_leave(Parser *parser) {
 	parser->trace_depth--;
 }
 
 #define TRACE_ENTER() parser_trace_enter(parser, __FUNCTION__)
 #define TRACE_LEAVE() parser_trace_leave(parser)
+#else
+#define TRACE_ENTER() 
+#define TRACE_LEAVE() 
+#endif
 
 static Bool parser_init(Parser *parser, String filename, Context *context) {
 	if (!source_read(&parser->source, filename, context)) {
@@ -724,11 +725,9 @@ static Statement *parse_directive_for_statement(Parser *parser, BlockFlag block_
 		statement = parse_statement(parser, block_flags);
 		break;
 	case DIRECTIVE_ASSERT:
-		// Compile time assert.
-		break;
+		UNIMPLEMENTED("#assert");
 	case DIRECTIVE_PANIC:
-		// Compile time panic.
-		break;
+		UNIMPLEMENTED("#panic");
 	case DIRECTIVE_UNROLL:
 		UNIMPLEMENTED("#unroll");
 	default:
@@ -1271,7 +1270,7 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 				Expression *expression = 0;
 				expect_keyword(parser, KEYWORD_PROC);
 				if (is_kind(parser->this_token, KIND_LBRACE)) {
-					UNIMPLEMENTED("Procedure groups");
+					UNIMPLEMENTED("procedure group");
 				} else {
 					expression = parse_procedure(parser);
 				}
@@ -1485,7 +1484,7 @@ static CompoundLiteralExpression *parse_compound_literal_expression(Parser *pars
 	const Sint32 depth = parser->expression_depth;
 	parser->expression_depth = 0;
 	if (!is_kind(parser->this_token, KIND_RBRACE)) {
-		UNIMPLEMENTED("Compound literal expressions");
+		UNIMPLEMENTED("compound literal expression");
 	}
 	parser->expression_depth = depth;
 	expect_closing(parser, KIND_RBRACE);
@@ -2046,7 +2045,6 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 	case KIND_OPERATOR:
 		switch (token.as_operator) {
 		case OPERATOR_IN:
-			// TODO(dweiler): Does this actually belong here? Should be treated as a binary operator.
 			if (allow_in) {
 				// [lhs] in <Expression>
 				accepted_operator(parser, OPERATOR_IN);
@@ -2418,9 +2416,9 @@ static Statement *parse_basic_simple_statement(Parser *parser, Bool allow_in) {
 
 static BranchStatement *parse_branch_statement(Parser *parser, KeywordKind kind) {
 	TRACE_ENTER();
-	const Token token = advancep(parser);
+	advancep(parser);
 	Identifier *label = 0;
-	if (!is_keyword(token, KEYWORD_FALLTHROUGH) && is_kind(parser->this_token, KIND_IDENTIFIER)) {
+	if (is_kind(parser->this_token, KIND_IDENTIFIER)) {
 		label = parse_identifier(parser, false);
 	}
 	BranchStatement *statement = tree_new_branch_statement(parser->tree, kind, label);
