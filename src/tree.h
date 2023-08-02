@@ -327,7 +327,7 @@ struct LiteralExpression {
 
 struct CompoundLiteralExpression {
 	Expression base;
-	Expression *expression;
+	Type *type;
 	Array(Expression*) expressions;
 };
 
@@ -602,7 +602,7 @@ TypeExpression *tree_new_type_expression(Tree *tree, Type *type);
 IndexExpression *tree_new_index_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs);
 SliceExpression *tree_new_slice_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs);
 LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, String value);
-CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Expression *expression, Array(Expression*) expressions);
+CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Type *type, Array(Expression*) expressions);
 IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier);
 
 // Statements

@@ -123,13 +123,13 @@ LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, Str
 	return expression;
 }
 
-CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Expression *expression, Array(Expression*) expressions) {
+CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Type *type, Array(Expression*) expressions) {
 	Allocator *allocator = tree->context->allocator;
-	CompoundLiteralExpression *expr = CAST(CompoundLiteralExpression*, allocator->allocate(allocator, sizeof *expression));
-	expr->base.kind = EXPRESSION_COMPOUND_LITERAL;
-	expr->expression = expression;
-	expr->expressions = expressions;
-	return expr;
+	CompoundLiteralExpression *expression = CAST(CompoundLiteralExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_COMPOUND_LITERAL;
+	expression->type = type;
+	expression->expressions = expressions;
+	return expression;
 }
 
 IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier) {

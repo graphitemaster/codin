@@ -121,7 +121,22 @@ Bool dump_literal_expression(const LiteralExpression *expression, Sint32 depth) 
 
 Bool dump_compound_literal_expression(const CompoundLiteralExpression *expression, Sint32 depth) {
 	pad(depth);
-	(void)expression;
+	printf("(comp");
+	if (expression->type) {
+		printf("\n");
+		dump_type(expression->type, depth + 1);
+	}
+	const Size n_expressions = array_size(expression->expressions);
+	if (expression->type && n_expressions != 0) {
+		printf("\n");
+	}
+	for (Size i = 0; i < n_expressions; i++) {
+		const Expression *expr = expression->expressions[i];
+		dump_expression(expr, depth + 1);
+		if (i != n_expressions - 1) {
+			printf("\n");
+		}
+	}
 	return false;
 }
 
@@ -476,9 +491,10 @@ Bool dump_assignment_statement(const AssignmentStatement *statement, Sint32 dept
 
 Bool dump_declaration_statement(const DeclarationStatement *statement, Sint32 depth) {
 	const Size n_names = array_size(statement->names);
- 	Array(Expression*) const values = statement->values ? statement->values->expressions : 0;
+ 	Array(Expression*) const values = statement->values->expressions;
 	for (Size i = 0; i < n_names; i++) {
 		const Identifier *name = statement->names[i];
+		const Expression *value = values[i];
 		pad(depth);
 		printf("(decl\n");
 		pad(depth + 1);
@@ -487,11 +503,8 @@ Bool dump_declaration_statement(const DeclarationStatement *statement, Sint32 de
 			printf("\n");
 			dump_type(statement->type, depth + 1);
 		}
-		if (i < array_size(values)) {
-			const Expression *value = values[i];
-			printf("\n");
-			dump_expression(value, depth + 1);
-		}
+		printf("\n");
+		dump_expression(value, depth + 1);
 		printf(")");
 		if (i != n_names - 1) {
 			printf("\n");

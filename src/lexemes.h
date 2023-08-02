@@ -239,9 +239,6 @@ CCONVENTION("naked",       NAKED)
 CCONVENTION("win64",       WIN64)
 CCONVENTION("sysv",        SYSV)
 
-// NOTE(dweiler): Actual types are not keywords because in Odin a type can be
-// replaced within a package. This makes types regular identifiers.
-
 #undef ATTRIBUTE
 #undef DIRECTIVE
 #undef KEYWORD

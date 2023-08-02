@@ -365,7 +365,7 @@ static Type *parse_type(Parser *parser) {
 	return type;
 }
 
-static CompoundLiteralExpression *parse_compound_literal_expression(Parser *parser, Expression *expression);
+static CompoundLiteralExpression *parse_compound_literal_expression(Parser *parser, Type *type);
 
 static Type *parse_variable_name_or_type(Parser *parser) {
 	Context *context = parser->context;
@@ -1476,7 +1476,7 @@ static Token expect_closing(Parser *parser, Kind kind) {
 	return expect_kind(parser, kind);
 }
 
-static CompoundLiteralExpression *parse_compound_literal_expression(Parser *parser, Expression *expression) {
+static CompoundLiteralExpression *parse_compound_literal_expression(Parser *parser, Type *type) {
 	Context *context = parser->context;
 	TRACE_ENTER();
 	Array(Expression*) elements = 0;
@@ -1488,7 +1488,7 @@ static CompoundLiteralExpression *parse_compound_literal_expression(Parser *pars
 	}
 	parser->expression_depth = depth;
 	expect_closing(parser, KIND_RBRACE);
-	CompoundLiteralExpression *expr = tree_new_compound_literal_expression(parser->tree, expression, elements);
+	CompoundLiteralExpression *expr = tree_new_compound_literal_expression(parser->tree, type, elements);
 	TRACE_LEAVE();
 	return expr;
 }
@@ -1637,7 +1637,12 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 			break;
 		case KIND_LBRACE:
 			if (!lhs && parser->expression_depth >= 0) {
-				CompoundLiteralExpression *expression = parse_compound_literal_expression(parser, operand);
+				if (operand->kind != EXPRESSION_TYPE) {
+					// Turn the operand into a type expression
+					operand = RCAST(Expression *, tree_new_expression_type(parser->tree, operand));
+				}
+				Type *type = RCAST(TypeExpression *, operand)->type;
+				CompoundLiteralExpression *expression = parse_compound_literal_expression(parser, type);
 				operand = RCAST(Expression *, expression);
 			} else {
 				goto L_exit;
@@ -1969,6 +1974,17 @@ static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Ar
 
 	if (!parser->this_procedure && n_values > 0 && n_names != n_values) {
 		PARSE_ERROR("Expected %d expressions on the right-hand side, got %d instead", n_names, n_values);
+	}
+
+	// Synthesize initialization of values with empty compound literal {} for zero-initialization.
+	// We do this at the syntatic level to eliminate unnecessary edge cases later on.
+	if (type && n_values == 0) {
+		Array(Expression*) expressions = 0;
+		for (Size i = 0; i < n_names; i++) {
+			CompoundLiteralExpression *expression = tree_new_compound_literal_expression(parser->tree, type, 0);
+			array_push(expressions, RCAST(Expression *, expression));
+		}
+		values = tree_new_list_expression(parser->tree, expressions);
 	}
 
 	DeclarationStatement *statement = tree_new_declaration_statement(parser->tree, type, names, values);
@@ -2630,7 +2646,7 @@ Tree *parse(String filename, Context *context) {
 
 	while (!is_kind(parser->this_token, KIND_EOF)) {
 		Statement *statement = parse_statement(parser, CAST(BlockFlag, 0));
-		if (statement && statement->kind != STATEMENT_EMPTY) {
+		if (statement->kind != STATEMENT_EMPTY) {
 			array_push(tree->statements, statement);
 		}
 	}

@@ -10,6 +10,4 @@ F :: distinct E
 G :: proc() -> int
 H :: []F
 I :: matrix[1, 1]f32
-J :: union {
-  int,
-}
+J :: union { int, }

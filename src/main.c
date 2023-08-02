@@ -137,6 +137,8 @@ static Bool dump_ast(String path) {
 		if (work->tree) {
 			printf("Took %.54g sec\n", work->end - work->beg);
 			dump(work->tree);
+			work->tree->context = context;
+			// infer(work->tree);
 		}
 		work_destroy(work);
 	}
