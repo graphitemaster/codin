@@ -39,7 +39,7 @@ Array(String) _path_list(String path, Context *context) {
 	}
 	for (struct dirent *de = readdir(dp); de; de = readdir(dp)) {
 		const char *name = de->d_name;
-		if (!strcmp(name, ".") || !strcmp(name, "..")) {
+		if (!strcmp(name, ".") || !strcmp(name, "..") || S_ISDIR(de->d_type)) {
 			continue;
 		}
 		if (!array_push(results, string_copy_from_null(name))) {
