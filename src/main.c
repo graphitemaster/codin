@@ -57,9 +57,9 @@ struct Work {
 	Tree *tree;
 };
 
-static void worker(void *data) {
+static void worker(void *data, Context *context) {
 	Work *work = RCAST(Work *, data);
-	work->tree = parse(work->file, work->ctx);
+	work->tree = parse(work->file, context);
 }
 
 static Bool dump_ast(String path) {
@@ -84,7 +84,7 @@ static Bool dump_ast(String path) {
 		strbuf_put_rune(&buf, '/');
 		strbuf_put_string(&buf, files[i]);
 		const String file = strbuf_result(&buf);
-		array_push(work, LIT(Work, &ctx, file, 0));
+		array_push(work, LIT(Work, &ctx, string_copy(file), 0));
 	}
 
 	for (Size i = 0; i < n_files; i++) {
@@ -101,6 +101,8 @@ static Bool dump_ast(String path) {
 	}
 
 	sched_fini(&sched);
+
+	ctx.allocator->finalize(ctx.allocator);
 
 	return true;
 }

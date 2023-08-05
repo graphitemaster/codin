@@ -18,7 +18,7 @@ void sched_fini(Sched *sched) {
 	sched->operations->fini(sched->instance);
 }
 
-void sched_queue(Sched *sched, void *data, void (*work)(void*), void (*dispose)(void*)) {
+void sched_queue(Sched *sched, void *data, void (*work)(void *data, Context *context), void (*dispose)(void *data, Context *context)) {
 	sched->operations->queue(sched->instance, data, work, dispose);
 }
 

@@ -3,6 +3,7 @@
 #include "threadpool.h"
 
 typedef struct SchedAsync SchedAsync;
+typedef struct SchedAsyncWork SchedAsyncWork;
 
 struct SchedAsync {
 	Context *context;
@@ -12,13 +13,23 @@ struct SchedAsync {
 	Cond cond;
 };
 
+struct SchedAsyncWork {
+	Context context;
+	SchedAsync *sched;
+	void *data;
+	void (*func)(void *data, Context *context);
+	void (*dispose)(void *data, Context *context);
+};
+
 static void _sched_async_work_func(void *data) {
-	SchedWork *work = RCAST(SchedWork *, data);
-	SchedAsync *sched = RCAST(SchedAsync *, work->ctx);
-	work->func(work->data);
-	if (work->dispose) {
-		work->dispose(work->data);
+	SchedAsyncWork *work = RCAST(SchedAsyncWork *, data);
+	if (!setjmp(work->context.jmp)) {
+		work->func(work->data, &work->context);
 	}
+	if (work->dispose) {
+		work->dispose(work->data, &work->context);
+	}
+	SchedAsync *sched = work->sched;
 	mutex_lock(&sched->mutex);
 	sched->count--;
 	cond_signal(&sched->cond);
@@ -26,9 +37,8 @@ static void _sched_async_work_func(void *data) {
 }
 
 static void _sched_async_work_dispose(void *data) {
-	SchedWork *work = RCAST(SchedWork *, data);
-	SchedAsync *sched = RCAST(SchedAsync *, work->ctx);
-	Allocator *allocator = sched->context->allocator;
+	SchedAsyncWork *work = RCAST(SchedAsyncWork *, data);
+	Allocator *allocator = work->context.allocator;
 	allocator->deallocate(allocator, data);
 }
 
@@ -61,15 +71,20 @@ static void sched_async_fini(void *ctx) {
 	allocator->deallocate(allocator, sched);
 }
 
-static Bool sched_async_queue(void *ctx, void *data, void (*func)(void*), void (*dispose)(void*)) {
+static Bool sched_async_queue(void *ctx, void *data, void (*func)(void *data, Context *context), void (*dispose)(void *data, Context *context)) {
 	SchedAsync *sched = CAST(SchedAsync *, ctx);
-	Context *context = sched->context;
-	Allocator *allocator = context->allocator;
-	SchedWork *work = allocator->allocate(allocator, sizeof *work);
+	Allocator *allocator = sched->context->allocator;
+	SchedAsyncWork *work = RCAST(SchedAsyncWork *, allocator->allocate(allocator, sizeof *work));
 	if (!work) {
 		return false;
 	}
-	*work = LIT(SchedWork, ctx, data, func, dispose);
+
+	work->context.allocator = allocator;
+	work->sched = sched;
+	work->data = data;
+	work->func = func;
+	work->dispose = dispose;
+
 	mutex_lock(&sched->mutex);
 	sched->count++;
 	const Bool result = threadpool_queue(
@@ -78,6 +93,7 @@ static Bool sched_async_queue(void *ctx, void *data, void (*func)(void*), void (
 		work,
 		_sched_async_work_dispose);
 	mutex_unlock(&sched->mutex);
+
 	return result;
 }
 

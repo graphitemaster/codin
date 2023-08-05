@@ -4,10 +4,18 @@
 #include "context.h"
 
 typedef struct SchedSync SchedSync;
+typedef struct SchedSyncWork SchedSyncWork;
+
+struct SchedSyncWork {
+	void *ctx;
+	void *data;
+	void (*func)(void *data, Context *context);
+	void (*dispose)(void *data, Context *context);
+};
 
 struct SchedSync {
-	Context *context;
-	Array(SchedWork) work;
+	Context context;
+	Array(SchedSyncWork) work;
 };
 
 static Bool sched_sync_init(Context *context, void **instance) {
@@ -16,7 +24,7 @@ static Bool sched_sync_init(Context *context, void **instance) {
 	if (!sched) {
 		return false;
 	}
-	sched->context = context;
+	sched->context.allocator = context->allocator;
 	sched->work = 0;
 	*instance = RCAST(void *, sched);
 	return true;
@@ -24,27 +32,34 @@ static Bool sched_sync_init(Context *context, void **instance) {
 
 static void sched_sync_fini(void *ctx) {
 	SchedSync *sched = CAST(SchedSync *, ctx);
+	Context *context = &sched->context;
 	ASSERT(array_size(sched->work) == 0);
-	Context *context = sched->context;
 	array_free(sched->work);
 	Allocator *allocator = context->allocator;
 	allocator->deallocate(allocator, sched);
 }
 
-static Bool sched_sync_queue(void *ctx, void *data, void (*func)(void*), void (*dispose)(void*)) {
+static Bool sched_sync_queue(void *ctx, void *data, void (*func)(void *data, Context *context), void (*dispose)(void *data, Context *context)) {
 	SchedSync *sched = CAST(SchedSync *, ctx);
-	Context *context = sched->context;
-	return array_push(sched->work, LIT(SchedWork, ctx, data, func, dispose));
+	Context *context = &sched->context;
+	return array_push(sched->work, LIT(SchedSyncWork, ctx, data, func, dispose));
 }
+
+#include <stdio.h>
 
 static void sched_sync_wait(void *ctx) {
 	SchedSync *sched = CAST(SchedSync *, ctx);
 	const Size n_work = array_size(sched->work);
 	for (Size i = 0; i < n_work; i++) {
-		const SchedWork *work = &sched->work[i];
-		work->func(work->data);
+		const SchedSyncWork *work = &sched->work[i];
+		if (!setjmp(sched->context.jmp)) {
+			work->func(work->data, &sched->context);
+		}
+	}
+	for (Size i = 0; i < n_work; i++) {
+		const SchedSyncWork *work = &sched->work[i];
 		if (work->dispose) {
-			work->dispose(work->data);
+			work->dispose(work->data, &sched->context);
 		}
 	}
 	array_clear(sched->work);
