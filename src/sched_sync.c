@@ -25,7 +25,7 @@ static Bool sched_sync_init(Context *context, void **instance) {
 		return false;
 	}
 	sched->context.allocator = context->allocator;
-	sched->work = 0;
+	sched->work = array_make(context);
 	*instance = RCAST(void *, sched);
 	return true;
 }
@@ -41,7 +41,6 @@ static void sched_sync_fini(void *ctx) {
 
 static Bool sched_sync_queue(void *ctx, void *data, void (*func)(void *data, Context *context), void (*dispose)(void *data, Context *context)) {
 	SchedSync *sched = CAST(SchedSync *, ctx);
-	Context *context = &sched->context;
 	return array_push(sched->work, LIT(SchedSyncWork, ctx, data, func, dispose));
 }
 

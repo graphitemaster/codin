@@ -68,13 +68,13 @@ static Bool dump_ast(String path) {
 
 	Context *context = &ctx;
 
-	Array(String) files = path_list(path);
+	Array(String) files = path_list(path, context);
 	const Size n_files = array_size(files);
 
 	Sched sched;
 	sched_init(&sched, SCLIT("async"), &ctx);
 
-	Array(Work) work = 0;
+	Array(Work) work = array_make(context);
 
 	StrBuf buf;
 	strbuf_init(&buf, context);

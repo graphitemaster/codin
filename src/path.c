@@ -12,7 +12,7 @@
 #include <windows.h>
 #endif
 
-Bool _path_mkdir(const char *pathname, Context *context) {
+Bool path_mkdir(const char *pathname, Context *context) {
 #if defined(OS_POSIX)
 	(void)context;
 	return mkdir(pathname, 0777) == 0;
@@ -28,8 +28,8 @@ Bool _path_mkdir(const char *pathname, Context *context) {
 #endif
 }
 
-Array(String) _path_list(String path, Context *context) {
-	Array(String) results = 0;
+Array(String) path_list(String path, Context *context) {
+	Array(String) results = array_make(context);
 #if defined(OS_POSIX)
 	char *name = string_to_null(path);
 	DIR *dp = opendir(name);

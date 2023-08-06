@@ -28,7 +28,7 @@ static const Uint8 PRECEDENCE[] = {
 };
 
 static Bool source_read(Source *source, String filename, Context *context) {
-	Array(Uint8) contents = readfile(filename);
+	Array(Uint8) contents = readfile(filename, context);
 	if (!contents) {
 		return false;
 	}
@@ -421,12 +421,12 @@ static Array(Field*) parse_field_list(Parser *parser, Bool is_struct) {
 	const Bool allow_newline = parser->allow_newline;
 	parser->allow_newline = true;
 
-	Array(Field*) fields = 0;
+	Array(Field*) fields = array_make(context);
 
 	// When parsing a field list we may have
 	// 	Type0, Type1, Type2, ..., or
 	//	Ident0, Ident1, Ident2, ... : Type0
-	Array(Type*) list = 0;
+	Array(Type*) list = array_make(context);
 	Type *type = 0;
 	while ((is_struct ? !is_kind(parser->this_token, KIND_RBRACE) : !is_operator(parser->this_token, OPERATOR_COLON))
 			&& !is_operator(parser->this_token, OPERATOR_RPAREN)
@@ -488,7 +488,7 @@ static Array(Field*) parse_field_list(Parser *parser, Bool is_struct) {
 			&& !is_kind(parser->this_token, KIND_SEMICOLON))
 	{
 		Type *type = 0;
-		Array(Identifier*) names = 0;
+		Array(Identifier*) names = array_make(context);
 		for (;;) {
 			Identifier *name = parse_identifier(parser, false);
 			array_push(names, name);
@@ -538,7 +538,7 @@ static Array(Field*) parse_procedure_results(Parser *parser, Bool *diverging) {
 		return 0;
 	}
 	
-	Array(Field*) fields = 0;
+	Array(Field*) fields = array_make(context);
 
 	if (!is_operator(parser->this_token, OPERATOR_LPAREN)) {
 		Type *type = parse_type(parser);
@@ -936,7 +936,7 @@ static TypeExpression *parse_struct_type_expression(Parser *parser) {
 
 	expect_keyword(parser, KEYWORD_STRUCT);
 
-	Array(Field*) parameters = 0;
+	Array(Field*) parameters = array_make(context);
 	if (accepted_operator(parser, OPERATOR_LPAREN)) {
 		parameters = parse_field_list(parser, false);
 		expect_operator(parser, OPERATOR_RPAREN);
@@ -1009,7 +1009,7 @@ static TypeExpression *parse_union_type_expression(Parser *parser) {
 
 	expect_keyword(parser, KEYWORD_UNION);
 
-	Array(Field*) parameters = 0;
+	Array(Field*) parameters = array_make(context);
 	if (accepted_operator(parser, OPERATOR_LPAREN)) {
 		parameters = parse_field_list(parser, false);
 		expect_operator(parser, OPERATOR_RPAREN);
@@ -1059,7 +1059,7 @@ static TypeExpression *parse_union_type_expression(Parser *parser) {
 
 	expect_kind(parser, KIND_LBRACE);
 
-	Array(Type*) variants = 0;
+	Array(Type*) variants = array_make(context);
 	while (!is_kind(parser->this_token, KIND_RBRACE) &&
          !is_kind(parser->this_token, KIND_EOF))
 	{
@@ -1112,7 +1112,7 @@ static TypeExpression *parse_enum_type_expression(Parser *parser) {
 
 	advance_possible_newline_within(parser);
 
-	Array(Field*) fields = 0;
+	Array(Field*) fields = array_make(context);
 	expect_kind(parser, KIND_LBRACE);
 	while (!is_kind(parser->this_token, KIND_RBRACE) &&
 	       !is_kind(parser->this_token, KIND_EOF))
@@ -1416,7 +1416,7 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 
 	Context *context = parser->context;
 
-	Array(Expression*) arguments = 0;
+	Array(Expression*) arguments = array_make(context);
 	const Sint32 expression_depth = parser->expression_depth;
 	const Bool allow_newline = parser->allow_newline;
 	parser->expression_depth = 0;
@@ -1479,7 +1479,7 @@ static Token expect_closing(Parser *parser, Kind kind) {
 static CompoundLiteralExpression *parse_compound_literal_expression(Parser *parser, Type *type) {
 	Context *context = parser->context;
 	TRACE_ENTER();
-	Array(Expression*) elements = 0;
+	Array(Expression*) elements = array_make(context);
 	expect_kind(parser, KIND_LBRACE);
 	const Sint32 depth = parser->expression_depth;
 	parser->expression_depth = 0;
@@ -1831,7 +1831,7 @@ static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
 
 	const Bool allow_newline = parser->allow_newline;
 
-	Array(Expression*) expressions = 0;
+	Array(Expression*) expressions = array_make(context);
 	for (;;) {
 		Expression *expression = parse_expression(parser, lhs);
 		array_push(expressions, expression);
@@ -1871,7 +1871,7 @@ static Array(Statement*) parse_statement_list(Parser *parser, BlockFlag block_fl
 
 	Context *context = parser->context;
 
-	Array(Statement*) statements = 0;
+	Array(Statement*) statements = array_make(context);
 
 	// Stop parsing the statement when we encounter one of:
 	//
@@ -1979,7 +1979,7 @@ static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Ar
 	// Synthesize initialization of values with empty compound literal {} for zero-initialization.
 	// We do this at the syntatic level to eliminate unnecessary edge cases later on.
 	if (type && n_values == 0) {
-		Array(Expression*) expressions = 0;
+		Array(Expression*) expressions = array_make(context);
 		for (Size i = 0; i < n_names; i++) {
 			CompoundLiteralExpression *expression = tree_new_compound_literal_expression(parser->tree, type, 0);
 			array_push(expressions, RCAST(Expression *, expression));
@@ -2003,7 +2003,7 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExp
 
 	// Everything inside 'lhs' should evaluate as an identifier.
 	const Size n_names = array_size(lhs->expressions);
-	Array(Identifier *) names = 0;
+	Array(Identifier *) names = array_make(context);
 	for (Size i = 0; i < n_names; i++) {
 		const Expression *expression = lhs->expressions[i];
 		Identifier *identifier = evaluate_identifier_expression(expression);
@@ -2130,7 +2130,7 @@ static BlockStatement *convert_statement_to_body(Parser *parser, BlockFlag flags
 	if (kind == STATEMENT_BLOCK || kind == STATEMENT_EMPTY) {
 		PARSE_ERROR("Expected a regular statement");
 	}
-	Array(Statement*) statements = 0;
+	Array(Statement*) statements = array_make(context);
 	array_push(statements, statement);
 	return tree_new_block_statement(parser->tree, flags, statements);
 }
@@ -2199,7 +2199,7 @@ static IfStatement *parse_if_statement(Parser *parser, BlockFlag block_flags) {
 		expect_keyword(parser, KEYWORD_ELSE);
 		if (is_keyword(parser->this_token, KEYWORD_IF)) {
 			IfStatement *statement = parse_if_statement(parser, block_flags);
-			Array(Statement) *statements = 0;
+			Array(Statement) *statements = array_make(context);
 			array_push(statements, RCAST(Statement *, statement));
 			elif = tree_new_block_statement(parser->tree, block_flags, statements);
 		} else if (is_kind(parser->this_token, KIND_LBRACE)) {
@@ -2252,7 +2252,7 @@ static WhenStatement *parse_when_statement(Parser *parser) {
 		expect_keyword(parser, KEYWORD_ELSE);
 		if (is_keyword(parser->this_token, KEYWORD_WHEN)) {
 			WhenStatement *statement = parse_when_statement(parser);
-			Array(Statement) *statements = 0;
+			Array(Statement) *statements = array_make(context);
 			array_push(statements, RCAST(Statement *, statement));
 			elif = tree_new_block_statement(parser->tree, flags, statements);
 		} else if (is_keyword(parser->this_token, KEYWORD_DO)) {
@@ -2400,7 +2400,7 @@ static ReturnStatement *parse_return_statement(Parser *parser) {
 		PARSE_ERROR("Cannot use return statement within expression");
 	}
 
-	Array(Expression*) results = 0;
+	Array(Expression*) results = array_make(context);
 	while (!is_kind(parser->this_token, KIND_SEMICOLON) &&
 	       !is_kind(parser->this_token, KIND_RBRACE) &&
 				 !is_kind(parser->this_token, KIND_EOF))

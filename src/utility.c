@@ -27,21 +27,20 @@ static Bool sizefile(FILE *fp, Uint64 *size) {
 	return true;
 }
 
-Array(Uint8) _readfile(String filename, Context *context) {
+Array(Uint8) readfile(String filename, Context *context) {
 	// Need to introduce the NUL to call fopen.
 	FILE *fp = fopen(string_to_null(filename), "rb");
 	if (!fp) {
 		return 0;
 	}
 
-	Array(Uint8) result = 0;
+	Array(Uint8) result = array_make(context);
 	Uint64 size = 0;
 	if (!sizefile(fp, &size)) {
 		while (!feof(fp)) {
 			const Uint8 ch = fgetc(fp);
 			if (!array_push(result, ch)) {
-				array_free(result);
-				return 0;
+				goto L_error;
 			}
 		}
 		return result;

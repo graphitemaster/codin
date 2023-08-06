@@ -6,7 +6,11 @@
 
 void strbuf_init(StrBuf *strbuf, Context *context) {
 	strbuf->context = context;
-	strbuf->contents = 0;
+	strbuf->contents = array_make(context);
+}
+
+void strbuf_fini(StrBuf *strbuf) {
+	array_free(strbuf->contents);
 }
 
 void strbuf_clear(StrBuf *strbuf) {
@@ -14,7 +18,6 @@ void strbuf_clear(StrBuf *strbuf) {
 }
 
 Bool strbuf_put_byte(StrBuf *strbuf, Uint8 byte) {
-	Context *context = strbuf->context;
 	return array_push(strbuf->contents, byte);
 }
 
@@ -39,7 +42,6 @@ Bool strbuf_put_rune(StrBuf *strbuf, Rune ch) {
 }
 
 Bool strbuf_put_string(StrBuf *strbuf, String string) {
-	Context *context = strbuf->context;
 	const Size size = array_size(strbuf->contents);
 	if (array_expand(strbuf->contents, string.length)) {
 		memcpy(&strbuf->contents[size], string.contents, string.length);
@@ -49,7 +51,6 @@ Bool strbuf_put_string(StrBuf *strbuf, String string) {
 }
 
 Bool strbuf_put_formatted(StrBuf *strbuf, const char *fmt, ...) {
-	Context *context = strbuf->context;
 	va_list va;
 	va_start(va, fmt);
 	const long bytes = vsnprintf(0, 0, fmt, va);

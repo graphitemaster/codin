@@ -1,7 +1,7 @@
 #ifndef CODIN_CONTEXT_H
 #define CODIN_CONTEXT_H
-
 #include <setjmp.h>
+
 #include "support.h"
 
 typedef struct Context Context;

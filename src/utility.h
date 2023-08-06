@@ -5,13 +5,9 @@
 
 typedef struct Context Context;
 
-Array(Uint8) _readfile(String filename, Context *context);
-
-#define readfile(filename) \
-	_readfile((filename), context)
+Array(Uint8) readfile(String filename, Context *context);
 
 Float16 f32_to_f16(Float32 x);
-
 Float64 qpc();
 
 #endif // CODIN_UTILITY_H

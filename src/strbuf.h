@@ -12,6 +12,7 @@ struct StrBuf {
 };
 
 void strbuf_init(StrBuf *strbuf, Context *context);
+void strbuf_fini(StrBuf *strbuf);
 void strbuf_clear(StrBuf *strbuf);
 Bool strbuf_put_rune(StrBuf *strbuf, Rune ch);
 Bool strbuf_put_string(StrBuf *strbuf, String string);

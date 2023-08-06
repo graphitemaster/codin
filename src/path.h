@@ -5,14 +5,8 @@
 
 typedef struct Context Context;
 
-Bool _path_mkdir(const char *pathname, Context *context);
+Bool path_mkdir(const char *pathname, Context *context);
 
-Array(String) _path_list(String path, Context *context);
-
-#define path_mkdir(pathname) \
-	_path_mkdir((pathname), context)
-
-#define path_list(path) \
-	_path_list((path), context)
+Array(String) path_list(String path, Context *context);
 
 #endif // CODIN_PATH_H
