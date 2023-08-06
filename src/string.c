@@ -184,10 +184,10 @@ static const Uint8 UTF8_DECODE_LUT[] = {
 };
 
 Uint32 utf8_decode(Uint32 *state, Rune *codep, Uint32 byte) {
-  const Uint32 type = UTF8_DECODE_LUT[byte];
-  *codep = (*state != UTF8_ACCEPT) ?
-    (byte & 0x3fu) | (*codep << 6) :
-    (0xff >> type) & byte;
-  *state = UTF8_DECODE_LUT[256 + *state + type];
-  return *state;
+	const Uint32 type = UTF8_DECODE_LUT[byte];
+	*codep = (*state != UTF8_ACCEPT) ?
+	  (byte & 0x3fu) | (*codep << 6) :
+	  (0xff >> type) & byte;
+	*state = UTF8_DECODE_LUT[256 + *state + type];
+	return *state;
 }

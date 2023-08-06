@@ -64,7 +64,7 @@ static Bool default_allocator_maybe_rehash_unlocked(DefaultAllocator *allocator)
 	}
 
 	Size capacity = allocator->capacity * 2;
-	void **items = CAST(void**, calloc(allocator->capacity, sizeof *items));
+	void **items = CAST(void**, calloc(capacity, sizeof *items));
 	if (!items) {
 		return false;
 	}
@@ -82,7 +82,6 @@ static Bool default_allocator_maybe_rehash_unlocked(DefaultAllocator *allocator)
 		default_allocator_add_unlocked(allocator, old_items[i]);
 	}
 
-	mutex_unlock(&allocator->mutex);
 	return true;
 }
 
@@ -90,7 +89,7 @@ static Bool default_allocator_add_unlocked(DefaultAllocator *allocator, void *it
 	Uint64 hash = RCAST(Uint64, item); // TODO(dweiler): MixInt
 	const Size mask = allocator->capacity - 1;
 
-	Size index = mask & (PRIME1 * hash);
+	Size index = (PRIME1 * hash) & mask;
 
 	for (;;) {
 		void *element = allocator->items[index];
@@ -98,7 +97,7 @@ static Bool default_allocator_add_unlocked(DefaultAllocator *allocator, void *it
 			if (element == item) {
 				return false;
 			} else {
-				index = mask & (index + PRIME2);
+				index = (index + PRIME2) & mask;
 			}
 		} else {
 			break;
@@ -148,7 +147,6 @@ static Bool default_allocator_remove(DefaultAllocator *allocator, void *item) {
 	}
 
 	mutex_unlock(&allocator->mutex);
-
 	return false;
 }
 

@@ -121,23 +121,14 @@ Bool dump_literal_expression(const LiteralExpression *expression, Sint32 depth) 
 
 Bool dump_compound_literal_expression(const CompoundLiteralExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(comp");
+	printf("(comp\n");
 	if (expression->type) {
-		printf("\n");
 		dump_type(expression->type, depth + 1);
-	}
-	const Size n_expressions = array_size(expression->expressions);
-	if (expression->type && n_expressions != 0) {
 		printf("\n");
 	}
-	for (Size i = 0; i < n_expressions; i++) {
-		const Expression *expr = expression->expressions[i];
-		dump_expression(expr, depth + 1);
-		if (i != n_expressions - 1) {
-			printf("\n");
-		}
-	}
-	return false;
+	dump_fields(expression->fields, depth + 1);
+	printf(")");
+	return true;
 }
 
 Bool dump_identifier_expression(const IdentifierExpression *expression, Sint32 depth) {
@@ -152,28 +143,45 @@ Bool dump_builtin_type(const BuiltinType *type, Sint32 depth) {
 	return true;
 }
 
-Bool dump_fields(Array(Field*) const fields, Sint32 depth) {
+Bool dump_field(const Field *field, Sint32 depth) {
 	pad(depth);
-	printf("(fields\n");
-	pad(depth + 1);
-	const Size n_fields = array_size(fields);
-	for (Size i = 0; i < n_fields; i++) {
-		const Field *field = fields[i];
-		printf("(field\n");
+	printf("(field\n");
+	if (field->flags) {
+		pad(depth + 1);
+		printf("(flags\n");
 		pad(depth + 2);
-		printf("'%.*s'", SFMT(field->name->contents));
-		if (field->type) {
-			printf("\n");
-			dump_type(field->type, depth + 2);
-		}
-		if (field->value) {
-			printf("\n");
-			dump_expression(field->value, depth + 2);
+		if (field->flags & FIELD_FLAG_ANY_INT) {
+			printf("'#any_int'");
 		}
 		printf(")");
-		if (i != n_fields - 1) {
-			printf("\n");
-			pad(depth + 1);
+		printf("\n");
+	}
+	pad(depth + 1);
+	printf("'%.*s'", SFMT(field->name->contents));
+	if (field->type) {
+		printf("\n");
+		dump_type(field->type, depth + 1);
+	}
+	if (field->value) {
+		printf("\n");
+		dump_expression(field->value, depth + 1);
+	}
+	printf(")");
+	return true;
+}
+
+Bool dump_fields(Array(Field*) const fields, Sint32 depth) {
+	pad(depth);
+	printf("(fields");
+	const Size n_fields = array_size(fields);
+	if (n_fields) {
+		printf("\n");
+		for (Size i = 0; i < n_fields; i++) {
+			const Field *field = fields[i];
+			dump_field(field, depth + 1);
+			if (i != n_fields - 1) {
+				printf("\n");
+			}
 		}
 	}
 	printf(")");
@@ -490,11 +498,11 @@ Bool dump_assignment_statement(const AssignmentStatement *statement, Sint32 dept
 }
 
 Bool dump_declaration_statement(const DeclarationStatement *statement, Sint32 depth) {
+	Array(Expression*) const values = statement->values->expressions;
 	const Size n_names = array_size(statement->names);
- 	Array(Expression*) const values = statement->values->expressions;
+	const Size n_values = array_size(values);
 	for (Size i = 0; i < n_names; i++) {
 		const Identifier *name = statement->names[i];
-		const Expression *value = values[i];
 		pad(depth);
 		printf("(decl\n");
 		pad(depth + 1);
@@ -503,8 +511,10 @@ Bool dump_declaration_statement(const DeclarationStatement *statement, Sint32 de
 			printf("\n");
 			dump_type(statement->type, depth + 1);
 		}
-		printf("\n");
-		dump_expression(value, depth + 1);
+		if (i < n_values) {
+			printf("\n");
+			dump_expression(values[i], depth + 1);
+		}
 		printf(")");
 		if (i != n_names - 1) {
 			printf("\n");

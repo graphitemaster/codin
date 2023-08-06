@@ -138,9 +138,8 @@ static Rune advancel(Lexer *lexer) {
 			Uint32 state = 0;
 			for (Size i = 0; i < len; i++) {
 				Rune rune;
-				if (!utf8_decode(&state, &rune, *input->cur)) {
-					input->cur++;
-				}
+				utf8_decode(&state, &rune, *input->cur);
+				input->cur++;
 			}
 			if (state != UTF8_ACCEPT) {
 				LEX_ERROR("Malformed UTF-8");
@@ -312,7 +311,7 @@ Bool lexer_init(Lexer *lexer, Context *context, const Source *source) {
 	lexer->here = lexer->input.cur;
 	lexer->rune = 0;
 	lexer->asi = false;
-	lexer->peek.kind = KIND_INVALID;
+	lexer->peek = array_make(context);
 
 	if (advancel(lexer) == RUNE_BOM) {
 		advancel(lexer);
@@ -327,21 +326,15 @@ static Bool unescape(Lexer *lexer) {
 	return false;
 }
 
+static Token lexer_raw_next(Lexer *lexer);
 Token lexer_peek(Lexer *lexer) {
-	ASSERT(lexer->peek.kind == KIND_INVALID);
-	const Token peek = lexer_next(lexer);
-	lexer->peek = peek;
+	const Token peek = lexer_raw_next(lexer);
+	array_push(lexer->peek, peek);
 	return peek;
 }
 
 static Token lexer_tokenize(Lexer *lexer) {
 	Context *context = lexer->context;
-
-	if (lexer->peek.kind != KIND_INVALID) {
-		const Token token = lexer->peek;
-		lexer->peek.kind = KIND_INVALID;
-		return token;
-	}
 
 	skip_whitespace(lexer, lexer->asi);
 
@@ -771,7 +764,7 @@ String token_to_string(Token token) {
 	UNREACHABLE();
 }
 
-Token lexer_next(Lexer *lexer) {
+static Token lexer_raw_next(Lexer *lexer) {
 	const Token token = lexer_tokenize(lexer);
 	switch (token.kind) {
 	case KIND_OPERATOR:
@@ -784,6 +777,14 @@ Token lexer_next(Lexer *lexer) {
 		lexer->asi = KIND_ASI[token.kind];
 		break;
 	}
-
 	return token;
+}
+
+Token lexer_next(Lexer *lexer) {
+	if (array_size(lexer->peek) != 0) {
+		const Token token = lexer->peek[0];
+		array_pop_front(lexer->peek);
+		return token;
+	}
+	return lexer_raw_next(lexer);
 }

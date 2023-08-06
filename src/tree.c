@@ -123,12 +123,12 @@ LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, Str
 	return expression;
 }
 
-CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Type *type, Array(Expression*) expressions) {
+CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Type *type, Array(Field*) fields) {
 	Allocator *allocator = tree->context->allocator;
 	CompoundLiteralExpression *expression = CAST(CompoundLiteralExpression*, allocator->allocate(allocator, sizeof *expression));
 	expression->base.kind = EXPRESSION_COMPOUND_LITERAL;
 	expression->type = type;
-	expression->expressions = expressions;
+	expression->fields = fields;
 	return expression;
 }
 
@@ -428,12 +428,13 @@ GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) 
 	return type;
 }
 
-Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value) {
+Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value, FieldFlag flags) {
 	Allocator *allocator = tree->context->allocator;
 	Field *field = CAST(Field*, allocator->allocate(allocator, sizeof *field));
 	field->type = type;
 	field->name = name;
 	field->value = value;
+	field->flags = flags;
 	return field;
 }
 

@@ -91,8 +91,8 @@ OPERATOR(RBRACKET,     "]",         0,             false, true)
 OPERATOR(COLON,        ":",         0,             false, false)
 OPERATOR(PERIOD,       ".",         0,             false, false)
 OPERATOR(COMMA,        ",",         0,             false, false)
-OPERATOR(IN,           "in",        0,             true,  false)  // Produces a value, therefore an operator.
-OPERATOR(NOT_IN,       "not_in",    0,             true,  false)  // Produces a value, therefore an operator.
+OPERATOR(IN,           "in",        6,             true,  false)  // Produces a value, therefore an operator.
+OPERATOR(NOT_IN,       "not_in",    6,             true,  false)  // Produces a value, therefore an operator.
 OPERATOR(AUTO_CAST,    "auto_cast", 0,             true,  false)  // Produces a value, therefore an operator.
 OPERATOR(CAST,         "cast",      0,             true,  false)  // Produces a value, therefore an operator.
 OPERATOR(TRANSMUTE,    "transmute", 0,             true,  false)  // Produces a value, therefore an operator.
@@ -191,53 +191,46 @@ DIRECTIVE(DEFINED,                  "defined")
 DIRECTIVE(CONFIG,                   "config")
 DIRECTIVE(MAYBE,                    "maybe")
 
-/*
-// This is actually impossible to lex within the Odin language because @ can
-// introduce a single attribute (easy to lex), or it can introduce an attribute
-// list which is a comma-separated list of attributes inside parenthesis. We
-// just lex '@' to KIND_ATTRIBUTE and it's up to the parser to parse the list.
-//
 //        ENUM,                     MATCH,                    WHERE
-ATTRIBUTE(TEST,                     "test",                   ATTRIBUTE_PROC)
-ATTRIBUTE(EXPORT,                   "export",                 ATTRIBUTE_PROC | ATTRIBUTE_VAR)
-ATTRIBUTE(LINKAGE,                  "linkage",                ATTRIBUTE_PROC | ATTRIBUTE_VAR)
-ATTRIBUTE(REQUIRE,                  "require",                ATTRIBUTE_PROC | ATTRIBUTE_VAR)
-ATTRIBUTE(INIT,                     "init",                   ATTRIBUTE_PROC)
-ATTRIBUTE(DEFERRED,                 "deferred",               ATTRIBUTE_PROC)
-ATTRIBUTE(DEFERRED_NONE,            "deferred_none",          ATTRIBUTE_PROC)
-ATTRIBUTE(DEFERRED_IN,              "deferred_in",            ATTRIBUTE_PROC)
-ATTRIBUTE(DEFERRED_OUT,             "deferred_out",           ATTRIBUTE_PROC)
-ATTRIBUTE(DEFERRED_IN_OUT,          "deferred_in_out",        ATTRIBUTE_PROC)
-ATTRIBUTE(LINK_NAME,                "link_name",              ATTRIBUTE_PROC | ATTRIBUTE_VAR)
-ATTRIBUTE(LINK_PREFIX,              "link_prefix",            ATTRIBUTE_PROC)
-ATTRIBUTE(DEPRECATED,               "deprecated",             ATTRIBUTE_PROC)
-ATTRIBUTE(WARNING,                  "warning",                ATTRIBUTE_PROC)
-ATTRIBUTE(REQUIRE_RESULTS,          "require_results",        ATTRIBUTE_PROC)
-ATTRIBUTE(DISABLED,                 "disabled",               ATTRIBUTE_PROC)
-ATTRIBUTE(COLD,                     "cold",                   ATTRIBUTE_PROC)
-ATTRIBUTE(OPTIMIZATION_MODE,        "optimization_mode",      ATTRIBUTE_PROC)
-ATTRIBUTE(OBJC_NAME,                "objc_name",              ATTRIBUTE_PROC)
-ATTRIBUTE(OBJC_IS_CLASS_METHOD,     "objc_is_class_method",   ATTRIBUTE_PROC)
-ATTRIBUTE(OBJC_TYPE,                "objc_type",              ATTRIBUTE_PROC)
-ATTRIBUTE(REQUIRE_TARGET_FEATURE,   "require_target_feature", ATTRIBUTE_PROC)
-ATTRIBUTE(ENABLE_TARGET_FEATURE,    "enable_target_feature",  ATTRIBUTE_PROC)
-ATTRIBUTE(STATIC,                   "static",                 ATTRIBUTE_VAR)
-ATTRIBUTE(THREAD_LOCAL,             "thread_local",           ATTRIBUTE_VAR)
-ATTRIBUTE(LINK_SECTION,             "link_section",           ATTRIBUTE_VAR)
-ATTRIBUTE(PRIVATE,                  "private",                ATTRIBUTE_PROC | ATTRIBUTE_CONST | ATTRIBUTE_TYPE)
-ATTRIBUTE(OBJC_CLASS,               "objc_class",             ATTRIBUTE_TYPE)
-*/
+ATTRIBUTE(TEST,                     "test",                   ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(EXPORT,                   "export",                 ATTRIBUTE_FOR_PROC | ATTRIBUTE_FOR_VAR)
+ATTRIBUTE(LINKAGE,                  "linkage",                ATTRIBUTE_FOR_PROC | ATTRIBUTE_FOR_VAR)
+ATTRIBUTE(REQUIRE,                  "require",                ATTRIBUTE_FOR_PROC | ATTRIBUTE_FOR_VAR)
+ATTRIBUTE(INIT,                     "init",                   ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(DEFERRED,                 "deferred",               ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(DEFERRED_NONE,            "deferred_none",          ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(DEFERRED_IN,              "deferred_in",            ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(DEFERRED_OUT,             "deferred_out",           ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(DEFERRED_IN_OUT,          "deferred_in_out",        ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(LINK_NAME,                "link_name",              ATTRIBUTE_FOR_PROC | ATTRIBUTE_FOR_VAR)
+ATTRIBUTE(LINK_PREFIX,              "link_prefix",            ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(DEPRECATED,               "deprecated",             ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(WARNING,                  "warning",                ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(REQUIRE_RESULTS,          "require_results",        ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(DISABLED,                 "disabled",               ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(COLD,                     "cold",                   ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(OPTIMIZATION_MODE,        "optimization_mode",      ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(OBJC_NAME,                "objc_name",              ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(OBJC_IS_CLASS_METHOD,     "objc_is_class_method",   ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(OBJC_TYPE,                "objc_type",              ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(REQUIRE_TARGET_FEATURE,   "require_target_feature", ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(ENABLE_TARGET_FEATURE,    "enable_target_feature",  ATTRIBUTE_FOR_PROC)
+ATTRIBUTE(STATIC,                   "static",                 ATTRIBUTE_FOR_VAR)
+ATTRIBUTE(THREAD_LOCAL,             "thread_local",           ATTRIBUTE_FOR_VAR)
+ATTRIBUTE(LINK_SECTION,             "link_section",           ATTRIBUTE_FOR_VAR)
+ATTRIBUTE(PRIVATE,                  "private",                ATTRIBUTE_FOR_PROC | ATTRIBUTE_FOR_CONST | ATTRIBUTE_FOR_TYPE)
+ATTRIBUTE(OBJC_CLASS,               "objc_class",             ATTRIBUTE_FOR_TYPE)
 
 // Calling conventions
-CCONVENTION("odin",        ODIN)
-CCONVENTION("contextless", CONTEXTLESS)
-CCONVENTION("cdecl",       CDECL)
-CCONVENTION("stdcall",     STDCALL)
-CCONVENTION("fastcall",    FASTCALL)
-CCONVENTION("none",        NONE)
-CCONVENTION("naked",       NAKED)
-CCONVENTION("win64",       WIN64)
-CCONVENTION("sysv",        SYSV)
+CCONVENTION(ODIN,        "odin")
+CCONVENTION(CONTEXTLESS, "contextless")
+CCONVENTION(CDECL,       "cdecl")
+CCONVENTION(STDCALL,     "stdcall")
+CCONVENTION(FASTCALL,    "fastcall")
+CCONVENTION(NONE,        "none")
+CCONVENTION(NAKED,       "naked")
+CCONVENTION(WIN64,       "win64")
+CCONVENTION(SYSV,        "sysv")
 
 #undef ATTRIBUTE
 #undef DIRECTIVE

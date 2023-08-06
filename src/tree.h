@@ -71,36 +71,36 @@ typedef struct Identifier Identifier;
 typedef struct Field Field;
 
 enum ExpressionKind {
-	EXPRESSION_LIST,
-	EXPRESSION_UNARY,            // <op> operand
-	EXPRESSION_BINARY,           // lhs <op> rhs
-	EXPRESSION_TERNARY,          // lhs <if|when> cond else rhs
-	EXPRESSION_CAST,             // auto_cast operand, cast(T)operand, transmute(T)operand
-	EXPRESSION_SELECTOR,         // base.field or .enumerator
-	EXPRESSION_CALL,             // operand(..args)
-	EXPRESSION_ASSERTION,        // operand.(T) or operand.?
-	EXPRESSION_PROCEDURE,        // proc() {}
-	EXPRESSION_TYPE,             // T
-	EXPRESSION_INDEX,            // x[n], x[:], x[n:], x[:n], x[a:b], x[a,b]
-	EXPRESSION_SLICE,            // []T
-	EXPRESSION_LITERAL,          // int, float, rune, string
-	EXPRESSION_COMPOUND_LITERAL, // T{...}
-	EXPRESSION_IDENTIFIER,       // ident
+	EXPRESSION_LIST             = 0,
+  EXPRESSION_UNARY            = 1,  // <op> operand
+	EXPRESSION_BINARY           = 2,  // lhs <op> rhs
+	EXPRESSION_TERNARY          = 3,  // lhs <if|when> cond else rhs
+	EXPRESSION_CAST             = 4,  // auto_cast operand, cast(T)operand, transmute(T)operand
+	EXPRESSION_SELECTOR         = 5,  // base.field or .enumerator
+	EXPRESSION_CALL             = 6,  // operand(..args)
+	EXPRESSION_ASSERTION        = 7,  // operand.(T) or operand.?
+	EXPRESSION_PROCEDURE        = 8,  // proc() {}
+	EXPRESSION_TYPE             = 9,  // T
+	EXPRESSION_INDEX            = 10, // x[n], x[:], x[n:], x[:n], x[a:b], x[a,b]
+	EXPRESSION_SLICE            = 11, // []T
+	EXPRESSION_LITERAL          = 12, // int, float, rune, string
+	EXPRESSION_COMPOUND_LITERAL = 13, // T{...}
+	EXPRESSION_IDENTIFIER       = 14, // ident
 };
 
 enum StatementKind {
-	STATEMENT_EMPTY,
-	STATEMENT_BLOCK,
-	STATEMENT_IMPORT,
-	STATEMENT_EXPRESSION, 
-	STATEMENT_ASSIGNMENT,
-	STATEMENT_DECLARATION,
-	STATEMENT_IF,
-	STATEMENT_WHEN,
-	STATEMENT_RETURN,
-	STATEMENT_FOR,
-	STATEMENT_DEFER,
-	STATEMENT_BRANCH,   // break, continue, fallthrough
+	STATEMENT_EMPTY       = 0,
+	STATEMENT_BLOCK       = 1,
+	STATEMENT_IMPORT      = 2,
+	STATEMENT_EXPRESSION  = 3,
+	STATEMENT_ASSIGNMENT  = 4,
+	STATEMENT_DECLARATION = 5,
+	STATEMENT_IF          = 6,
+	STATEMENT_WHEN        = 7,
+	STATEMENT_RETURN      = 8,
+	STATEMENT_FOR         = 9,
+	STATEMENT_DEFER       = 10,
+	STATEMENT_BRANCH      = 11, // break, continue, fallthrough
 };
 
 enum ProcedureKind {
@@ -119,33 +119,33 @@ enum UnionKind {
 };
 
 enum TypeKind {
-	TYPE_BUILTIN,       // b{8,16,32,64}, f{16,32,64}(le|be), (i|u)8, (i|u){16,32,64,128}(le|be), 
-	TYPE_PROCEDURE,     // proc
-	TYPE_POINTER,       // ^T
-	TYPE_MULTI_POINTER, // [^]T
-	TYPE_SLICE,         // []T
-	TYPE_ARRAY,         // [N]T or [?]T
-	TYPE_DYNAMIC_ARRAY, // [dynamic]T
-	TYPE_BIT_SET,       // bit_set[T] or bit_set[T; U]
-	TYPE_TYPEID,        // typeid
-	TYPE_MAP,           // map[K]V
-	TYPE_MATRIX,        // matrix[R,C]T
-	TYPE_DISTINCT,      // distinct T
-	TYPE_ENUM,          // enum
-	TYPE_STRUCT,        // struct
-	TYPE_UNION,         // union
-	TYPE_EXPRESSION,    // Expression which evaluates to a Type*
+	TYPE_BUILTIN         = 0,  // b{8,16,32,64}, f{16,32,64}(le|be), (i|u)8, (i|u){16,32,64,128}(le|be), 
+	TYPE_PROCEDURE       = 1,  // proc
+	TYPE_POINTER         = 2,  // ^T
+	TYPE_MULTI_POINTER   = 3,  // [^]T
+	TYPE_SLICE           = 4,  // []T
+	TYPE_ARRAY           = 5,  // [N]T or [?]T
+	TYPE_DYNAMIC_ARRAY   = 6,  // [dynamic]T
+	TYPE_BIT_SET         = 7,  // bit_set[T] or bit_set[T; U]
+	TYPE_TYPEID          = 8,  // typeid
+	TYPE_MAP             = 9,  // map[K]V
+	TYPE_MATRIX          = 10, // matrix[R,C]T
+	TYPE_DISTINCT        = 11, // distinct T
+	TYPE_ENUM            = 12, // enum
+	TYPE_STRUCT          = 13, // struct
+	TYPE_UNION           = 14, // union
+	TYPE_EXPRESSION      = 15, // Expression which evaluates to a Type*
 };
 
 enum BuiltinTypeKind {
-	BUILTIN_TYPE_SINT,    // i8,i{16,32,64,128}(le|be)
-	BUILTIN_TYPE_UINT,    // u8,u{16,32,64,128}(le|be)
-	BUILTIN_TYPE_FLOAT,   // f{16,32,64}(le|be)
-	BUILTIN_TYPE_BOOL,    // b{8,16,32,64}
-	BUILTIN_TYPE_STRING,  // string
-	BUILTIN_TYPE_CSTRING, // cstring
-	BUILTIN_TYPE_POINTER, // rawptr
-	BUILTIN_TYPE_UINTPTR, // uintptr
+	BUILTIN_TYPE_SINT    = 0, // i8,i{16,32,64,128}(le|be)
+	BUILTIN_TYPE_UINT    = 1, // u8,u{16,32,64,128}(le|be)
+	BUILTIN_TYPE_FLOAT   = 2, // f{16,32,64}(le|be)
+	BUILTIN_TYPE_BOOL    = 3, // b{8,16,32,64}
+	BUILTIN_TYPE_STRING  = 4, // string
+	BUILTIN_TYPE_CSTRING = 5, // cstring
+	BUILTIN_TYPE_POINTER = 6, // rawptr
+	BUILTIN_TYPE_UINTPTR = 7, // uintptr
 };
 
 enum Endianess {
@@ -175,12 +175,17 @@ enum StructFlag {
 };
 
 enum UnionFlag {
-	UNION_FLAG_NO_NIL     = 1 << 0,
-	UNION_FLAG_SHARED_NIL = 1 << 1,
-	UNION_FLAG_MAYBE      = 1 << 2,
+	UNION_FLAG_NO_NIL     = 1 << 0, // #no_nil
+	UNION_FLAG_SHARED_NIL = 1 << 1, // #shared_nil
+	UNION_FLAG_MAYBE      = 1 << 2, // #maybe
 };
 
-#define CCONVENTION(name, enumerator) CCONV_ ## enumerator,
+enum FieldFlag {
+	FIELD_FLAG_ANY_INT  = 1 << 0, // #any_int
+	FIELD_FLAG_C_VARARG = 1 << 1, // #c_vararg
+};
+
+#define CCONVENTION(enumerator, string) CCONV_ ## enumerator,
 enum CallingConvention {
 	CCONV_INVALID,
 	#include "lexemes.h"
@@ -199,6 +204,7 @@ typedef enum BlockFlag BlockFlag;
 typedef enum ProcedureFlag ProcedureFlag;
 typedef enum StructFlag StructFlag;
 typedef enum UnionFlag UnionFlag;
+typedef enum FieldFlag FieldFlag;
 
 typedef enum CallingConvention CallingConvention;
 
@@ -328,7 +334,7 @@ struct LiteralExpression {
 struct CompoundLiteralExpression {
 	Expression base;
 	Type *type;
-	Array(Expression*) expressions;
+	Array(Field*) fields;
 };
 
 struct IdentifierExpression {
@@ -374,6 +380,7 @@ struct DeclarationStatement {
 	Type *type;
 	Array(Identifier*) names;
 	ListExpression *values;
+	Array(Field*) attributes;
 };
 
 struct IfStatement {
@@ -567,12 +574,12 @@ struct Field {
 	Identifier *name; // Always present
 	Type *type; // Optional.
 	Expression *value;
+	FieldFlag flags;
 };
 
 static inline String calling_convention_to_string(CallingConvention cc) {
-	#define CCONVENTION(name, ...) SLIT(name),
+	#define CCONVENTION(enumerator, name, ...) SLIT(name),
 	static const String TABLE[] = {
-		SLIT("invalid"),
 		#include "lexemes.h"
 	};
 	return TABLE[cc];
@@ -602,7 +609,7 @@ TypeExpression *tree_new_type_expression(Tree *tree, Type *type);
 IndexExpression *tree_new_index_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs);
 SliceExpression *tree_new_slice_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs);
 LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, String value);
-CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Type *type, Array(Expression*) expressions);
+CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Type *type, Array(Field*) fields);
 IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier);
 
 // Statements
@@ -639,7 +646,7 @@ GenericStructType *tree_new_generic_struct_type(Tree *tree, StructFlag flags, Ex
 ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Type*) variants, ListExpression *where_clauses);
 GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Field*) parameters, Array(Type*) variants, ListExpression *where_clauses);
 
-Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value);
+Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value, FieldFlag flags);
 Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly);
 
 #endif // CODIN_TREE_H

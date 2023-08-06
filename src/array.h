@@ -41,6 +41,12 @@ struct ALIGN(16) Array {
 		? ((array)[array_meta(array)->size++] = (value), true) \
 		: false)
 
+#define array_pop_front(array) \
+	(array_size(array) ? \
+		(memmove((array), &(array)[1], sizeof *(array) * (array_meta(array)->size - 1)), \
+		 array_meta(array)->size--, true) \
+		: false)
+
 #define array_free(array) \
 	(void)((array) ? (array_delete(array), (array) = 0) : 0)
 

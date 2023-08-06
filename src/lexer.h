@@ -1,6 +1,7 @@
 #ifndef CODIN_LEXER_H
 #define CODIN_LEXER_H
 #include "string.h"
+#include "array.h"
 
 typedef struct Context Context;
 
@@ -104,7 +105,7 @@ struct Lexer {
 	const Uint8 *here;
 	Rune rune;
 	Bool asi;
-	Token peek;
+	Array(Token) peek;
 };
 
 Bool lexer_init(Lexer *lexer, Context *context, const Source *source);
