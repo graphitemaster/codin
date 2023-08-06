@@ -3,6 +3,7 @@
 
 #include "path.h"
 #include "context.h"
+#include "strbuf.h"
 
 #if defined(OS_POSIX)
 #include <sys/stat.h> // mkdir
@@ -28,6 +29,49 @@ Bool path_mkdir(const char *pathname, Context *context) {
 #endif
 }
 
+Bool dir_list_r_impl(String path, Array(String) *results, Context *context) {
+	char *name = string_to_null(path);
+	DIR *dp = opendir(name);
+	context->allocator->deallocate(context->allocator, name);
+	if (!dp) {
+		return false;
+	}
+	for (struct dirent *de = readdir(dp); de; de = readdir(dp)) {
+		const char *name = de->d_name;
+		if (!strcmp(name, ".") || !strcmp(name, "..") || de->d_type != DT_DIR) {
+			continue;
+		}
+		StrBuf buf;
+		strbuf_init(&buf, context);
+		strbuf_put_string(&buf, path);
+		strbuf_put_rune(&buf, '/');
+		strbuf_put_string(&buf, string_from_null(name));
+		const String result = strbuf_result(&buf);
+		if (!array_push(*results, result)) {
+			goto L_error;
+		}
+		if (!dir_list_r_impl(result, results, context)) {
+			goto L_error;
+		}
+	}
+
+	closedir(dp);
+	return true;
+
+L_error:
+	closedir(dp);
+	return false;
+}
+
+Array(String) dir_list_r(String path, Context *context) {
+	Array(String) results = array_make(context);
+	if (dir_list_r_impl(path, &results, context)) {
+		return results;
+	}
+	array_free(results);
+	return 0;
+}
+
 Array(String) path_list(String path, Context *context) {
 	Array(String) results = array_make(context);
 #if defined(OS_POSIX)
@@ -39,7 +83,7 @@ Array(String) path_list(String path, Context *context) {
 	}
 	for (struct dirent *de = readdir(dp); de; de = readdir(dp)) {
 		const char *name = de->d_name;
-		if (!strcmp(name, ".") || !strcmp(name, "..") || S_ISDIR(de->d_type)) {
+		if (!strcmp(name, ".") || !strcmp(name, "..") || de->d_type == DT_DIR) {
 			continue;
 		}
 		if (!array_push(results, string_copy_from_null(name))) {

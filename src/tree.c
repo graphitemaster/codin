@@ -402,6 +402,14 @@ GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expre
 	return type;
 }
 
+// $T or $T/$U
+PolyType *tree_new_poly_type(Tree *tree, Type *base_type, Type *specialization) {
+	PolyType *type = RCAST(PolyType *, new_type(tree, TYPE_POLY, sizeof *type));
+	type->type = base_type;
+	type->specialization = specialization;
+	return type;
+}
+
 ExpressionType *tree_new_expression_type(Tree *tree, Expression *expression) {
 	ExpressionType *type = RCAST(ExpressionType *, new_type(tree, TYPE_EXPRESSION, sizeof *type));
 	type->expression = expression;

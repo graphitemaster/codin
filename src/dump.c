@@ -156,8 +156,10 @@ Bool dump_field(const Field *field, Sint32 depth) {
 		printf(")");
 		printf("\n");
 	}
-	pad(depth + 1);
-	printf("'%.*s'", SFMT(field->name->contents));
+	if (field->name) {
+		pad(depth + 1);
+		printf("'%.*s'", SFMT(field->name->contents));
+	}
 	if (field->type) {
 		printf("\n");
 		dump_type(field->type, depth + 1);
@@ -354,6 +356,18 @@ Bool dump_union_type(const UnionType *type, Sint32 depth) {
 	return true;
 }
 
+Bool dump_poly_type(const PolyType *type, Sint32 depth) {
+	pad(depth);
+	printf("(poly\n");
+	dump_type(type->type, depth + 1);
+	if (type->specialization) {
+		printf("\n");
+		dump_type(type->specialization, depth + 1);
+	}
+	printf(")");
+	return true;
+}
+
 Bool dump_procedure_expression(const ProcedureExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(proc\n");
@@ -389,6 +403,7 @@ Bool dump_type(const Type *type, Sint32 depth) {
 	case TYPE_EXPRESSION:    return dump_expression_type(RCAST(const ExpressionType *, type), depth);
 	case TYPE_STRUCT:        return dump_struct_type(RCAST(const StructType *, type), depth);
 	case TYPE_UNION:         return dump_union_type(RCAST(const UnionType *, type), depth);
+	case TYPE_POLY:          return dump_poly_type(RCAST(const PolyType *, type), depth);
 	}
 	return false;
 }

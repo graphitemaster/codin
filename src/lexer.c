@@ -287,10 +287,40 @@ L_exponent:
 }
 
 static Bool scan_escape(Lexer *lexer) {
-	if (!is_digit(lexer->rune)) {
+	Context *context = lexer->context;
+	switch (lexer->rune) {
+	// \a, \b, \e, \f, \n, \r, \t, \v
+	case 'a': case 'b': case 'e': case 'f': case 'n': case 'r': case 't': case 'v':
 		advancel(lexer);
+		return true;
+	case '\\': case '\'': case '\"':
+		advancel(lexer);
+		return true;
+	case 'x':
+		advancel(lexer);
+		for (Size i = 0; i < 2; i++) advancel(lexer); // "0x"
+		return true;
+	case 'u':
+		advancel(lexer);
+		for (Size i = 0; i < 4; i++) advancel(lexer); // u000
+		return true;
+	case 'U':
+		advancel(lexer);
+		for (Size i = 0; i < 8; i++) advancel(lexer); // U0000000
+		return true;
+	default:
+		if (is_digit(lexer->rune)) {
+			for (Size i = 0; i < 3; i++) advancel(lexer); // %d00
+			return true;
+		} else {
+			if (lexer->rune < 0) {
+				LEX_ERROR("Unterminated escape sequence");
+			} else {
+				LEX_ERROR("Unknown escape sequence %d", CAST(int, lexer->rune));
+			}
+		}
 	}
-	return true;
+	UNREACHABLE();
 }
 
 Bool lexer_init(Lexer *lexer, Context *context, const Source *source) {
@@ -318,12 +348,6 @@ Bool lexer_init(Lexer *lexer, Context *context, const Source *source) {
 	}
 
 	return true;
-}
-
-static Bool unescape(Lexer *lexer) {
-	// TODO(dweiler): Implement.
-	(void)lexer;
-	return false;
 }
 
 static Token lexer_raw_next(Lexer *lexer);
@@ -460,15 +484,17 @@ static Token lexer_tokenize(Lexer *lexer) {
 		{
 			const Rune quote = rune;
 			for (;;) {
-				const Rune r = lexer->rune;
-				if ((rune == '"' && r == '\n') || r == EOF) {
+				const Rune ch = lexer->rune;
+				if (ch == '\n' || ch < 0) {
 					LEX_ERROR("Unterminated string literal");
 					break;
 				}
 				advancel(lexer);
-				if (r == quote) break;
-				if (rune != '"' && r == '\\') {
-					unescape(lexer);
+				if (ch == quote) {
+					break;
+				}
+				if (ch == '\\' && !scan_escape(lexer)) {
+					LEX_ERROR("Malformed string literal");
 				}
 			}
 			token.kind = KIND_LITERAL;

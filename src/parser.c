@@ -422,10 +422,19 @@ static Type *parse_variable_name_or_type(Parser *parser) {
 static Identifier *evaluate_identifier_expression(const Expression *expression);
 
 static Identifier *evaluate_identifier_type(const Type *type) {
-	if (type->kind != TYPE_EXPRESSION) {
+	switch (type->kind) {
+	case TYPE_EXPRESSION:
+		return evaluate_identifier_expression(RCAST(const ExpressionType *, type)->expression);
+	case TYPE_POLY:
+		const PolyType *const poly = RCAST(const PolyType *, type);
+		if (!poly->specialization) {
+			return evaluate_identifier_type(poly->type);
+		}
+		FALLTHROUGH();
+	default:
 		return 0;
 	}
-	return evaluate_identifier_expression(RCAST(const ExpressionType *, type)->expression);
+	UNREACHABLE();
 }
 
 static Identifier *evaluate_identifier_expression(const Expression *expression) {
@@ -523,7 +532,7 @@ static Array(Field*) parse_field_list(Parser *parser, Bool is_struct) {
 			const FieldFlag flags = field_flags[i];
 			Identifier *const identifier = evaluate_identifier_type(name);
 			if (!identifier) {
-				PARSE_ERROR("Expected identifier");
+				PARSE_ERROR("Expected identifier in field list");
 			}
 			array_push(fields, tree_new_field(parser->tree, type, identifier, value, flags));
 		}
@@ -1265,14 +1274,22 @@ static TypeExpression *parse_enum_type_expression(Parser *parser) {
 	return expression;
 }
 
-// $ident
-static IdentifierExpression *parse_const_identifier_expression(Parser *parser) {
+// $T or $T/$U
+static TypeExpression *parse_poly_type_expression(Parser *parser) {
 	TRACE_ENTER();
 
 	expect_kind(parser, KIND_CONST);
 
-	Identifier *identifier = parse_identifier(parser, true);
-	IdentifierExpression *expression = tree_new_identifier_expression(parser->tree, identifier);
+	IdentifierExpression *identifier = tree_new_identifier_expression(parser->tree, parse_identifier(parser, true));
+	ExpressionType *type = tree_new_expression_type(parser->tree, RCAST(Expression *, identifier));
+
+	Type *specialization = 0;
+	if (accepted_operator(parser, OPERATOR_QUO)) {
+		specialization = parse_type(parser);
+	}
+
+	PolyType *poly = tree_new_poly_type(parser->tree, RCAST(Type *, type), specialization);
+	TypeExpression *expression = tree_new_type_expression(parser->tree, RCAST(Type *, poly));
 
 	TRACE_LEAVE();
 
@@ -1528,7 +1545,7 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 	case KIND_CONST:
 		{
 			// $ident
-			IdentifierExpression *const expression = parse_const_identifier_expression(parser);
+			TypeExpression *const expression = parse_poly_type_expression(parser);
 			TRACE_LEAVE();
 			return RCAST(Expression *, expression);
 		}
@@ -1577,7 +1594,7 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 			}
 			UNIMPLEMENTED("..");
 		} else if (has_ellipsis) {
-			PARSE_ERROR("Position arguments not allowed after '..'");
+			PARSE_ERROR("Positional arguments not allowed after '..'");
 		}
 
 		array_push(arguments, argument);
@@ -2158,7 +2175,7 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExp
 		const Expression *const expression = lhs->expressions[i];
 		Identifier *const identifier = evaluate_identifier_expression(expression);
 		if (!identifier) {
-			PARSE_ERROR("Expected identifier");
+			PARSE_ERROR("Expected identifier in declaration");
 		}
 		array_push(names, identifier);
 	}

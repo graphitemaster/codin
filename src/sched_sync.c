@@ -44,12 +44,13 @@ static Bool sched_sync_queue(void *ctx, void *data, void (*func)(void *data, Con
 	return array_push(sched->work, LIT(SchedSyncWork, ctx, data, func, dispose));
 }
 
-#include <stdio.h>
-
+static Size n_work = 0;
+static Size i = 0;
 static void sched_sync_wait(void *ctx) {
 	SchedSync *sched = CAST(SchedSync *, ctx);
-	const Size n_work = array_size(sched->work);
-	for (Size i = 0; i < n_work; i++) {
+	n_work = array_size(sched->work);
+	i = 0;
+	for (i = 0; i < n_work; i++) {
 		const SchedSyncWork *work = &sched->work[i];
 		if (!setjmp(sched->context.jmp)) {
 			work->func(work->data, &sched->context);

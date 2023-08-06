@@ -65,6 +65,7 @@ typedef struct GenericStructType GenericStructType;
 typedef struct UnionType UnionType;
 typedef struct ConcreteUnionType ConcreteUnionType;
 typedef struct GenericUnionType GenericUnionType;
+typedef struct PolyType PolyType;
 
 // Misc.
 typedef struct Identifier Identifier;
@@ -134,7 +135,8 @@ enum TypeKind {
 	TYPE_ENUM            = 12, // enum
 	TYPE_STRUCT          = 13, // struct
 	TYPE_UNION           = 14, // union
-	TYPE_EXPRESSION      = 15, // Expression which evaluates to a Type*
+	TYPE_POLY            = 15, // $T or $T/$U
+	TYPE_EXPRESSION      = 16, // Expression which evaluates to a Type*
 };
 
 enum BuiltinTypeKind {
@@ -564,6 +566,12 @@ struct GenericUnionType {
 	Array(Field*) parameters;
 };
 
+struct PolyType {
+	Type base;
+	Type *type;
+	Type *specialization;
+};
+
 // Misc.
 struct Identifier {
 	String contents;
@@ -645,6 +653,7 @@ ConcreteStructType *tree_new_concrete_struct_type(Tree *tree, StructFlag flags, 
 GenericStructType *tree_new_generic_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) parameters, Array(Field*) fields, ListExpression *where_clauses);
 ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Type*) variants, ListExpression *where_clauses);
 GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Field*) parameters, Array(Type*) variants, ListExpression *where_clauses);
+PolyType *tree_new_poly_type(Tree *tree, Type *type, Type *specialization);
 
 Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value, FieldFlag flags);
 Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly);
