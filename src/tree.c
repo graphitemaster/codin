@@ -140,6 +140,13 @@ IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *ide
 	return expression;
 }
 
+UndefinedExpression *tree_new_undefined_expression(Tree *tree) {
+	Allocator *allocator = tree->context->allocator;
+	UndefinedExpression *expression = CAST(UndefinedExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_UNDEFINED;
+	return expression;
+}
+
 // Statements.
 EmptyStatement *tree_new_empty_statement(Tree *tree) {
 	Allocator *allocator = tree->context->allocator;
@@ -241,6 +248,15 @@ BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Ident
 	statement->base.kind = STATEMENT_BRANCH;
 	statement->branch = branch;
 	statement->label = label;
+	return statement;
+}
+
+ForeignBlockStatement *tree_new_foreign_block_statement(Tree *tree, Identifier *name, BlockStatement *body) {
+	Allocator *allocator = tree->context->allocator;
+	ForeignBlockStatement *statement = CAST(ForeignBlockStatement *, allocator->allocate(allocator, sizeof *statement));
+	statement->base.kind = STATEMENT_FOREIGN_BLOCK;
+	statement->name = name;
+	statement->body = body;
 	return statement;
 }
 

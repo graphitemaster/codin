@@ -42,6 +42,8 @@ Bool dump_defer_statement(const DeferStatement *statement, Sint32 depth);
 Bool dump_branch_statement(const BranchStatement *statement, Sint32 depth);
 Bool dump_statement(const Statement *statement, Sint32 depth);
 
+Bool dump_identifier(const Identifier *identifier, Sint32 depth);
+
 void dump(Tree *tree);
 
 #endif // CODIN_DUMP_H

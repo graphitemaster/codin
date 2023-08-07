@@ -330,7 +330,10 @@ static CallingConvention string_to_calling_convention(String input) {
 }
 
 static Identifier *parse_identifier(Parser *parser, Bool poly) {
+	Context *const context = parser->context;
+
 	TRACE_ENTER();
+
 	Token token = parser->this_token;
 	if (is_kind(token, KIND_IDENTIFIER)) {
 		// NOTE(dweiler): Should write this a different way?
@@ -340,12 +343,14 @@ static Identifier *parse_identifier(Parser *parser, Bool poly) {
 		token = parser->this_token;
 		advancep(parser);
 	} else {
-		Context *context = parser->context;
 		const String got = token_to_string(token);
 		PARSE_ERROR("Expected identifier, got '%.*s'", SFMT(got));
 	}
+
 	Identifier *identifier = tree_new_identifier(parser->tree, token.string, poly);
+
 	TRACE_LEAVE();
+
 	return identifier;
 }
 
@@ -357,14 +362,18 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 // ExpressionType when anything else.
 static Type *parse_type_or_identifier(Parser *parser) {
 	TRACE_ENTER();
+
 	const Sint32 depth = parser->expression_depth;
 	const Bool allow_type = parser->allow_type;
 	parser->expression_depth = -1;
 	parser->allow_type = true;
+
 	Expression *const operand = parse_operand(parser, true);
 	Expression *const expression = parse_atom_expression(parser, operand, true);
+
 	parser->expression_depth = depth;
 	parser->allow_type = allow_type;
+
 	if (expression) {
 		// When TypeExpression we can strip the nesting.
 		Type *type = 0;
@@ -376,19 +385,24 @@ static Type *parse_type_or_identifier(Parser *parser) {
 		TRACE_LEAVE();
 		return type;
 	}
+
 	TRACE_LEAVE();
 	return 0;
 }
 
 static Type *parse_type(Parser *parser) {
-	TRACE_ENTER();
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
+
 	Type *const type = parse_type_or_identifier(parser);
 	if (!type) {
 		const String name = token_to_string(parser->this_token);
 		PARSE_ERROR("Expected a type, got '%.*s' instead", SFMT(name));
 	}
+
 	TRACE_LEAVE();
+
 	return type;
 }
 
@@ -396,7 +410,9 @@ static CompoundLiteralExpression *parse_compound_literal_expression(Parser *pars
 
 static Type *parse_variable_name_or_type(Parser *parser) {
 	Context *const context = parser->context;
+
 	TRACE_ENTER();
+
 	if (is_operator(parser->this_token, OPERATOR_ELLIPSIS)) {
 		advancep(parser);
 		Type *type = parse_type_or_identifier(parser);
@@ -414,8 +430,11 @@ static Type *parse_variable_name_or_type(Parser *parser) {
 		TRACE_LEAVE();
 		return RCAST(Type *, type);
 	}
+
 	Type *const type = parse_type(parser);
+
 	TRACE_LEAVE();
+
 	return type;
 }
 
@@ -459,8 +478,10 @@ static Identifier *evaluate_identifier_expression(const Expression *expression) 
 }
 
 static FieldFlag parse_field_flags(Parser *parser) {
-	TRACE_ENTER();
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
+
 	FieldFlag flags = CAST(FieldFlag, 0);
 	while (is_kind(parser->this_token, KIND_DIRECTIVE)) {
 		const DirectiveKind directive = parser->this_token.as_directive;
@@ -476,14 +497,16 @@ static FieldFlag parse_field_flags(Parser *parser) {
 		}
 		advancep(parser);
 	}
-	return flags;
+
 	TRACE_LEAVE();
+
+	return flags;
 }
 
 static Array(Field*) parse_field_list(Parser *parser, Bool is_struct) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	const Bool allow_newline = parser->allow_newline;
 	parser->allow_newline = true;
@@ -638,9 +661,10 @@ static Array(Field*) parse_procedure_results(Parser *parser, Bool *diverging) {
 }
 
 static ProcedureType *parse_procedure_type(Parser *parser) {
+	Context *const context = parser->context;
+
 	TRACE_ENTER();
 
-	Context *const context = parser->context;
 	CallingConvention convention = CCONV_ODIN;
 	if (is_literal(parser->this_token, LITERAL_STRING)) {
 		const Token token = expect_literal(parser, LITERAL_STRING);
@@ -701,8 +725,9 @@ static BlockStatement *parse_body(Parser *parser, BlockFlag flags);
 static ListExpression *parse_rhs_list_expression(Parser *parser);
 
 static Expression *parse_procedure(Parser *parser) {
-	TRACE_ENTER();
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	ProcedureType *const type = parse_procedure_type(parser);
 
@@ -776,10 +801,20 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 static Statement *parse_statement(Parser *parser, BlockFlag block_flags);
 static Expression *parse_unary_expression(Parser *parser, Bool lhs);
 
-static Statement *parse_directive_for_statement(Parser *parser, BlockFlag block_flags) {
-	TRACE_ENTER();
+// Given a name generates a call statement to intrinsics.%s(...)
+static Statement *parse_directive_call_statement(Parser *parser, String name) {
+	Identifier *intrinsics = tree_new_identifier(parser->tree, SCLIT("intrinsics"), false);
+	Identifier *directive = tree_new_identifier(parser->tree, name, false);
+	IdentifierExpression *identifier = tree_new_identifier_expression(parser->tree, intrinsics);
+	SelectorExpression *selector = tree_new_selector_expression(parser->tree, RCAST(Expression *, identifier), directive);
+	CallExpression *expression = parse_call_expression(parser, RCAST(Expression *, selector));
+	return RCAST(Statement *, tree_new_expression_statement(parser->tree, RCAST(Expression *, expression)));
+}
 
+static Statement *parse_directive_for_statement(Parser *parser, BlockFlag block_flags) {
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	const Token token = expect_kind(parser, KIND_DIRECTIVE);
 	Statement *statement = 0;
@@ -797,14 +832,19 @@ static Statement *parse_directive_for_statement(Parser *parser, BlockFlag block_
 		statement = parse_statement(parser, block_flags & ~BLOCK_FLAG_TYPE_ASSERT);
 		break;
 	case DIRECTIVE_PARTIAL:
+		// Ignore the partial directive for now.
 		statement = parse_statement(parser, block_flags);
 		break;
 	case DIRECTIVE_ASSERT:
-		UNIMPLEMENTED("#assert");
+		statement = parse_directive_call_statement(parser, SCLIT("assert"));
+		break;
 	case DIRECTIVE_PANIC:
-		UNIMPLEMENTED("#panic");
+		statement = parse_directive_call_statement(parser, SCLIT("panic"));
+		break;
 	case DIRECTIVE_UNROLL:
-		UNIMPLEMENTED("#unroll");
+		// Ignore the unroll directive for now.
+		statement = parse_statement(parser, block_flags);
+		break;
 	default:
 		{
 			const String directive = directive_to_string(token.as_directive);
@@ -819,12 +859,13 @@ static Statement *parse_directive_for_statement(Parser *parser, BlockFlag block_
 }
 
 static Expression *parse_value(Parser *parser);
+
 static Statement *parse_attributes_for_statement(Parser *parser, BlockFlag block_flags) {
+	Context *const context = parser->context;
+
 	TRACE_ENTER();
 
 	expect_kind(parser, KIND_ATTRIBUTE);
-
-	Context *const context = parser->context;
 
 	Array(Field*) attributes = array_make(context);
 	if (is_kind(parser->this_token, KIND_IDENTIFIER)) {
@@ -873,17 +914,23 @@ static Statement *parse_attributes_for_statement(Parser *parser, BlockFlag block
 
 static IdentifierExpression *parse_identifier_expression(Parser *parser) {
 	TRACE_ENTER();
+
 	Identifier *const identifier = parse_identifier(parser, false);
 	IdentifierExpression *const expression = tree_new_identifier_expression(parser->tree, identifier);
+
 	TRACE_LEAVE();
+
 	return expression;
 }
 
 static LiteralExpression *parse_literal_expression(Parser *parser) {
 	TRACE_ENTER();
+
 	const Token token = advancep(parser);
 	LiteralExpression *const expression = tree_new_literal_expression(parser->tree, token.as_literal, token.string);
+
 	TRACE_LEAVE();
+
 	return expression;
 }
 
@@ -1057,9 +1104,9 @@ static TypeExpression *parse_distinct_type_expression(Parser *parser) {
 
 // struct
 static TypeExpression *parse_struct_type_expression(Parser *parser) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_STRUCT);
 
@@ -1109,9 +1156,7 @@ static TypeExpression *parse_struct_type_expression(Parser *parser) {
 	advance_possible_newline_within(parser);
 
 	expect_kind(parser, KIND_LBRACE);
-
 	Array(Field*) const fields = parse_field_list(parser, true);
-
 	expect_kind(parser, KIND_RBRACE);
 
 	Type *type = 0;
@@ -1130,9 +1175,9 @@ static TypeExpression *parse_struct_type_expression(Parser *parser) {
 
 // union
 static TypeExpression *parse_union_type_expression(Parser *parser) {
-	TRACE_ENTER();
-
 	Context *context = parser->context;
+
+	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_UNION);
 
@@ -1187,8 +1232,8 @@ static TypeExpression *parse_union_type_expression(Parser *parser) {
 	expect_kind(parser, KIND_LBRACE);
 
 	Array(Type*) variants = array_make(context);
-	while (!is_kind(parser->this_token, KIND_RBRACE) &&
-         !is_kind(parser->this_token, KIND_EOF))
+	while (!is_kind(parser->this_token, KIND_RBRACE)
+	   &&  !is_kind(parser->this_token, KIND_EOF))
 	{
 		Type *const type = parse_type(parser);
 		array_push(variants, type);
@@ -1215,20 +1260,24 @@ static TypeExpression *parse_union_type_expression(Parser *parser) {
 
 static Expression *parse_value(Parser *parser) {
 	TRACE_ENTER();
+
 	if (is_kind(parser->this_token, KIND_LBRACE)) {
 		CompoundLiteralExpression *const expression = parse_compound_literal_expression(parser, 0);
 		TRACE_LEAVE();
 		return RCAST(Expression *, expression);
 	}
+
 	Expression *const value = parse_expression(parser, false);
+
 	TRACE_LEAVE();
+
 	return value;
 }
 
 static TypeExpression *parse_enum_type_expression(Parser *parser) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_ENUM);
 
@@ -1241,8 +1290,8 @@ static TypeExpression *parse_enum_type_expression(Parser *parser) {
 
 	Array(Field*) fields = array_make(context);
 	expect_kind(parser, KIND_LBRACE);
-	while (!is_kind(parser->this_token, KIND_RBRACE) &&
-	       !is_kind(parser->this_token, KIND_EOF))
+	while (!is_kind(parser->this_token, KIND_RBRACE)
+	    && !is_kind(parser->this_token, KIND_EOF))
 	{
 		Expression *name = parse_value(parser);
 		if (name->kind != EXPRESSION_IDENTIFIER) {
@@ -1296,10 +1345,23 @@ static TypeExpression *parse_poly_type_expression(Parser *parser) {
 	return expression;
 }
 
-static Expression *parse_directive_prefix(Parser *parser, Bool lhs) {
+// ---
+static UndefinedExpression *parse_undefined_expression(Parser *parser) {
 	TRACE_ENTER();
 
+	expect_kind(parser, KIND_UNDEFINED);
+
+	UndefinedExpression *expression = tree_new_undefined_expression(parser->tree);
+
+	TRACE_LEAVE();
+
+	return expression;
+}
+
+static Expression *parse_directive_prefix(Parser *parser, Bool lhs) {
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	const Token token = expect_kind(parser, KIND_DIRECTIVE);
 	switch (token.as_directive) {
@@ -1364,8 +1426,10 @@ static Expression *parse_directive_prefix(Parser *parser, Bool lhs) {
 }
 
 static Expression *parse_operand(Parser *parser, Bool lhs) {
-	TRACE_ENTER();
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
+
 	const Token token = parser->this_token;
 	switch (token.kind) {
 	case KIND_IDENTIFIER:
@@ -1402,6 +1466,21 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 			Expression *const expression = parse_directive_prefix(parser, lhs);
 			TRACE_LEAVE();
 			return expression;
+		}
+	case KIND_CONST:
+		{
+			// $ident
+			TypeExpression *const expression = parse_poly_type_expression(parser);
+			TRACE_LEAVE();
+			return RCAST(Expression *, expression);
+		}
+		break;
+	case KIND_UNDEFINED:
+		{
+			// ---
+			UndefinedExpression *const expression = parse_undefined_expression(parser);
+			TRACE_LEAVE();
+			return RCAST(Expression *, expression);
 		}
 	case KIND_KEYWORD:
 		switch (token.as_keyword) {
@@ -1542,26 +1621,19 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 			break;
 		}
 		break;
-	case KIND_CONST:
-		{
-			// $ident
-			TypeExpression *const expression = parse_poly_type_expression(parser);
-			TRACE_LEAVE();
-			return RCAST(Expression *, expression);
-		}
-		break;
 	default:
 		break;
 	}
 
 	TRACE_LEAVE();
+
 	return 0;
 }
 
 static CallExpression *parse_call_expression(Parser *parser, Expression *operand) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	Array(Expression*) arguments = array_make(context);
 	const Sint32 expression_depth = parser->expression_depth;
@@ -1603,11 +1675,15 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 			break;
 		}
 	}
+	expect_operator(parser, OPERATOR_RPAREN);
+
 	parser->allow_newline = allow_newline;
 	parser->expression_depth = expression_depth;
-	expect_operator(parser, OPERATOR_RPAREN);
+
 	CallExpression *const expression = tree_new_call_expression(parser->tree, operand, arguments);
+
 	TRACE_LEAVE();
+
 	return expression;
 }
 
@@ -1623,11 +1699,15 @@ static Token expect_closing(Parser *parser, Kind kind) {
 
 static CompoundLiteralExpression *parse_compound_literal_expression(Parser *parser, Type *type) {
 	Context *const context = parser->context;
+
 	TRACE_ENTER();
+
 	Array(Field*) fields = array_make(context);
-	expect_kind(parser, KIND_LBRACE);
+
 	const Sint32 depth = parser->expression_depth;
 	parser->expression_depth = 0;
+
+	expect_kind(parser, KIND_LBRACE);
 	while (!is_kind(parser->this_token, KIND_RBRACE) &&
 				 !is_kind(parser->this_token, KIND_EOF))
 	{
@@ -1646,17 +1726,20 @@ static CompoundLiteralExpression *parse_compound_literal_expression(Parser *pars
 			break;
 		}
 	}
-	parser->expression_depth = depth;
 	expect_closing(parser, KIND_RBRACE);
+
+	parser->expression_depth = depth;
 	CompoundLiteralExpression *const expression = tree_new_compound_literal_expression(parser->tree, type, fields);
+
 	TRACE_LEAVE();
+
 	return expression;
 }
 
 static Expression *parse_index_expression(Parser *parser, Expression *operand) {
-	TRACE_ENTER();
+	Context *const context = parser->context;
 
-	Context *context = parser->context;
+	TRACE_ENTER();
 
 	Expression *lhs = 0;
 	Expression *rhs = 0;
@@ -1696,9 +1779,9 @@ static Expression *parse_index_expression(Parser *parser, Expression *operand) {
 		}
 	}
 
-	parser->expression_depth--;
-
 	expect_operator(parser, OPERATOR_RBRACKET);
+
+	parser->expression_depth--;
 
 	Expression *expression = 0;
 	if (interval.kind != KIND_INVALID) {
@@ -1717,9 +1800,9 @@ static Expression *parse_index_expression(Parser *parser, Expression *operand) {
 }
 
 static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bool lhs) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	if (!operand) {
 		if (parser->allow_type) {
@@ -1770,14 +1853,13 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 					}
 					break;
 				default:
-					PARSE_ERROR("Expected selector");
-					advancep(parser);
+					PARSE_ERROR("Expected selector in selector expression");
 					break;
 				}
 				break;
 			case OPERATOR_ARROW:
 				// ->ident
-				advancep(parser);
+				expect_operator(parser, OPERATOR_ARROW);
 				ident = parse_identifier(parser, false);
 				operand = RCAST(Expression *, tree_new_selector_expression(parser->tree, operand, ident));
 				break;
@@ -1820,34 +1902,45 @@ L_exit:
 
 static CastExpression *parse_cast_expression(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
+
 	const Token token = advancep(parser);
+
 	Type *type = 0;
-	if (token.as_operator != OPERATOR_AUTO_CAST) {
+	if (!is_operator(token, OPERATOR_AUTO_CAST)) {
 		expect_operator(parser, OPERATOR_LPAREN);
 		type = parse_type(parser);
 		expect_operator(parser, OPERATOR_RPAREN);
 	}
+
 	Expression *const operand = parse_unary_expression(parser, lhs);
 	CastExpression *const expression = tree_new_cast_expression(parser->tree, token.as_operator, type, operand);
+
 	TRACE_LEAVE();
+
 	return expression;
 }
 
 static UnaryExpression *parse_unary_stem_expression(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
+
 	const Token token = advancep(parser);
 	Expression *const operand = parse_unary_expression(parser, lhs);
 	UnaryExpression *const expression = tree_new_unary_expression(parser->tree, token.as_operator, operand);
+
 	TRACE_LEAVE();
+
 	return expression;
 }
 
 static SelectorExpression *parse_implicit_selector_expression(Parser *parser) {
 	TRACE_ENTER();
+
 	expect_operator(parser, OPERATOR_PERIOD);
 	Identifier *const identifier = parse_identifier(parser, false);
 	SelectorExpression *const expression = tree_new_selector_expression(parser->tree, 0, identifier);
+
 	TRACE_LEAVE();
+
 	return expression;
 }
 
@@ -1925,9 +2018,9 @@ static TernaryExpression *parse_ternary_expression(Parser *parser, Expression *e
 }
 
 static Expression *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	Expression *expr = parse_unary_expression(parser, lhs);
 	for (;;) {
@@ -1939,7 +2032,8 @@ static Expression *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec
 			// 'in' and 'not_in' are not allowed here.
 			if (parser->expression_depth < 0 &&
 			    !parser->allow_in &&
-					(is_operator(token, OPERATOR_IN) || is_operator(token, OPERATOR_NOT_IN)))
+			    (is_operator(token, OPERATOR_IN) ||
+			     is_operator(token, OPERATOR_NOT_IN)))
 			{
 				op_prec = 0;
 			}
@@ -1985,8 +2079,11 @@ static Expression *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec
 
 static FORCE_INLINE Expression *parse_expression(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
+
 	Expression *const expression = parse_binary_expression(parser, lhs, 1);
+
 	TRACE_LEAVE();
+
 	return expression;
 }
 
@@ -2018,24 +2115,30 @@ static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
 
 static FORCE_INLINE ListExpression *parse_lhs_list_expression(Parser *parser) {
 	TRACE_ENTER();
+
 	ListExpression *const result = parse_list_expression(parser, true);
+
 	TRACE_LEAVE();
+
 	return result;
 }
 
 static FORCE_INLINE ListExpression *parse_rhs_list_expression(Parser *parser) {
 	TRACE_ENTER();
+
 	ListExpression *const result = parse_list_expression(parser, false);
+
 	TRACE_LEAVE();
+
 	return result;
 }
 
 static Statement *parse_statement(Parser *parser, BlockFlag block_flags);
 
 static Array(Statement*) parse_statement_list(Parser *parser, BlockFlag block_flags) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	Array(Statement*) statements = array_make(context);
 
@@ -2061,24 +2164,30 @@ static Array(Statement*) parse_statement_list(Parser *parser, BlockFlag block_fl
 
 static BlockStatement *parse_body(Parser *parser, BlockFlag flags) {
 	TRACE_ENTER();
+
 	const Sint32 depth = parser->expression_depth;
 	const Bool allow_newline = parser->allow_newline;
 	parser->expression_depth = 0;
 	parser->allow_newline = true;
+
 	expect_kind(parser, KIND_LBRACE);
 	Array(Statement*) const statements = parse_statement_list(parser, flags);
 	expect_kind(parser, KIND_RBRACE);
+
 	parser->expression_depth = depth;
 	parser->allow_newline = allow_newline;
+
 	BlockStatement *const statement = tree_new_block_statement(parser->tree, flags, statements);
+
 	TRACE_LEAVE();
+
 	return statement;
 }
 
 static BlockStatement *parse_block_statement(Parser *parser, BlockFlag flags, Bool when) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	advance_possible_newline_within(parser);
 
@@ -2094,10 +2203,10 @@ static BlockStatement *parse_block_statement(Parser *parser, BlockFlag flags, Bo
 }
 
 static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Array(Identifier*) names) {
+	Context *const context = parser->context;
+
 	// ':'
 	TRACE_ENTER();
-
-	Context *const context = parser->context;
 
 	ListExpression *values = 0;
 	Type *const type = parse_type_or_identifier(parser);
@@ -2212,9 +2321,9 @@ static AssignmentStatement *parse_assignment_statement(Parser *parser, ListExpre
 }
 
 static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	ListExpression *const lhs = parse_lhs_list_expression(parser);
 	const Token token = parser->this_token;
@@ -2291,6 +2400,7 @@ static ImportStatement *parse_import_statement(Parser *parser) {
 	return statement;
 }
 
+// Not a parser. Do not TRACE_(ENTER|LEAVE)
 static BlockStatement *convert_statement_to_body(Parser *parser, BlockFlag flags, Statement *statement) {
 	Context *const context = parser->context;
 	const StatementKind kind = statement->kind;
@@ -2302,6 +2412,7 @@ static BlockStatement *convert_statement_to_body(Parser *parser, BlockFlag flags
 	return tree_new_block_statement(parser->tree, flags, statements);
 }
 
+// Not a parser. Do not TRACE_(ENTER|LEAVE)
 static Expression *convert_statement_to_expression(Parser *parser, Statement *statement) {
 	if (!statement) {
 		return 0;
@@ -2315,22 +2426,26 @@ static Expression *convert_statement_to_expression(Parser *parser, Statement *st
 
 static BlockStatement *parse_do_body(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
+
 	const Sint32 expression_depth = parser->expression_depth;
 	const Bool allow_newline = parser->allow_newline;
 	parser->expression_depth = 0;
 	parser->allow_newline = false;
+
 	Statement *const statement = parse_statement(parser, block_flags);
 	BlockStatement *const body = convert_statement_to_body(parser, block_flags, statement);
 	parser->expression_depth = expression_depth;
 	parser->allow_newline = allow_newline;
+
 	TRACE_LEAVE();
+
 	return body;
 }
 
 static IfStatement *parse_if_statement(Parser *parser, BlockFlag block_flags) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_IF);
 
@@ -2442,9 +2557,9 @@ static WhenStatement *parse_when_statement(Parser *parser) {
 }
 
 static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	Statement *init = 0;
 	Expression *cond = 0;
@@ -2538,8 +2653,10 @@ static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) 
 }
 
 static DeferStatement *parse_defer_statement(Parser *parser, BlockFlag block_flags) {
-	TRACE_ENTER();
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
+
 	expect_keyword(parser, KEYWORD_DEFER);
 	Statement *const statement = parse_statement(parser, block_flags);
 	switch (statement->kind) {
@@ -2554,15 +2671,18 @@ static DeferStatement *parse_defer_statement(Parser *parser, BlockFlag block_fla
 	default:
 		break;
 	}
+
 	DeferStatement *const defer = tree_new_defer_statement(parser->tree, statement);
+
 	TRACE_LEAVE();
+
 	return defer;
 }
 
 static ReturnStatement *parse_return_statement(Parser *parser) {
-	TRACE_ENTER();
-
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_RETURN);
 
@@ -2594,35 +2714,97 @@ static ReturnStatement *parse_return_statement(Parser *parser) {
 
 static Statement *parse_basic_simple_statement(Parser *parser, Bool allow_in) {
 	TRACE_ENTER();
+
 	Statement *const statement = parse_simple_statement(parser, allow_in);
 	expect_semicolon(parser);
+
 	TRACE_LEAVE();
+
 	return statement;
+}
+
+static ForeignBlockStatement *parse_foreign_block_statement(Parser *parser) {
+	Context *const context = parser->context;
+
+	TRACE_ENTER();
+
+	Identifier *name = 0;
+	if (is_kind(parser->this_token, KIND_IDENTIFIER)) {
+		name = parse_identifier(parser, false);
+	}
+
+	Array(Statement*) statements = array_make(context);
+
+	advance_possible_newline_within(parser);
+
+	expect_kind(parser, KIND_LBRACE);
+	while (!is_kind(parser->this_token, KIND_RBRACE)
+	    && !is_kind(parser->this_token, KIND_EOF))
+	{
+		Statement *const statement = parse_statement(parser, 0);
+		array_push(statements, statement);
+	}
+	expect_kind(parser, KIND_RBRACE);
+
+	BlockStatement *block = tree_new_block_statement(parser->tree, 0, statements);
+	ForeignBlockStatement *statement = tree_new_foreign_block_statement(parser->tree, name, block);
+
+	TRACE_LEAVE();
+
+	return statement;
+}
+
+static Statement *parse_foreign_declaration_statement(Parser *parser) {
+	Context *const context = parser->context;
+
+	TRACE_ENTER();
+
+	expect_keyword(parser, KEYWORD_FOREIGN);
+	if (is_kind(parser->this_token, KIND_IDENTIFIER)
+	 || is_kind(parser->this_token, KIND_LBRACE)) {
+		ForeignBlockStatement *statement = parse_foreign_block_statement(parser);
+		TRACE_LEAVE();
+		return RCAST(Statement *, statement);
+	} else if (is_keyword(parser->this_token, KEYWORD_IMPORT)) {
+		UNIMPLEMENTED("foreign import");
+	}
+
+	TRACE_LEAVE();
+
+	return 0;
 }
 
 static BranchStatement *parse_branch_statement(Parser *parser, KeywordKind kind) {
 	TRACE_ENTER();
+
 	advancep(parser);
 	Identifier *label = 0;
 	if (is_kind(parser->this_token, KIND_IDENTIFIER)) {
 		label = parse_identifier(parser, false);
 	}
 	BranchStatement *const statement = tree_new_branch_statement(parser->tree, kind, label);
+
 	TRACE_LEAVE();
+
 	return statement;
 }
 
 static EmptyStatement *parse_empty_statement(Parser *parser) {
 	TRACE_ENTER();
+
 	EmptyStatement *const statement = tree_new_empty_statement(parser->tree);
 	expect_semicolon(parser);
+
 	TRACE_LEAVE();
+
 	return statement;
 }
 
 static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
-	TRACE_ENTER();
 	Context *const context = parser->context;
+
+	TRACE_ENTER();
+
 	const Token token = parser->this_token;
 	switch (token.kind) {
 	case KIND_EOF:
@@ -2655,7 +2837,11 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 				return statement;
 			}
 		case KEYWORD_FOREIGN:
-			UNIMPLEMENTED("foreign declaration");
+			{
+				Statement *const statement = parse_foreign_declaration_statement(parser);
+				TRACE_LEAVE();
+				return statement;
+			}
 		case KEYWORD_IF:
 			{
 				IfStatement *const statement = parse_if_statement(parser, block_flags);
@@ -2765,6 +2951,8 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 	}
 
 	PARSE_ERROR("Expected statement");
+
+	TRACE_LEAVE(); // Unreachable.
 }
 
 Tree *parse(String filename, Context *context) {
@@ -2793,8 +2981,7 @@ Tree *parse(String filename, Context *context) {
 
 	static const String RESERVED_PACKAGES[] = {
 		SLIT("builtin"),
-		SLIT("runtime"),
-		SLIT("intrinsics")
+		SLIT("intrinsics"),
 	};
 
 	// "package <ident>"
@@ -2804,7 +2991,7 @@ Tree *parse(String filename, Context *context) {
 		PARSE_ERROR("Cannot name package '_'");
 	}
 
-	for (Size i = 0; i < sizeof(RESERVED_PACKAGES)/sizeof *RESERVED_PACKAGES; i++) {
+	for (Size i = 0; i < sizeof RESERVED_PACKAGES / sizeof *RESERVED_PACKAGES; i++) {
 		const String name = RESERVED_PACKAGES[i];
 		if (string_compare(package.string, name)) {
 			PARSE_ERROR("Use of reserved package name '%.*s'", SFMT(name));

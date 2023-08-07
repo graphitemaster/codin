@@ -25,6 +25,7 @@ typedef struct SliceExpression SliceExpression;
 typedef struct LiteralExpression LiteralExpression;
 typedef struct CompoundLiteralExpression CompoundLiteralExpression;
 typedef struct IdentifierExpression IdentifierExpression;
+typedef struct UndefinedExpression UndefinedExpression;
 
 // Statements.
 typedef struct Statement Statement;
@@ -40,6 +41,7 @@ typedef struct ReturnStatement ReturnStatement;
 typedef struct ForStatement ForStatement;
 typedef struct DeferStatement DeferStatement;
 typedef struct BranchStatement BranchStatement;
+typedef struct ForeignBlockStatement ForeignBlockStatement;
 
 // Types.
 typedef struct Type Type;
@@ -87,21 +89,23 @@ enum ExpressionKind {
 	EXPRESSION_LITERAL          = 12, // int, float, rune, string
 	EXPRESSION_COMPOUND_LITERAL = 13, // T{...}
 	EXPRESSION_IDENTIFIER       = 14, // ident
+	EXPRESSION_UNDEFINED        = 15, // ---
 };
 
 enum StatementKind {
-	STATEMENT_EMPTY       = 0,
-	STATEMENT_BLOCK       = 1,
-	STATEMENT_IMPORT      = 2,
-	STATEMENT_EXPRESSION  = 3,
-	STATEMENT_ASSIGNMENT  = 4,
-	STATEMENT_DECLARATION = 5,
-	STATEMENT_IF          = 6,
-	STATEMENT_WHEN        = 7,
-	STATEMENT_RETURN      = 8,
-	STATEMENT_FOR         = 9,
-	STATEMENT_DEFER       = 10,
-	STATEMENT_BRANCH      = 11, // break, continue, fallthrough
+	STATEMENT_EMPTY         = 0,
+	STATEMENT_BLOCK         = 1,
+	STATEMENT_IMPORT        = 2,
+	STATEMENT_EXPRESSION    = 3,
+	STATEMENT_ASSIGNMENT    = 4,
+	STATEMENT_DECLARATION   = 5,
+	STATEMENT_IF            = 6,
+	STATEMENT_WHEN          = 7,
+	STATEMENT_RETURN        = 8,
+	STATEMENT_FOR           = 9,
+	STATEMENT_DEFER         = 10,
+	STATEMENT_BRANCH        = 11, // break, continue, fallthrough
+	STATEMENT_FOREIGN_BLOCK = 12,
 };
 
 enum ProcedureKind {
@@ -344,6 +348,10 @@ struct IdentifierExpression {
 	Identifier *identifier;
 };
 
+struct UndefinedExpression {
+	Expression base;
+};
+
 // Statements.
 struct Statement {
 	StatementKind kind;
@@ -422,6 +430,12 @@ struct BranchStatement {
 	Statement base;
 	KeywordKind branch;
 	Identifier *label; // Optional label.
+};
+
+struct ForeignBlockStatement {
+	Statement base;
+	Identifier *name;
+	BlockStatement *body;
 };
 
 // Types.
@@ -619,6 +633,7 @@ SliceExpression *tree_new_slice_expression(Tree *tree, Expression *operand, Expr
 LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, String value);
 CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Type *type, Array(Field*) fields);
 IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier);
+UndefinedExpression *tree_new_undefined_expression(Tree *tree);
 
 // Statements
 EmptyStatement *tree_new_empty_statement(Tree *tree);
@@ -633,6 +648,7 @@ ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *co
 ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) results);
 DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
 BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label);
+ForeignBlockStatement *tree_new_foreign_block_statement(Tree *tree, Identifier *name, BlockStatement *body);
 
 // Types
 ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);
