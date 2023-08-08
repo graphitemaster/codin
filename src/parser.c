@@ -2146,9 +2146,8 @@ static Expression *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec
 				return expr;
 			}
 		}
-		
-		// TODO(dweiler): More robust.
-		advancep(parser);
+
+		expect_kind(parser, KIND_OPERATOR);
 
 		if (is_operator(token, OPERATOR_QUESTION)
 		 || is_keyword(token, KEYWORD_IF)
@@ -2196,6 +2195,7 @@ static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
 		if (!is_operator(parser->this_token, OPERATOR_COMMA) || is_kind(parser->this_token, KIND_EOF)) {
 			break;
 		}
+		advancep(parser);
 	}
 
 	ListExpression *const expression = tree_new_list_expression(parser->tree, expressions);
@@ -2369,8 +2369,6 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExp
 
 	TRACE_ENTER();
 
-	expect_operator(parser, OPERATOR_COLON);
-
 	// Everything inside 'lhs' should evaluate as an identifier.
 	const Size n_names = array_size(lhs->expressions);
 	Array(Identifier *) names = array_make(context);
@@ -2414,7 +2412,7 @@ static AssignmentStatement *parse_assignment_statement(Parser *parser, ListExpre
 	return statement;
 }
 
-static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
+static Statement *parse_simple_statement(Parser* parser, BlockFlag block_flags, Bool allow_in, Bool allow_label) {
 	Context *const context = parser->context;
 
 	TRACE_ENTER();
@@ -2443,6 +2441,38 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 			break;
 		case OPERATOR_COLON:
 			{
+				advancep(parser);
+				// Check if label prefix.
+				if (allow_label && array_size(lhs->expressions) == 1) {
+					const Token token = parser->this_token;
+					if (is_kind(token, KIND_LBRACE)
+					 || is_keyword(token, KEYWORD_IF)
+					 || is_keyword(token, KEYWORD_FOR)
+					 || is_keyword(token, KEYWORD_SWITCH))
+					{
+						Expression *const name = lhs->expressions[0];
+						if (name->kind != EXPRESSION_IDENTIFIER) {
+							PARSE_ERROR("Expected identifier for label");
+						}
+						Identifier *const label = RCAST(IdentifierExpression *, name)->identifier;
+						Statement *const statement = parse_statement(parser, block_flags);
+						switch (statement->kind) {
+						case STATEMENT_BLOCK:
+							RCAST(BlockStatement *, statement)->label = label;
+							break;
+						case STATEMENT_IF:
+							RCAST(IfStatement *, statement)->label = label;
+							break;
+						case STATEMENT_FOR:
+							RCAST(ForStatement *, statement)->label = label;
+							break;
+						default:
+							PARSE_ERROR("Cannot apply label to this statement");
+						}
+						TRACE_LEAVE();
+						return statement;
+					}
+				}
 				DeclarationStatement *const statement = parse_declaration_statement(parser, lhs, false);
 				TRACE_LEAVE();
 				return RCAST(Statement *, statement);
@@ -2545,7 +2575,7 @@ static IfStatement *parse_if_statement(Parser *parser, BlockFlag block_flags) {
 	parser->expression_depth = -1;
 	parser->allow_in = true;
 
-	Statement *init = parse_simple_statement(parser, false);
+	Statement *init = parse_simple_statement(parser, block_flags, false, false);
 	Expression *cond = 0;
 	if (accepted_control_statement_separator(parser)) {
 		cond = parse_expression(parser, false);
@@ -2676,7 +2706,7 @@ static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) 
 		}
 
 		// for [...] in <Expression>
-		Statement *const statement = parse_simple_statement(parser, true);
+		Statement *const statement = parse_simple_statement(parser, block_flags, true, false);
 		if (statement->kind == STATEMENT_EXPRESSION) {
 			Expression *const expression = RCAST(ExpressionStatement *, statement)->expression;
 			if (expression->kind == EXPRESSION_UNARY) {
@@ -2701,7 +2731,7 @@ static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) 
 			} else {
 				if (!is_kind(token, KIND_SEMICOLON)) {
 					// for [...] <cond>
-					Statement *const statement = parse_simple_statement(parser, false);
+					Statement *const statement = parse_simple_statement(parser, block_flags, false, false);
 					cond = convert_statement_to_expression(parser, statement);
 				}
 				expect_semicolon(parser);
@@ -2709,7 +2739,7 @@ static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) 
 				 && !is_keyword(parser->this_token, KEYWORD_DO))
 				{
 					// for [...] [...] <post>
-					post = parse_simple_statement(parser, false);
+					post = parse_simple_statement(parser, block_flags, false, false);
 				}
 			}
 		}
@@ -2779,10 +2809,10 @@ static ReturnStatement *parse_return_statement(Parser *parser) {
 }
 
 // SimpleStatement , Semicolon
-static Statement *parse_basic_simple_statement(Parser *parser, Bool allow_in) {
+static Statement *parse_basic_simple_statement(Parser *parser, BlockFlag block_flags, Bool allow_in) {
 	TRACE_ENTER();
 
-	Statement *const statement = parse_simple_statement(parser, allow_in);
+	Statement *const statement = parse_simple_statement(parser, block_flags, allow_in, true);
 	expect_semicolon(parser);
 
 	TRACE_LEAVE();
@@ -2955,7 +2985,7 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 		case LITERAL_RUNE:      FALLTHROUGH();
 		case LITERAL_STRING:
 			{
-				Statement *const statement = parse_basic_simple_statement(parser, false);
+				Statement *const statement = parse_basic_simple_statement(parser, block_flags, false);
 				TRACE_LEAVE();
 				return statement;
 			}
@@ -2970,7 +3000,7 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 			FALLTHROUGH();
 		case KEYWORD_PROC:
 			{
-				Statement *const statement = parse_basic_simple_statement(parser, false);
+				Statement *const statement = parse_basic_simple_statement(parser, block_flags, false);
 				TRACE_LEAVE();
 				return statement;
 			}
@@ -3038,7 +3068,7 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 		break;
 	case KIND_IDENTIFIER:
 		{
-			Statement *const statement = parse_basic_simple_statement(parser, false);
+			Statement *const statement = parse_basic_simple_statement(parser, block_flags, false);
 			TRACE_LEAVE();
 			return statement;
 		}
@@ -3052,7 +3082,7 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 		case OPERATOR_NOT:     FALLTHROUGH();
 		case OPERATOR_AND:
 			{
-				Statement *const statement = parse_basic_simple_statement(parser, false);
+				Statement *const statement = parse_basic_simple_statement(parser, block_flags, false);
 				TRACE_LEAVE();
 				return statement;
 			}

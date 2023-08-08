@@ -391,6 +391,7 @@ struct BlockStatement {
 	Statement base;
 	BlockFlag flags;
 	Array(Statement*) statements;
+	Identifier *label;
 };
 
 struct AssignmentStatement {
@@ -415,6 +416,7 @@ struct IfStatement {
 	Expression *cond;
 	BlockStatement *body;
 	BlockStatement *elif;
+	Identifier *label;
 };
 
 struct WhenStatement {
@@ -435,6 +437,7 @@ struct ForStatement {
 	Expression *cond;
 	BlockStatement *body;
 	Statement *post;
+	Identifier *label;
 };
 
 struct DeferStatement {
