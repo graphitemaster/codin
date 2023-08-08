@@ -1,5 +1,7 @@
 #ifndef CODIN_ARRAY_H
 #define CODIN_ARRAY_H
+#include <string.h> // memmove
+
 #include "support.h" // ALIGN, Size
 
 typedef struct Context Context;

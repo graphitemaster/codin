@@ -155,13 +155,14 @@ EmptyStatement *tree_new_empty_statement(Tree *tree) {
 	return statement;
 }
 
-ImportStatement *tree_new_import_statement(Tree *tree, String name, String package) {
+ImportStatement *tree_new_import_statement(Tree *tree, String name, String package, Bool using) {
 	Context *context = tree->context;
 	Allocator *allocator = context->allocator;
 	ImportStatement *statement = CAST(ImportStatement*, allocator->allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_IMPORT;
 	statement->name = string_copy(name);
 	statement->package = string_copy(package);
+	statement->using = using;
 	return statement;
 }
 
@@ -192,13 +193,14 @@ AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind as
 	return statement;
 }
 
-DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values) {
+DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values, Bool using) {
 	Allocator *allocator = tree->context->allocator;
 	DeclarationStatement *statement = CAST(DeclarationStatement *, allocator->allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_DECLARATION;
 	statement->type = type;
 	statement->names = names;
 	statement->values = values;
+	statement->using = using;
 	return statement;
 }
 
@@ -242,6 +244,14 @@ ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) result
 	return statement;
 }
 
+DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt) {
+	Allocator *allocator = tree->context->allocator;
+	DeferStatement *statement = CAST(DeferStatement *, allocator->allocate(allocator, sizeof *statement));
+	statement->base.kind = STATEMENT_DEFER;
+	statement->statement = stmt;
+	return statement;
+}
+
 BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label) {
 	Allocator *allocator = tree->context->allocator;
 	BranchStatement *statement = CAST(BranchStatement *, allocator->allocate(allocator, sizeof *statement));
@@ -260,11 +270,20 @@ ForeignBlockStatement *tree_new_foreign_block_statement(Tree *tree, Identifier *
 	return statement;
 }
 
-DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt) {
+ForeignImportStatement *tree_new_foreign_import_statement(Tree *tree, String name, Array(String) sources) {
 	Allocator *allocator = tree->context->allocator;
-	DeferStatement *statement = CAST(DeferStatement *, allocator->allocate(allocator, sizeof *statement));
-	statement->base.kind = STATEMENT_DEFER;
-	statement->statement = stmt;
+	ForeignImportStatement *statement = CAST(ForeignImportStatement *, allocator->allocate(allocator, sizeof *statement));
+	statement->base.kind = STATEMENT_FOREIGN_IMPORT;
+	statement->name = name;
+	statement->sources = sources;
+	return statement;
+}
+
+UsingStatement *tree_new_using_statement(Tree *tree, ListExpression *list) {
+	Allocator *allocator = tree->context->allocator;
+	UsingStatement *statement = CAST(UsingStatement *, allocator->allocate(allocator, sizeof *statement));
+	statement->base.kind = STATEMENT_USING;
+	statement->list = list;
 	return statement;
 }
 
@@ -274,6 +293,7 @@ Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly) {
 	Identifier *identifier = CAST(Identifier *, allocator->allocate(allocator, sizeof *identifier));
 	identifier->contents = string_copy(contents);
 	identifier->poly = poly;
+	identifier->token = array_size(tree->tokens) - 1;
 	return identifier;
 }
 
@@ -467,4 +487,9 @@ void tree_init(Tree *tree, Context *context) {
 	tree->package_name = STRING_NIL;
 	tree->file_name = STRING_NIL;
 	tree->statements = array_make(context);
+	tree->tokens = array_make(context);
+}
+
+void tree_record_token(Tree *tree, Token token) {
+	array_push(tree->tokens, token);
 }

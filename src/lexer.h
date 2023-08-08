@@ -66,8 +66,6 @@ struct Source {
 	String contents;
 };
 
-extern const Source SOURCE_NIL;
-
 struct Location {
 	int column;
 	int line;
@@ -101,7 +99,8 @@ struct Input {
 struct Lexer {
 	Context *context;
 	Input input;
-	Location location; 
+	Location this_location; 
+	Location last_location;
 	const Uint8 *here;
 	Rune rune;
 	Bool asi;

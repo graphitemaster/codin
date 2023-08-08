@@ -10,7 +10,7 @@
 
 #define PARSE_ERROR(...) \
 	do { \
-		report_error(&parser->source, &parser->last_token.location, __VA_ARGS__); \
+		report_error(&parser->source, &parser->this_token.location, __VA_ARGS__); \
 		THROW(1); \
 	} while (0)
 
@@ -55,6 +55,10 @@ struct Parser {
 	Bool allow_in;
 };
 
+static FORCE_INLINE void record(Parser *parser) {
+	tree_record_token(parser->tree, parser->this_token);
+}
+
 #if defined(TRACE)
 static void parser_trace_enter(Parser *parser, const char *function) {
 	if (parser->trace_depth) {
@@ -71,8 +75,8 @@ static FORCE_INLINE void parser_trace_leave(Parser *parser) {
 #define TRACE_ENTER() parser_trace_enter(parser, __FUNCTION__)
 #define TRACE_LEAVE() parser_trace_leave(parser)
 #else
-#define TRACE_ENTER() 
-#define TRACE_LEAVE() 
+#define TRACE_ENTER()
+#define TRACE_LEAVE()
 #endif
 
 static Bool parser_init(Parser *parser, String filename, Context *context) {
@@ -308,7 +312,8 @@ static void expect_semicolon(Parser *parser) {
 	}
 
 	if (token.location.line == parser->last_token.location.line) {
-		PARSE_ERROR("Expected ';'");
+		const String got = token_to_string(token);
+		PARSE_ERROR("Expected ';', got '%.*s'", SFMT(got));
 	}
 }
 
@@ -329,22 +334,28 @@ static CallingConvention string_to_calling_convention(String input) {
 	return CCONV_INVALID;
 }
 
+// Identifier = ['$'] Char { Char | Digit }
 static Identifier *parse_identifier(Parser *parser, Bool poly) {
 	Context *const context = parser->context;
 
 	TRACE_ENTER();
+
+	record(parser);
 
 	Token token = parser->this_token;
 	if (is_kind(token, KIND_IDENTIFIER)) {
 		// NOTE(dweiler): Should write this a different way?
 		advancep(parser);
 	} else if (is_kind(token, KIND_CONST)) {
-		expect_kind(parser, KIND_CONST);
+		advancep(parser); // KIND_CONST
+		if (!accepted_kind(parser, KIND_IDENTIFIER)) {
+			const String got = token_to_string(parser->this_token);
+			PARSE_ERROR("Expected identifier, got '%.*s'", SFMT(got));
+		}
 		token = parser->this_token;
-		advancep(parser);
 	} else {
 		const String got = token_to_string(token);
-		PARSE_ERROR("Expected identifier, got '%.*s'", SFMT(got));
+		PARSE_ERROR("Expected identifier or '$', got '%.*s'", SFMT(got));
 	}
 
 	Identifier *identifier = tree_new_identifier(parser->tree, token.string, poly);
@@ -358,8 +369,6 @@ static Expression *parse_operand(Parser *parser, Bool lhs);
 static Expression *parse_expression(Parser *parser, Bool lhs);
 static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bool lhs);
 
-// IdentifierType when parsing an identifier.
-// ExpressionType when anything else.
 static Type *parse_type_or_identifier(Parser *parser) {
 	TRACE_ENTER();
 
@@ -419,7 +428,7 @@ static Type *parse_variable_name_or_type(Parser *parser) {
 		if (!type) {
 			PARSE_ERROR("Missing type after '..'");
 		}
-		UNIMPLEMENTED("..");
+		return type;
 	} else if (is_keyword(parser->this_token, KEYWORD_TYPEID)) {
 		expect_keyword(parser, KEYWORD_TYPEID);
 		Type *specialization = 0;
@@ -483,11 +492,19 @@ static FieldFlag parse_field_flags(Parser *parser) {
 	TRACE_ENTER();
 
 	FieldFlag flags = CAST(FieldFlag, 0);
+	if (is_keyword(parser->this_token, KEYWORD_USING)) {
+		advancep(parser);
+		flags |= FIELD_FLAG_USING;
+	}
+
 	while (is_kind(parser->this_token, KIND_DIRECTIVE)) {
 		const DirectiveKind directive = parser->this_token.as_directive;
 		switch (directive) {
 		case DIRECTIVE_ANY_INT:
 			flags |= FIELD_FLAG_ANY_INT;
+			break;
+		case DIRECTIVE_C_VARARG:
+			flags |= FIELD_FLAG_C_VARARG;
 			break;
 		default:
 			{
@@ -560,13 +577,15 @@ static Array(Field*) parse_field_list(Parser *parser, Bool is_struct) {
 			array_push(fields, tree_new_field(parser->tree, type, identifier, value, flags));
 		}
 	} else {
+		record(parser);
+
 		// Generate identifiers with '__unnamed_%d'.
 		for (Size i = 0; i < n_elements; i++) {
 			Type *const type = list[i];
 			const FieldFlag flags = field_flags[i];
 			StrBuf buf;
 			strbuf_init(&buf, context);
-			strbuf_put_formatted(&buf, "__unnamed_%d", CAST(Sint32, array_size(fields)));
+			strbuf_put_formatted(&buf, "__unnamed_%d", CAST(Sint32, i));
 			Identifier *name = tree_new_identifier(parser->tree, strbuf_result(&buf), false);
 			array_push(fields, tree_new_field(parser->tree, type, name, value, flags));
 		}
@@ -640,6 +659,7 @@ static Array(Field*) parse_procedure_results(Parser *parser, Bool *diverging) {
 
 	if (!is_operator(parser->this_token, OPERATOR_LPAREN)) {
 		Type *const type = parse_type(parser);
+		record(parser);
 		Identifier *const identifier = tree_new_identifier(parser->tree, SCLIT("__unnamed"), false);
 		Field *const field = tree_new_field(parser->tree, type, identifier, 0, 0);
 		array_push(fields, field);
@@ -778,7 +798,14 @@ static Expression *parse_procedure(Parser *parser) {
 
 	advance_possible_newline_within(parser);
 
-	if (is_kind(parser->this_token, KIND_LBRACE)) {
+	if (accepted_kind(parser, KIND_UNDEFINED)) {
+		if (where_clauses) {
+			PARSE_ERROR("Cannot use 'where' clause on procedures without bodies");
+		}
+		ProcedureExpression *const expression = tree_new_procedure_expression(parser->tree, type, 0, 0);
+		TRACE_LEAVE();
+		return RCAST(Expression *, expression);
+	} else if (is_kind(parser->this_token, KIND_LBRACE)) {
 		BlockFlag block_flags = CAST(BlockFlag, 0);
 		if (flags & PROC_FLAG_BOUNDS_CHECK) block_flags |= BLOCK_FLAG_BOUNDS_CHECK;
 		if (flags & PROC_FLAG_TYPE_ASSERT)  block_flags |= BLOCK_FLAG_TYPE_ASSERT;
@@ -802,12 +829,18 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags);
 static Expression *parse_unary_expression(Parser *parser, Bool lhs);
 
 // Given a name generates a call statement to intrinsics.%s(...)
-static Statement *parse_directive_call_statement(Parser *parser, String name) {
+static Expression *parse_directive_call_expression(Parser *parser, String name) {
+	record(parser);
 	Identifier *intrinsics = tree_new_identifier(parser->tree, SCLIT("intrinsics"), false);
 	Identifier *directive = tree_new_identifier(parser->tree, name, false);
 	IdentifierExpression *identifier = tree_new_identifier_expression(parser->tree, intrinsics);
 	SelectorExpression *selector = tree_new_selector_expression(parser->tree, RCAST(Expression *, identifier), directive);
 	CallExpression *expression = parse_call_expression(parser, RCAST(Expression *, selector));
+	return RCAST(Expression *, expression);
+}
+
+static Statement *parse_directive_call_statement(Parser *parser, String name) {
+	Expression *expression = parse_directive_call_expression(parser, name);
 	return RCAST(Statement *, tree_new_expression_statement(parser->tree, RCAST(Expression *, expression)));
 }
 
@@ -903,8 +936,14 @@ static Statement *parse_attributes_for_statement(Parser *parser, BlockFlag block
 	case STATEMENT_DECLARATION:
 		RCAST(DeclarationStatement *, statement)->attributes = attributes;
 		break;
+	case STATEMENT_FOREIGN_BLOCK:
+		RCAST(ForeignBlockStatement *, statement)->attributes = attributes;
+		break;
+	case STATEMENT_FOREIGN_IMPORT:
+		RCAST(ForeignImportStatement *, statement)->attributes = attributes;
+		break;
 	default:
-		PARSE_ERROR("Unexpected declaration after attribute");
+		PARSE_ERROR("Unexpected statement after attribute");
 	}
 
 	TRACE_LEAVE();
@@ -1413,6 +1452,12 @@ static Expression *parse_directive_prefix(Parser *parser, Bool lhs) {
 			TRACE_LEAVE();
 			return expression;
 		}
+	case DIRECTIVE_CONFIG:
+		{
+			Expression *const expression = parse_directive_call_expression(parser, SCLIT("config"));
+			TRACE_LEAVE();
+			return expression;
+		}
 	default:
 		{
 			const String name = directive_to_string(token.as_directive);
@@ -1546,6 +1591,7 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 			}
 		case KEYWORD_CONTEXT:
 			{
+				record(parser);
 				expect_keyword(parser, KEYWORD_CONTEXT);
 				Identifier *const identifier = tree_new_identifier(parser->tree, SCLIT("context"), false);
 				IdentifierExpression *const expression = tree_new_identifier_expression(parser->tree, identifier);
@@ -2202,7 +2248,7 @@ static BlockStatement *parse_block_statement(Parser *parser, BlockFlag flags, Bo
 	return body;
 }
 
-static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Array(Identifier*) names) {
+static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Array(Identifier*) names, Bool using) {
 	Context *const context = parser->context;
 
 	// ':'
@@ -2263,14 +2309,14 @@ static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Ar
 		values = tree_new_list_expression(parser->tree, expressions);
 	}
 
-	DeclarationStatement *const statement = tree_new_declaration_statement(parser->tree, type, names, values);
+	DeclarationStatement *const statement = tree_new_declaration_statement(parser->tree, type, names, values, using);
 
 	TRACE_LEAVE();
 
 	return statement;
 }
 
-static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExpression *lhs) {
+static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExpression *lhs, Bool using) {
 	Context *const context = parser->context;
 
 	TRACE_ENTER();
@@ -2289,7 +2335,7 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExp
 		array_push(names, identifier);
 	}
 
-	DeclarationStatement *const statement = parse_declaration_statement_tail(parser, names);
+	DeclarationStatement *const statement = parse_declaration_statement_tail(parser, names, using);
 
 	TRACE_LEAVE();
 
@@ -2349,7 +2395,7 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 			break;
 		case OPERATOR_COLON:
 			{
-				DeclarationStatement *const statement = parse_declaration_statement(parser, lhs);
+				DeclarationStatement *const statement = parse_declaration_statement(parser, lhs, false);
 				TRACE_LEAVE();
 				return RCAST(Statement *, statement);
 			}
@@ -2372,7 +2418,7 @@ static Statement *parse_simple_statement(Parser* parser, Bool allow_in) {
 	return RCAST(Statement *, statement);
 }
 
-static ImportStatement *parse_import_statement(Parser *parser) {
+static ImportStatement *parse_import_statement(Parser *parser, Bool using) {
 	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_IMPORT);
@@ -2393,7 +2439,8 @@ static ImportStatement *parse_import_statement(Parser *parser) {
 	const String name = string_unquote(token.string, "\"");
 	const String package = string_unquote(path.string, "\"");
 
-	ImportStatement *const statement = tree_new_import_statement(parser->tree, name, package);
+	ImportStatement *const statement = 
+		tree_new_import_statement(parser->tree, name, package, using);
 
 	TRACE_LEAVE();
 
@@ -2556,6 +2603,7 @@ static WhenStatement *parse_when_statement(Parser *parser) {
 	return statement;
 }
 
+// TODO(dweiler): EBNF
 static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) {
 	Context *const context = parser->context;
 
@@ -2652,6 +2700,7 @@ static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) 
 	return statement;
 }
 
+// 'defer' [Statement]
 static DeferStatement *parse_defer_statement(Parser *parser, BlockFlag block_flags) {
 	Context *const context = parser->context;
 
@@ -2679,6 +2728,7 @@ static DeferStatement *parse_defer_statement(Parser *parser, BlockFlag block_fla
 	return defer;
 }
 
+// 'return' [Expression] (',' [Expression])+ [Semicolon]
 static ReturnStatement *parse_return_statement(Parser *parser) {
 	Context *const context = parser->context;
 
@@ -2712,6 +2762,7 @@ static ReturnStatement *parse_return_statement(Parser *parser) {
 	return statement;
 }
 
+// SimpleStatement , Semicolon
 static Statement *parse_basic_simple_statement(Parser *parser, Bool allow_in) {
 	TRACE_ENTER();
 
@@ -2723,6 +2774,7 @@ static Statement *parse_basic_simple_statement(Parser *parser, Bool allow_in) {
 	return statement;
 }
 
+// ForeignBlockStatement = Identifier? , '{' , Statement+ , '}'
 static ForeignBlockStatement *parse_foreign_block_statement(Parser *parser) {
 	Context *const context = parser->context;
 
@@ -2749,14 +2801,53 @@ static ForeignBlockStatement *parse_foreign_block_statement(Parser *parser) {
 	BlockStatement *block = tree_new_block_statement(parser->tree, 0, statements);
 	ForeignBlockStatement *statement = tree_new_foreign_block_statement(parser->tree, name, block);
 
+	expect_semicolon(parser);
+
 	TRACE_LEAVE();
 
 	return statement;
 }
 
-static Statement *parse_foreign_declaration_statement(Parser *parser) {
+// ForeignImportStatement = 'import' , Identifier? , ()
+static ForeignImportStatement *parse_foreign_import_statement(Parser *parser) {
 	Context *const context = parser->context;
 
+	TRACE_ENTER();
+
+	expect_keyword(parser, KEYWORD_IMPORT);
+
+	Token name = TOKEN_NIL;
+	if (is_kind(parser->this_token, KIND_IDENTIFIER)) {
+		name = advancep(parser); // Consume the identifier
+	}
+
+	Array(String) sources = array_make(context);
+	if (accepted_kind(parser, KIND_LBRACE)) {
+		while (!is_kind(parser->this_token, KIND_RBRACE)
+		    && !is_kind(parser->this_token, KIND_EOF))
+		{
+			const Token path = expect_literal(parser, LITERAL_STRING);
+			array_push(sources, path.string);
+			if (!accepted_separator(parser)) {
+				break;
+			}
+		}
+		expect_closing(parser, KIND_RBRACE);
+	} else {
+		const Token path = expect_literal(parser, LITERAL_STRING);
+		array_push(sources, path.string);
+	}
+
+	ForeignImportStatement *statement = 
+		tree_new_foreign_import_statement(parser->tree, name.string, sources);
+
+	TRACE_LEAVE();
+
+	return statement;
+}
+
+// ForeignDeclaration = 'foreign' , ( ForeignBlockStatement | ForeignImportStatement ) ;
+static Statement *parse_foreign_declaration_statement(Parser *parser) {
 	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_FOREIGN);
@@ -2766,7 +2857,9 @@ static Statement *parse_foreign_declaration_statement(Parser *parser) {
 		TRACE_LEAVE();
 		return RCAST(Statement *, statement);
 	} else if (is_keyword(parser->this_token, KEYWORD_IMPORT)) {
-		UNIMPLEMENTED("foreign import");
+		ForeignImportStatement *statement = parse_foreign_import_statement(parser);
+		TRACE_LEAVE();
+		return RCAST(Statement *, statement);
 	}
 
 	TRACE_LEAVE();
@@ -2787,6 +2880,34 @@ static BranchStatement *parse_branch_statement(Parser *parser, KeywordKind kind)
 	TRACE_LEAVE();
 
 	return statement;
+}
+
+static Statement *parse_using_statement(Parser *parser) {
+	TRACE_ENTER();
+
+	expect_keyword(parser, KEYWORD_USING);
+
+	if (is_keyword(parser->this_token, KEYWORD_IMPORT)) {
+		ImportStatement *statement = parse_import_statement(parser, true);
+		TRACE_LEAVE();
+		return RCAST(Statement *, statement);
+	}
+
+	ListExpression *list = parse_rhs_list_expression(parser);
+	if (!is_operator(parser->this_token, OPERATOR_COLON)) {
+		expect_semicolon(parser);
+		UsingStatement *statement = tree_new_using_statement(parser->tree, list);
+		TRACE_LEAVE();
+		return RCAST(Statement *, statement);
+	}
+
+	expect_operator(parser, OPERATOR_COLON);
+
+	DeclarationStatement *statement = parse_declaration_statement(parser, list, true);
+
+	TRACE_LEAVE();
+
+	return RCAST(Statement *, statement);
 }
 
 static EmptyStatement *parse_empty_statement(Parser *parser) {
@@ -2856,7 +2977,7 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 			}
 		case KEYWORD_IMPORT:
 			{
-				ImportStatement *const statement = parse_import_statement(parser);
+				ImportStatement *const statement = parse_import_statement(parser, false);
 				TRACE_LEAVE();
 				return RCAST(Statement *, statement);
 			}
@@ -2889,7 +3010,11 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 				return RCAST(Statement *, statement);
 			}
 		case KEYWORD_USING:
-			UNIMPLEMENTED("using statement");
+			{
+				Statement *const statement = parse_using_statement(parser);
+				TRACE_LEAVE();
+				return statement;
+			}
 		default:
 			ICE("Unexpected keyword in statement");
 		}

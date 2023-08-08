@@ -79,10 +79,16 @@ static Bool dump_ast(String path) {
 	StrBuf buf;
 	strbuf_init(&buf, context);
 	for (Size i = 0; i < n_files; i++) {
+		const String name = files[i];
+		if (!string_ends_with(name, SCLIT(".odin"))) {
+			continue;
+		}
 		strbuf_clear(&buf);
 		strbuf_put_string(&buf, path);
-		strbuf_put_rune(&buf, '/');
-		strbuf_put_string(&buf, files[i]);
+		if (!string_ends_with(path, SCLIT("/"))) {
+			strbuf_put_rune(&buf, '/');
+		}
+		strbuf_put_string(&buf, name);
 		const String file = strbuf_result(&buf);
 		array_push(work, LIT(Work, &ctx, string_copy(file), 0));
 	}
@@ -115,8 +121,10 @@ int main(int argc, char **argv) {
 
 	// Hack for now
 	argc = 2;
+	argv[1] = argv[0];
 	argv[0] = CCAST(char *, "dump-ast");
-	argv[1] = CCAST(char *, "tests");
+	
+	// argv[1] = CCAST(char *, "tests");
 
 	if (argc <= 1) {
 		return usage(app);

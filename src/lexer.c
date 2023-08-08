@@ -1,14 +1,9 @@
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-
 #include "lexer.h"
 #include "support.h"
 #include "report.h"
 #include "context.h"
 
 const Token TOKEN_NIL = { KIND_INVALID, { 0, 0 }, { 0, 0 }, { CAST(LiteralKind, 0), } };
-const Source SOURCE_NIL = { { 0, 0 }, { 0, 0 } };
 
 // Automatic semicolon insertion tables.
 #define KIND(enum, name, asi) asi,
@@ -57,7 +52,7 @@ static const struct NamedOperator { String s; OperatorKind e; } NAMED_OPERATORS[
 
 #define LEX_ERROR(...) \
 	do { \
-		report_error(lexer->input.source, &lexer->location, __VA_ARGS__); \
+		report_error(lexer->input.source, &lexer->last_location, __VA_ARGS__); \
 		THROW(1); \
 	} while (0)
 
@@ -123,8 +118,8 @@ static Uint8 peekl(Lexer *lexer) {
 static Rune advancel(Lexer *lexer) {
 	Context *context = lexer->context;
 	if (lexer->rune == '\n') {
-		lexer->location.column = 1;
-		lexer->location.line++;
+		lexer->this_location.column = 0;
+		lexer->this_location.line++;
 	}
 	Input *input = &lexer->input;
 	if (input->cur < input->end) {
@@ -148,7 +143,7 @@ static Rune advancel(Lexer *lexer) {
 			input->cur++;
 		}
 		lexer->rune = rune;
-		lexer->location.column++;
+		lexer->this_location.column++;
 	} else {
 		lexer->here = input->end;
 		lexer->rune = RUNE_EOF;
@@ -189,7 +184,7 @@ static void scan(Lexer* lexer, Sint32 base) {
 static FORCE_INLINE Token mkkind(const Lexer *lexer, Kind kind) {
 	Token token = {};
 	token.kind = kind;
-	token.location = lexer->location;
+	token.location = lexer->last_location;
 	return token;
 }
 
@@ -287,7 +282,7 @@ L_exponent:
 }
 
 static Bool scan_escape(Lexer *lexer) {
-	Context *context = lexer->context;
+	Context *const context = lexer->context;
 	switch (lexer->rune) {
 	// \a, \b, \e, \f, \n, \r, \t, \v
 	case 'a': case 'b': case 'e': case 'f': case 'n': case 'r': case 't': case 'v':
@@ -335,8 +330,8 @@ Bool lexer_init(Lexer *lexer, Context *context, const Source *source) {
 	lexer->input.cur = string->contents;
 	lexer->input.end = string->contents + string->length;
 
-	lexer->location.column = 1;
-	lexer->location.line = 1;
+	lexer->this_location.column = 0;
+	lexer->this_location.line = 1;
 
 	lexer->here = lexer->input.cur;
 	lexer->rune = 0;
@@ -351,6 +346,7 @@ Bool lexer_init(Lexer *lexer, Context *context, const Source *source) {
 }
 
 static Token lexer_raw_next(Lexer *lexer);
+
 Token lexer_peek(Lexer *lexer) {
 	const Token peek = lexer_raw_next(lexer);
 	array_push(lexer->peek, peek);
@@ -361,6 +357,8 @@ static Token lexer_tokenize(Lexer *lexer) {
 	Context *context = lexer->context;
 
 	skip_whitespace(lexer, lexer->asi);
+
+	lexer->last_location = lexer->this_location;
 
 	Token token = mkkind(lexer, KIND_INVALID);
 	token.string.contents = CCAST(Uint8*, lexer->here);

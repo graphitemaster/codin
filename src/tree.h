@@ -42,6 +42,8 @@ typedef struct ForStatement ForStatement;
 typedef struct DeferStatement DeferStatement;
 typedef struct BranchStatement BranchStatement;
 typedef struct ForeignBlockStatement ForeignBlockStatement;
+typedef struct ForeignImportStatement ForeignImportStatement;
+typedef struct UsingStatement UsingStatement;
 
 // Types.
 typedef struct Type Type;
@@ -93,19 +95,21 @@ enum ExpressionKind {
 };
 
 enum StatementKind {
-	STATEMENT_EMPTY         = 0,
-	STATEMENT_BLOCK         = 1,
-	STATEMENT_IMPORT        = 2,
-	STATEMENT_EXPRESSION    = 3,
-	STATEMENT_ASSIGNMENT    = 4,
-	STATEMENT_DECLARATION   = 5,
-	STATEMENT_IF            = 6,
-	STATEMENT_WHEN          = 7,
-	STATEMENT_RETURN        = 8,
-	STATEMENT_FOR           = 9,
-	STATEMENT_DEFER         = 10,
-	STATEMENT_BRANCH        = 11, // break, continue, fallthrough
-	STATEMENT_FOREIGN_BLOCK = 12,
+	STATEMENT_EMPTY          = 0,
+	STATEMENT_BLOCK          = 1,
+	STATEMENT_IMPORT         = 2, // import
+	STATEMENT_EXPRESSION     = 3, 
+	STATEMENT_ASSIGNMENT     = 4, // =, +=, -=, *=, /=, %=, %%=, &=, |=, ~=, &~=, <<=, >>=, &&=, ||=
+	STATEMENT_DECLARATION    = 5,
+	STATEMENT_IF             = 6,
+	STATEMENT_WHEN           = 7,
+	STATEMENT_RETURN         = 8,
+	STATEMENT_FOR            = 9,
+	STATEMENT_DEFER          = 10,
+	STATEMENT_BRANCH         = 11, // break, continue, fallthrough
+	STATEMENT_FOREIGN_BLOCK  = 12,
+	STATEMENT_FOREIGN_IMPORT = 13,
+	STATEMENT_USING          = 14,
 };
 
 enum ProcedureKind {
@@ -189,6 +193,7 @@ enum UnionFlag {
 enum FieldFlag {
 	FIELD_FLAG_ANY_INT  = 1 << 0, // #any_int
 	FIELD_FLAG_C_VARARG = 1 << 1, // #c_vararg
+	FIELD_FLAG_USING    = 1 << 2, // using:
 };
 
 #define CCONVENTION(enumerator, string) CCONV_ ## enumerator,
@@ -365,6 +370,7 @@ struct ImportStatement {
 	Statement base;
 	String name;
 	String package;
+	Bool using;
 };
 
 struct ExpressionStatement {
@@ -391,6 +397,7 @@ struct DeclarationStatement {
 	Array(Identifier*) names;
 	ListExpression *values;
 	Array(Field*) attributes;
+	Bool using;
 };
 
 struct IfStatement {
@@ -436,6 +443,19 @@ struct ForeignBlockStatement {
 	Statement base;
 	Identifier *name;
 	BlockStatement *body;
+	Array(Field*) attributes;
+};
+
+struct ForeignImportStatement {
+	Statement base;
+	String name;
+	Array(String) sources;
+	Array(Field*) attributes;
+};
+
+struct UsingStatement {
+	Statement base;
+	ListExpression *list;
 };
 
 // Types.
@@ -590,6 +610,7 @@ struct PolyType {
 struct Identifier {
 	String contents;
 	Bool poly;
+	Uint32 token;
 };
 
 struct Field {
@@ -612,10 +633,11 @@ struct Tree {
 	String package_name;
 	String file_name;
 	Array(Statement*) statements;
+	Array(Token) tokens; // Recorded tokens for diagnostics.
 };
 
 void tree_init(Tree *tree, Context *context);
-void tree_dump(Tree *tree);
+void tree_record_token(Tree *tree, Token token);
 
 // Expressions
 ListExpression *tree_new_list_expression(Tree *tree, Array(Expression*) expressions);
@@ -637,11 +659,11 @@ UndefinedExpression *tree_new_undefined_expression(Tree *tree);
 
 // Statements
 EmptyStatement *tree_new_empty_statement(Tree *tree);
-ImportStatement *tree_new_import_statement(Tree *tree, String name, String package);
+ImportStatement *tree_new_import_statement(Tree *tree, String name, String package, Bool using);
 ExpressionStatement *tree_new_expression_statement(Tree *tree, Expression *expression);
 BlockStatement *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Statement*) statements);
 AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, ListExpression *lhs, ListExpression *rhs);
-DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values);
+DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values, Bool using);
 IfStatement *tree_new_if_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, BlockStatement *elif);
 WhenStatement *tree_new_when_statement(Tree *tree, Expression *cond, BlockStatement *body, BlockStatement *elif);
 ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, Statement *post);
@@ -649,6 +671,8 @@ ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) result
 DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
 BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label);
 ForeignBlockStatement *tree_new_foreign_block_statement(Tree *tree, Identifier *name, BlockStatement *body);
+ForeignImportStatement *tree_new_foreign_import_statement(Tree *tree, String name, Array(String) sources);
+UsingStatement *tree_new_using_statement(Tree *tree, ListExpression *list);
 
 // Types
 ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);
