@@ -135,6 +135,17 @@ Bool dump_undefined_expression(const Tree *tree, const UndefinedExpression *expr
 	return true;
 }
 
+Bool dump_procedure_group_expression(const Tree *tree, const ProcedureGroupExpression *expression, Sint32 depth) {
+	printf("(procgroup");
+	const Size n_procs = array_size(expression->expressions);
+	for (Size i = 0; i < n_procs; i++) {
+		printf("\n");
+		dump_expression(tree, expression->expressions[i], depth + 1);
+	}
+	printf(")");
+	return true;
+}
+
 Bool dump_builtin_type(const Tree *tree, const BuiltinType *type, Sint32 depth) {
 	(void)tree;
 	pad(depth);
@@ -484,6 +495,7 @@ Bool dump_expression(const Tree *tree, const Expression *expression, Sint32 dept
 	break; case EXPRESSION_COMPOUND_LITERAL: dump_compound_literal_expression(tree, RCAST(const CompoundLiteralExpression *, expression), depth + 1);
 	break; case EXPRESSION_IDENTIFIER:       dump_identifier_expression(tree, RCAST(const IdentifierExpression *, expression), depth + 1);
 	break; case EXPRESSION_UNDEFINED:        dump_undefined_expression(tree, RCAST(const UndefinedExpression *, expression), depth + 1);
+	break; case EXPRESSION_PROCEDURE_GROUP:  dump_procedure_group_expression(tree, RCAST(const ProcedureGroupExpression *, expression), depth + 1);
 	break;
 	}
 	printf(")");
@@ -550,6 +562,9 @@ Bool dump_declaration_statement(const Tree *tree, const DeclarationStatement *st
 			dump_expression(tree, values[i], depth + 1);
 		}
 		printf(")");
+		if (i != n_names - 1) {
+			printf("\n");
+		}
 	}
 	return true;
 }

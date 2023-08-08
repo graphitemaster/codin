@@ -26,6 +26,7 @@ typedef struct LiteralExpression LiteralExpression;
 typedef struct CompoundLiteralExpression CompoundLiteralExpression;
 typedef struct IdentifierExpression IdentifierExpression;
 typedef struct UndefinedExpression UndefinedExpression;
+typedef struct ProcedureGroupExpression ProcedureGroupExpression;
 
 // Statements.
 typedef struct Statement Statement;
@@ -92,6 +93,7 @@ enum ExpressionKind {
 	EXPRESSION_COMPOUND_LITERAL = 13, // T{...}
 	EXPRESSION_IDENTIFIER       = 14, // ident
 	EXPRESSION_UNDEFINED        = 15, // ---
+	EXPRESSION_PROCEDURE_GROUP  = 16, // proc{...}
 };
 
 enum StatementKind {
@@ -193,7 +195,9 @@ enum UnionFlag {
 enum FieldFlag {
 	FIELD_FLAG_ANY_INT  = 1 << 0, // #any_int
 	FIELD_FLAG_C_VARARG = 1 << 1, // #c_vararg
-	FIELD_FLAG_USING    = 1 << 2, // using:
+	FIELD_FLAG_NO_ALIAS = 1 << 2, // #no_alias
+	FIELD_FLAG_SUBTYPE  = 1 << 3, // #subtype
+	FIELD_FLAG_USING    = 1 << 3, // using
 };
 
 #define CCONVENTION(enumerator, string) CCONV_ ## enumerator,
@@ -355,6 +359,11 @@ struct IdentifierExpression {
 
 struct UndefinedExpression {
 	Expression base;
+};
+
+struct ProcedureGroupExpression {
+	Expression base;
+	Array(Expression*) expressions;
 };
 
 // Statements.
@@ -656,6 +665,7 @@ LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, Str
 CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Type *type, Array(Field*) fields);
 IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier);
 UndefinedExpression *tree_new_undefined_expression(Tree *tree);
+ProcedureGroupExpression *tree_new_procedure_group_expression(Tree *tree, Array(Expression*) expressions);
 
 // Statements
 EmptyStatement *tree_new_empty_statement(Tree *tree);

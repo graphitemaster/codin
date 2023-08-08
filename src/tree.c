@@ -147,6 +147,14 @@ UndefinedExpression *tree_new_undefined_expression(Tree *tree) {
 	return expression;
 }
 
+ProcedureGroupExpression *tree_new_procedure_group_expression(Tree *tree, Array(Expression*) expressions) {
+	Allocator *allocator = tree->context->allocator;
+	ProcedureGroupExpression *expression = CAST(ProcedureGroupExpression*, allocator->allocate(allocator, sizeof *expression));
+	expression->base.kind = EXPRESSION_PROCEDURE_GROUP;
+	expression->expressions = expressions;
+	return expression;
+}
+
 // Statements.
 EmptyStatement *tree_new_empty_statement(Tree *tree) {
 	Allocator *allocator = tree->context->allocator;

@@ -452,7 +452,7 @@ static Token lexer_tokenize(Lexer *lexer) {
 	CASE(BSLASH, '\\'):
 		// Line continuation.
 		lexer->asi = false;
-		LEX_ERROR("Unimplemented: line continuation");
+		return lexer_tokenize(lexer);
 	CASE(SQUOTE, '\''):
 		// Rune literal.
 		{
