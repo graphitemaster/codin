@@ -19,15 +19,16 @@ struct Command {
 	String description;
 };
 
+static const Command COMMANDS[] = {
+	{ SLIT("dump-ast"), SLIT("dump the generated syntax tree to stdout.") },
+};
+
 String project_name(String path) {
 	(void)path;
 	return SCLIT("main");
 }
 
 static int usage(const char *app) {
-	static const Command COMMANDS[] = {
-		{ SLIT("dump-ast"), SLIT("dump the generated syntax tree to stdout.") },
-	};
 	printf("Usage:\n");
 	printf("\t%s command [arguments]\n", app);
 	printf("Commands:\n");
@@ -118,14 +119,6 @@ int main(int argc, char **argv) {
 
 	argc--;
 	argv++;
-
-	// Hack for now
-	argc = 2;
-	argv[1] = argv[0];
-	argv[0] = CCAST(char *, "dump-ast");
-	
-	// argv[1] = CCAST(char *, "tests");
-
 	if (argc <= 1) {
 		return usage(app);
 	}

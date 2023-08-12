@@ -1231,7 +1231,10 @@ static TypeExpression *parse_struct_type_expression(Parser *parser) {
 			{
 				const Sint32 expression_depth = parser->expression_depth;
 				parser->expression_depth = -1;
+				// TODO(dweiler): Enable when Odin requires it.
+				// expect_operator(parser, OPERATOR_LPAREN);
 				align = parse_expression(parser, true);
+				// expect_operator(parser, OPERATOR_RPAREN);
 				parser->expression_depth = expression_depth;
 				break;
 			}
