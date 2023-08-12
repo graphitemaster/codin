@@ -1,6 +1,6 @@
 # Style
 
-This is the style guide of the codin compiler.
+This is the style guide of the c-odin compiler.
 
 * C11
 * Types `PascalCase`
