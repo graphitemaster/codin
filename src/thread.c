@@ -116,7 +116,9 @@ void mutex_destroy(Mutex *mutex) {
 #endif
 }
 
-void mutex_lock(Mutex *mutex) {
+void mutex_lock(Mutex *mutex)
+	THREAD_INTERNAL
+{
 #if defined(OS_POSIX)
 	pthread_mutex_t *handle = RCAST(pthread_mutex_t*, mutex->storage);
 	if (pthread_mutex_lock(handle) != 0) {
@@ -128,7 +130,9 @@ void mutex_lock(Mutex *mutex) {
 #endif
 }
 
-void mutex_unlock(Mutex *mutex) {
+void mutex_unlock(Mutex *mutex)
+	THREAD_INTERNAL
+{
 #if defined(OS_POSIX)
 	pthread_mutex_t *handle = RCAST(pthread_mutex_t*, mutex->storage);
 	if (pthread_mutex_unlock(handle) != 0) {
@@ -204,7 +208,9 @@ void cond_broadcast(Cond *cond) {
 #endif
 }
 
-void waitgroup_init(WaitGroup *wg, Size count) {
+void waitgroup_init(WaitGroup *wg, Size count)
+	THREAD_INTERNAL
+{
 	mutex_init(&wg->mutex);
 	cond_init(&wg->cond);
 	wg->count = count;

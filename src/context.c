@@ -13,10 +13,10 @@ static const Uint32 PRIME2 = 5009;
 typedef struct DefaultAllocator DefaultAllocator;
 
 struct DefaultAllocator {
-	Size size;
-	Size deleted;
-	Size capacity;
-	void **items;
+	Size size     THREAD_GUARDED(mutex);
+	Size deleted  THREAD_GUARDED(mutex);
+	Size capacity THREAD_GUARDED(mutex);
+	void **items  THREAD_GUARDED(mutex);
 	Mutex mutex;
 };
 
@@ -26,20 +26,24 @@ static DefaultAllocator *create_default_allocator(Size capacity) {
 		return 0;
 	}
 
+	mutex_init(&allocator->mutex);
+
+	mutex_lock(&allocator->mutex);
 	allocator->size = 0;
 	allocator->capacity = capacity;
 	allocator->items = CAST(void**, calloc(capacity, sizeof *allocator->items));
 	if (!allocator->items) {
+		mutex_unlock(&allocator->mutex);
 		free(allocator);
 		return 0;
 	}
-
-	mutex_init(&allocator->mutex);
+	mutex_unlock(&allocator->mutex);
 
 	return allocator;
 }
 
 static void destroy_default_allocator(DefaultAllocator *allocator) {
+	mutex_lock(&allocator->mutex);
 	const Size capacity = allocator->capacity;
 	for (Size i = 0; i < capacity; i++) {
 		void *item = allocator->items[i];
@@ -51,14 +55,16 @@ static void destroy_default_allocator(DefaultAllocator *allocator) {
 		allocator->deleted++;
 	}
 	free(allocator->items);
+	mutex_unlock(&allocator->mutex);
 
 	mutex_destroy(&allocator->mutex);
-
 	free(allocator);
 }
 
 static Bool default_allocator_add_unlocked(DefaultAllocator *allocator, void *item);
-static Bool default_allocator_maybe_rehash_unlocked(DefaultAllocator *allocator) {
+static Bool default_allocator_maybe_rehash_unlocked(DefaultAllocator *allocator)
+	THREAD_REQUIRES(allocator->mutex)
+{
 	if (allocator->size + allocator->deleted < CAST(Float32, allocator->capacity) * RESIZE_THRESHOLD) {
 		return true;
 	}
@@ -85,7 +91,7 @@ static Bool default_allocator_maybe_rehash_unlocked(DefaultAllocator *allocator)
 	return true;
 }
 
-static Bool default_allocator_add_unlocked(DefaultAllocator *allocator, void *item) {
+static Bool default_allocator_add_unlocked(DefaultAllocator *allocator, void *item) THREAD_REQUIRES(allocator->mutex) {
 	Uint64 hash = RCAST(Uint64, item); // TODO(dweiler): MixInt
 	const Size mask = allocator->capacity - 1;
 

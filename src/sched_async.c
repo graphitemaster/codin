@@ -7,10 +7,10 @@ typedef struct SchedAsyncWork SchedAsyncWork;
 
 struct SchedAsync {
 	Context *context;
-	ThreadPool pool;
-	Size count;
 	Mutex mutex;
-	Cond cond;
+	ThreadPool pool THREAD_GUARDED(mutex);
+	Cond cond       THREAD_GUARDED(mutex);
+	Size count      THREAD_GUARDED(mutex);
 };
 
 struct SchedAsyncWork {
@@ -53,16 +53,20 @@ Bool sched_async_init(Context *context, void **instance) {
 		return false;
 	}
 	sched->context = context;
-	sched->count = 0;
 	mutex_init(&sched->mutex);
 	cond_init(&sched->cond);
+	mutex_lock(&sched->mutex);
+	sched->count = 0;
+	mutex_unlock(&sched->mutex);
 	*instance = RCAST(void *, sched);
 	return true;
 }
 
 static void sched_async_fini(void *ctx) {
 	SchedAsync *sched = CAST(SchedAsync *, ctx);
+	mutex_lock(&sched->mutex);
 	ASSERT(sched->count == 0);
+	mutex_unlock(&sched->mutex);
 	Context *context = sched->context;
 	threadpool_free(&sched->pool);
 	mutex_destroy(&sched->mutex);

@@ -164,4 +164,19 @@ constexpr T& operator^= (T& a, T b) noexcept {
 }
 #endif
 
+#if defined(__clang__) && defined(__cplusplus)
+#define THREAD_ATTRIBUTE(x) __attribute__((x))
+#else
+#define THREAD_ATTRIBUTE(x)
+#endif
+
+#define THREAD_GUARDED(...)     THREAD_ATTRIBUTE(guarded_by(__VA_ARGS__))
+#define THREAD_CAPABILITY(...)  THREAD_ATTRIBUTE(capability(__VA_ARGS__))
+#define THREAD_ACQUIRES(...)    THREAD_ATTRIBUTE(acquire_capability(__VA_ARGS__))
+#define THREAD_RELEASES(...)    THREAD_ATTRIBUTE(release_capability(__VA_ARGS__))
+#define THREAD_TRY_ACQUIRE(...) THREAD_ATTRIBUTE(try_acquire_capability(__VA_ARGS__))
+#define THREAD_EXCLUDES(...)    THREAD_ATTRIBUTE(locks_excluded(__VA_ARGS__))
+#define THREAD_REQUIRES(...)    THREAD_ATTRIBUTE(requires_capability(__VA_ARGS__))
+#define THREAD_INTERNAL         THREAD_ATTRIBUTE(no_thread_safety_analysis)
+
 #endif // CODIN_SUPPORT_H

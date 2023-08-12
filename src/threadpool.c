@@ -35,12 +35,14 @@ Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
 	cond_init(&pool->cond);
 	mutex_init(&pool->mutex);
 
+	mutex_lock(&pool->mutex);
 	pool->context = context;
 	pool->threads = array_make(context);
 	pool->work = array_make(context);
 	pool->quit = false;
 
 	if (!array_resize(pool->threads, n_threads)) {
+		mutex_unlock(&pool->mutex);
 		return false;
 	}
 
@@ -48,6 +50,7 @@ Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
 		thread_create(&pool->threads[i], threadpool_worker, pool);
 	}
 
+	mutex_unlock(&pool->mutex);
 	return true;
 }
 
@@ -64,9 +67,7 @@ Bool threadpool_free(ThreadPool *pool) {
 
 	array_free(pool->threads);
 
-	cond_destroy(&pool->cond);
-	mutex_destroy(&pool->mutex);
-
+	mutex_lock(&pool->mutex);
 	const Size n_work = array_size(pool->work);
 	for (Size i = 0; i < n_work; i++) {
 		ThreadPoolWork *work = &pool->work[i];
@@ -75,6 +76,10 @@ Bool threadpool_free(ThreadPool *pool) {
 		}
 	}
 	array_free(pool->work);
+	mutex_unlock(&pool->mutex);
+
+	cond_destroy(&pool->cond);
+	mutex_destroy(&pool->mutex);
 
 	return true;
 }

@@ -11,10 +11,10 @@ typedef struct ThreadPoolWork ThreadPoolWork;
 struct ThreadPool {
 	Context *context;
 	Array(Thread) threads;
-	Array(ThreadPoolWork) work;
-	Cond cond;
 	Mutex mutex;
-	Bool quit;
+	Array(ThreadPoolWork) work THREAD_GUARDED(mutex);
+	Cond cond                  THREAD_GUARDED(mutex);
+	Bool quit                  THREAD_GUARDED(mutex);
 };
 
 Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context);

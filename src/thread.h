@@ -17,14 +17,14 @@ struct ALIGN(16) Cond {
 	Uint8 storage[64];
 };
 
-struct ALIGN(16) Mutex { 
+struct ALIGN(16) THREAD_CAPABILITY("mutex") Mutex { 
 	Uint8 storage[64];
 };
 
 struct WaitGroup {
 	Mutex mutex;
-	Cond cond;
-	Size count;
+	Cond cond  THREAD_GUARDED(mutex);
+	Size count THREAD_GUARDED(mutex);
 };
 
 #define thread_create(thread, proc, data) \
@@ -33,17 +33,24 @@ struct WaitGroup {
 Bool _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *context);
 Bool thread_join(Thread *thread);
 
+// Mutex
 void mutex_init(Mutex *mutex);
-void mutex_destroy(Mutex *mutex);
-void mutex_lock(Mutex *mutex);
-void mutex_unlock(Mutex *mutex);
+void mutex_destroy(Mutex *mutex)
+	THREAD_EXCLUDES(*mutex);
+void mutex_lock(Mutex *mutex)
+	THREAD_ACQUIRES(*mutex);
+void mutex_unlock(Mutex *mutex)
+	THREAD_REQUIRES(*mutex)
+	THREAD_RELEASES(*mutex);
 
+// Cond
 void cond_init(Cond *cond);
 void cond_destroy(Cond *cond);
-void cond_wait(Cond *cond, Mutex *mutex);
+void cond_wait(Cond *cond, Mutex *mutex) THREAD_REQUIRES(*mutex);
 void cond_signal(Cond *cond);
 void cond_broadcast(Cond *cond);
 
+// WaitGroup
 void waitgroup_init(WaitGroup *wg, Size count);
 void waitgroup_destroy(WaitGroup *wg);
 void waitgroup_signal(WaitGroup *wg);
