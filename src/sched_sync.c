@@ -20,7 +20,7 @@ struct SchedSync {
 
 static Bool sched_sync_init(Context *context, void **instance) {
 	Allocator *allocator = context->allocator;
-	SchedSync *sched = RCAST(SchedSync *, allocator->allocate(allocator, sizeof *sched));
+	SchedSync *sched = allocator->allocate(allocator, sizeof *sched);
 	if (!sched) {
 		return false;
 	}

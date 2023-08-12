@@ -8,8 +8,8 @@ typedef struct Context Context;
 typedef struct Allocator Allocator;
 
 struct Allocator {
-	void *(*allocate)(Allocator *allocator, Size bytes);
-	void *(*reallocate)(Allocator *allocator, void *ptr, Size bytes);
+	Ptr (*allocate)(Allocator *allocator, Size bytes);
+	Ptr (*reallocate)(Allocator *allocator, void *ptr, Size bytes);
 	void (*deallocate)(Allocator *allocator, void *ptr);
 	void (*finalize)(Allocator *allocator);
 	void *user;

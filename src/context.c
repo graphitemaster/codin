@@ -163,7 +163,7 @@ static Bool ensure_initialized(Allocator *allocator) {
 	return false;
 }
 
-static void *default_allocator_allocate(Allocator *allocator, Size bytes) {
+static Ptr default_allocator_allocate(Allocator *allocator, Size bytes) {
 	(void)allocator;
 	void *ptr = malloc(bytes);
 	if (ptr) {
@@ -178,7 +178,7 @@ static void *default_allocator_allocate(Allocator *allocator, Size bytes) {
 	return 0;
 }
 
-static void *default_allocator_reallocate(Allocator *allocator, void *ptr, Size bytes) {
+static Ptr default_allocator_reallocate(Allocator *allocator, void *ptr, Size bytes) {
 	if (!ptr) {
 		return 0;
 	}

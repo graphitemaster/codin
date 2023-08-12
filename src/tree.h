@@ -368,7 +368,7 @@ struct ImportStatement {
 	Statement base;
 	String name;
 	String package;
-	Bool using;
+	Bool is_using;
 };
 
 struct ExpressionStatement {
@@ -396,7 +396,7 @@ struct DeclarationStatement {
 	Array(Identifier*) names;
 	ListExpression *values;
 	Array(Field*) attributes;
-	Bool using;
+	Bool is_using;
 };
 
 struct IfStatement {
@@ -674,11 +674,11 @@ ProcedureGroupExpression *tree_new_procedure_group_expression(Tree *tree, Array(
 
 // Statements
 EmptyStatement *tree_new_empty_statement(Tree *tree);
-ImportStatement *tree_new_import_statement(Tree *tree, String name, String package, Bool using);
+ImportStatement *tree_new_import_statement(Tree *tree, String name, String package, Bool is_using);
 ExpressionStatement *tree_new_expression_statement(Tree *tree, Expression *expression);
 BlockStatement *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Statement*) statements);
 AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, ListExpression *lhs, ListExpression *rhs);
-DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values, Bool using);
+DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values, Bool is_using);
 IfStatement *tree_new_if_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, BlockStatement *elif);
 WhenStatement *tree_new_when_statement(Tree *tree, Expression *cond, BlockStatement *body, BlockStatement *elif);
 ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, Statement *post);

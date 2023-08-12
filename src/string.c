@@ -18,7 +18,7 @@ String _string_copy_from_data(const Uint8 *data, Size length, Context *context) 
 		return STRING_NIL;
 	}
 	Allocator *allocator = context->allocator;
-	Uint8 *storage = CAST(Uint8*, allocator->allocate(allocator, length));
+	Uint8 *storage = allocator->allocate(allocator, length);
 	if (!storage) {
 		return STRING_NIL;
 	}
@@ -66,7 +66,7 @@ void _string_free(String string, Context *context) {
 char* _string_to_null(String string, Context *context) {
 	Allocator *allocator = context->allocator;
 	const Size length = string.length;
-	char *result = CAST(char*, allocator->allocate(allocator, length + 1));
+	char *result = allocator->allocate(allocator, length + 1);
 	if (!result) {
 		return 0;
 	}
@@ -148,7 +148,7 @@ Bool _utf8_to_utf16(const char *source, Uint16 **const destination, Context *con
 	utf8_to_utf16_core(source, 0, &length);
 
 	Allocator *allocator = context->allocator;
-	Uint16 *dest = CAST(Uint16*, allocator->allocate(allocator, (length + 1) * sizeof *dest));
+	Uint16 *dest = allocator->allocate(allocator, (length + 1) * sizeof *dest);
 	if (!dest) {
 		return false;
 	}

@@ -3,11 +3,9 @@
 #include "dump.h"
 
 static void pad(Sint32 depth) {
-	Sint32 dots = depth * 2 - 1;
-	for (Sint32 i = 0; i < dots; i++) {
-		printf(".");
+	for (Sint32 i = 0; i < depth; i++) {
+		printf("  ");
 	}
-	if (dots > 0) printf(" ");
 }
 
 Bool dump_list_expression(const Tree *tree, const ListExpression *expression, Sint32 depth) {
@@ -1057,10 +1055,44 @@ Bool dump_foreign_block_statement(const Tree *tree, const ForeignBlockStatement 
 }
 
 Bool dump_foreign_import_statement(const Tree *tree, const ForeignImportStatement *statement, Sint32 depth) {
-	(void)tree;
-	(void)statement;
 	pad(depth);
-	printf("(foreign-import)");
+	printf("(foreign-import");
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(name");
+	printf("\n");
+	const String name = statement->name;
+	pad(depth + 2);
+	printf("'%.*s'", SFMT(name));
+	printf(")"); // name
+
+	const Size n_attributes = array_size(statement->attributes);
+	if (n_attributes) {
+		printf("\n");
+		pad(depth + 1);
+		printf("(attributes");
+		for (Size i = 0; i < n_attributes; i++) {
+			printf("\n");
+			dump_field(tree, statement->attributes[i], depth + 2);
+		}
+		printf(")"); // attributes
+	}
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(sources");
+	const Size n_sources = array_size(statement->sources);
+	for (Size i = 0; i < n_sources; i++) {
+		printf("\n");
+		pad(depth + 2);
+		const String source = statement->sources[i];
+		printf("'%.*s", SFMT(source));
+	}
+	printf(")"); // sources
+
+	printf(")"); // foreign-import
+
 	return true;
 }
 

@@ -43,7 +43,7 @@ static unsigned thread_proc(void *data)
 
 Bool _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *context) {
 	Allocator *allocator = context->allocator;
-	State *state = CAST(State *, allocator->allocate(allocator, sizeof *state));
+	State *state = allocator->allocate(allocator, sizeof *state);
 	state->allocator = allocator;
 	state->proc = proc;
 	state->data = data;

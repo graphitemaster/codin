@@ -458,11 +458,13 @@ static Identifier *evaluate_identifier_type(const Type *type) {
 	case TYPE_EXPRESSION:
 		return evaluate_identifier_expression(RCAST(const ExpressionType *, type)->expression);
 	case TYPE_POLY:
-		const PolyType *const poly = RCAST(const PolyType *, type);
-		if (!poly->specialization) {
-			return evaluate_identifier_type(poly->type);
+		{
+			const PolyType *const poly = RCAST(const PolyType *, type);
+			if (!poly->specialization) {
+				return evaluate_identifier_type(poly->type);
+			}
+			FALLTHROUGH();
 		}
-		FALLTHROUGH();
 	default:
 		return 0;
 	}
@@ -692,7 +694,7 @@ static Array(Field*) parse_procedure_results(Parser *parser, Bool *diverging) {
 		Type *const type = parse_type(parser);
 		record(parser);
 		Identifier *const identifier = tree_new_identifier(parser->tree, SCLIT("__unnamed"), false);
-		Field *const field = tree_new_field(parser->tree, type, identifier, 0, STRING_NIL, 0);
+		Field *const field = tree_new_field(parser->tree, type, identifier, 0, STRING_NIL, CAST(FieldFlag, 0));
 		array_push(fields, field);
 		TRACE_LEAVE();
 		return fields;
@@ -938,7 +940,7 @@ static Statement *parse_attributes_for_statement(Parser *parser, BlockFlag block
 	Array(Field*) attributes = array_make(context);
 	if (is_kind(parser->this_token, KIND_IDENTIFIER)) {
 		Identifier *const identifier = parse_identifier(parser, false);
-		Field *const field = tree_new_field(parser->tree, 0, identifier, 0, STRING_NIL, 0);
+		Field *const field = tree_new_field(parser->tree, 0, identifier, 0, STRING_NIL, CAST(FieldFlag, 0));
 		array_push(attributes, field);
 	} else {
 		expect_operator(parser, OPERATOR_LPAREN);
@@ -951,9 +953,9 @@ static Statement *parse_attributes_for_statement(Parser *parser, BlockFlag block
 			if (is_assignment(parser->this_token, ASSIGNMENT_EQ)) {
 				expect_assignment(parser, ASSIGNMENT_EQ);
 				Expression *value = parse_value(parser);
-				field = tree_new_field(parser->tree, 0, identifier, value, STRING_NIL, 0);
+				field = tree_new_field(parser->tree, 0, identifier, value, STRING_NIL, CAST(FieldFlag, 0));
 			} else {
-				field = tree_new_field(parser->tree, 0, identifier, 0, STRING_NIL, 0);
+				field = tree_new_field(parser->tree, 0, identifier, 0, STRING_NIL, CAST(FieldFlag, 0));
 			}
 			array_push(attributes, field);
 			if (!accepted_separator(parser)) {
@@ -1407,7 +1409,7 @@ static TypeExpression *parse_enum_type_expression(Parser *parser) {
 	
 		Identifier *const identifier = RCAST(IdentifierExpression *, name)->identifier;
 	
-		Field *const field = tree_new_field(parser->tree, 0, identifier, value, STRING_NIL, 0);
+		Field *const field = tree_new_field(parser->tree, 0, identifier, value, STRING_NIL, CAST(FieldFlag, 0));
 		array_push(fields, field);
 	
 		if (!accepted_separator(parser)) {
@@ -1788,7 +1790,7 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 			Identifier *name = evaluate_identifier_expression(argument);
 			if (name) {
 				Expression *value = parse_value(parser);
-				Field *field = tree_new_field(parser->tree, 0, name, value, STRING_NIL, 0);
+				Field *field = tree_new_field(parser->tree, 0, name, value, STRING_NIL, CAST(FieldFlag, 0));
 				array_push(arguments, field);
 			} else {
 				PARSE_ERROR("Expected identifier for named argument");
@@ -1797,7 +1799,7 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 			if (seen_ellipsis) {
 				PARSE_ERROR("Positional arguments not allowed after '..'");
 			}
-			Field *field = tree_new_field(parser->tree, 0, 0, argument, STRING_NIL, 0);
+			Field *field = tree_new_field(parser->tree, 0, 0, argument, STRING_NIL, CAST(FieldFlag, 0));
 			array_push(arguments, field);
 		}
 
@@ -1854,10 +1856,10 @@ static CompoundLiteralExpression *parse_compound_literal_expression(Parser *pars
 		if (is_assignment(parser->this_token, ASSIGNMENT_EQ)) {
 			expect_assignment(parser, ASSIGNMENT_EQ);
 			Expression *const value = parse_value(parser);
-			Field *const field = tree_new_field(parser->tree, 0, name, value, STRING_NIL, 0);
+			Field *const field = tree_new_field(parser->tree, 0, name, value, STRING_NIL, CAST(FieldFlag, 0));
 			array_push(fields, field);
 		} else {
-			Field *const field = tree_new_field(parser->tree, 0, name, 0, STRING_NIL, 0);
+			Field *const field = tree_new_field(parser->tree, 0, name, 0, STRING_NIL, CAST(FieldFlag, 0));
 			array_push(fields, field);
 		}
 		if (!accepted_separator(parser)) {
@@ -2337,7 +2339,7 @@ static BlockStatement *parse_block_statement(Parser *parser, BlockFlag flags, Bo
 	return body;
 }
 
-static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Array(Identifier*) names, Bool using) {
+static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Array(Identifier*) names, Bool is_using) {
 	Context *const context = parser->context;
 
 	// ':'
@@ -2398,14 +2400,14 @@ static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Ar
 		values = tree_new_list_expression(parser->tree, expressions);
 	}
 
-	DeclarationStatement *const statement = tree_new_declaration_statement(parser->tree, type, names, values, using);
+	DeclarationStatement *const statement = tree_new_declaration_statement(parser->tree, type, names, values, is_using);
 
 	TRACE_LEAVE();
 
 	return statement;
 }
 
-static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExpression *lhs, Bool using) {
+static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExpression *lhs, Bool is_using) {
 	Context *const context = parser->context;
 
 	TRACE_ENTER();
@@ -2422,7 +2424,7 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExp
 		array_push(names, identifier);
 	}
 
-	DeclarationStatement *const statement = parse_declaration_statement_tail(parser, names, using);
+	DeclarationStatement *const statement = parse_declaration_statement_tail(parser, names, is_using);
 
 	TRACE_LEAVE();
 
@@ -2540,7 +2542,7 @@ static Statement *parse_simple_statement(Parser* parser, BlockFlag block_flags, 
 	return RCAST(Statement *, statement);
 }
 
-static ImportStatement *parse_import_statement(Parser *parser, Bool using) {
+static ImportStatement *parse_import_statement(Parser *parser, Bool is_using) {
 	TRACE_ENTER();
 
 	expect_keyword(parser, KEYWORD_IMPORT);
@@ -2558,7 +2560,7 @@ static ImportStatement *parse_import_statement(Parser *parser, Bool using) {
 	const String package = string_unquote(path.string, "\"");
 
 	ImportStatement *const statement = 
-		tree_new_import_statement(parser->tree, name, package, using);
+		tree_new_import_statement(parser->tree, name, package, is_using);
 
 	TRACE_LEAVE();
 
@@ -2947,12 +2949,12 @@ static ForeignBlockStatement *parse_foreign_block_statement(Parser *parser) {
 	while (!is_kind(parser->this_token, KIND_RBRACE)
 	    && !is_kind(parser->this_token, KIND_EOF))
 	{
-		Statement *const statement = parse_statement(parser, 0);
+		Statement *const statement = parse_statement(parser, CAST(BlockFlag, 0));
 		array_push(statements, statement);
 	}
 	expect_kind(parser, KIND_RBRACE);
 
-	BlockStatement *block = tree_new_block_statement(parser->tree, 0, statements);
+	BlockStatement *block = tree_new_block_statement(parser->tree, CAST(BlockFlag, 0), statements);
 	ForeignBlockStatement *statement = tree_new_foreign_block_statement(parser->tree, name, block);
 
 	expect_semicolon(parser);
@@ -3247,7 +3249,7 @@ Tree *parse(String filename, Context *context) {
 	}
 
 	Allocator *allocator = context->allocator;
-	Tree *tree = CAST(Tree *, allocator->allocate(allocator, sizeof *tree));
+	Tree *tree = allocator->allocate(allocator, sizeof *tree);
 	if (!tree) {
 		return 0;
 	}

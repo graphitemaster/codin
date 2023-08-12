@@ -10,29 +10,44 @@
 	#define OS_LINUX
 #endif
 
+// FORCE_INLINE
 #if defined(_MSC_VER)
 	#define FORCE_INLINE __forceinline
 #else
 	#define FORCE_INLINE __attribute__((always_inline)) inline
 #endif
 
+// UNREACHABLE()
 #if defined(_MSC_VER)
 	#define UNREACHABLE() __assume(0)
 #else
 	#define UNREACHABLE() __builtin_unreachable()
 #endif
 
+// FALLTHROUGH()
 #if defined(_MSC_VER)
 	#define FALLTHROUGH()
-	#define NORETURN      __declspec(noreturn)
-	#define ALIGN(n)      __declspec(align(n))
 #elif defined(__cplusplus)
 	#define FALLTHROUGH() [[fallthrough]]
-	#define NORETURN      [[noreturn]]
-	#define ALIGN(n)      alignas(n)
 #else
 	#define FALLTHROUGH() __attribute__((__fallthrough__))
+#endif
+
+// NORETURN
+#if defined(_MSC_VER)
+	#define NORETURN      __declspec(noreturn)
+#elif defined(__cplusplus)
+	#define NORETURN      [[noreturn]]
+#else
 	#define NORETURN      __attribute__((__noreturn__))
+#endif
+
+// ALIGN(n)
+#if defined(_MSC_VER)
+	#define ALIGN(n)      __declspec(align(n))
+#elif defined(__cplusplus)
+	#define ALIGN(n)      alignas(n)
+#else
 	#define ALIGN(n)      __attribute__((__aligned__(n)))
 #endif
 
@@ -57,7 +72,9 @@
 	#endif
 #endif
 
-// Casts
+// CAST(T, expr)
+// RCAST(T, expr)
+// CCAST(T, expr)
 #if defined(__cplusplus)
 	#define CAST(T, expr) static_cast<T>(expr)
 	#define RCAST(T, expr) reinterpret_cast<T>(expr)
@@ -68,6 +85,7 @@
 	#define CCAST(T, expr) ((T)(expr))
 #endif
 
+// Integer types
 typedef int8_t Sint8;
 typedef uint8_t Uint8;
 typedef int16_t Sint16;
@@ -81,6 +99,9 @@ typedef Uint16 Float16;
 typedef float Float32;
 typedef double Float64;
 
+typedef size_t Size;
+
+// Bool
 #if defined(__cplusplus)
 typedef bool Bool;
 #else
@@ -89,18 +110,27 @@ typedef _Bool Bool;
 #define false CAST(Bool, 0)
 #endif
 
-typedef size_t Size;
-
+// Rune
 typedef int32_t Rune; // Unicode codepoint.
-
 #define RUNE_MAX CAST(Rune, 0x0010ffff)
 #define RUNE_BOM CAST(Rune, 0xfeff)
 #define RUNE_EOF CAST(Rune, -1)
 
+// ASSERT
 NORETURN void report_assertion(const char *expression, const char *file, int line);
-
 #define ASSERT(expression) \
   CAST(void, (expression) ? CAST(void, 0) : report_assertion(#expression, __FILE__, __LINE__))
+
+// Ptr
+#if defined(__cplusplus)
+struct Ptr {
+	constexpr Ptr(void *p = 0) noexcept : p{p} {}
+	template <typename T> operator T*() const noexcept { return CAST(T*, p); };
+	void *p = 0;
+};
+#else
+typedef void *Ptr;
+#endif
 
 // Support bitwise operators on enumerators in C++ like C.
 #if defined(__cplusplus)

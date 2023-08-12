@@ -3,7 +3,7 @@
 #include "array.h"
 #include "context.h"
 
-void *array_create(Context *context) {
+Ptr array_create(Context *context) {
 	Allocator *allocator = context->allocator;
 	void *data = allocator->allocate(allocator, sizeof(Array));
 	if (!data) {

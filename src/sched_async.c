@@ -44,7 +44,7 @@ static void _sched_async_work_dispose(void *data) {
 
 Bool sched_async_init(Context *context, void **instance) {
 	Allocator *allocator = context->allocator;
-	SchedAsync *sched = RCAST(SchedAsync *, allocator->allocate(allocator, sizeof *sched));
+	SchedAsync *sched = allocator->allocate(allocator, sizeof *sched);
 	if (!sched) {
 		return false;
 	}
@@ -74,7 +74,7 @@ static void sched_async_fini(void *ctx) {
 static Bool sched_async_queue(void *ctx, void *data, void (*func)(void *data, Context *context), void (*dispose)(void *data, Context *context)) {
 	SchedAsync *sched = CAST(SchedAsync *, ctx);
 	Allocator *allocator = sched->context->allocator;
-	SchedAsyncWork *work = RCAST(SchedAsyncWork *, allocator->allocate(allocator, sizeof *work));
+	SchedAsyncWork *work = allocator->allocate(allocator, sizeof *work);
 	if (!work) {
 		return false;
 	}

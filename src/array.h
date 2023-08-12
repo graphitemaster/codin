@@ -69,6 +69,6 @@ struct ALIGN(16) Array {
 
 Bool array_grow(void **const array, Size elements, Size type_size);
 void array_delete(void *const array);
-void *array_create(Context *context);
+Ptr array_create(Context *context);
 
 #endif // CODIN_ARRAY_H
