@@ -583,6 +583,12 @@ static Array(Field*) parse_field_list(Parser *parser, Bool is_struct) {
 		value = parse_expression(parser, false);
 	}
 
+	String tag = STRING_NIL;
+	if (type && !value && is_literal(parser->this_token, LITERAL_STRING)) {
+		tag = parser->this_token.string;
+		advancep(parser);
+	}
+
 	const Size n_elements = array_size(list);
 	if (type) {
 		// The list are identifiers which have type 'type'
@@ -593,7 +599,7 @@ static Array(Field*) parse_field_list(Parser *parser, Bool is_struct) {
 			if (!identifier) {
 				PARSE_ERROR("Expected identifier in field list");
 			}
-			array_push(fields, tree_new_field(parser->tree, type, identifier, value, flags));
+			array_push(fields, tree_new_field(parser->tree, type, identifier, value, tag, flags));
 		}
 	} else {
 		record(parser);
@@ -606,7 +612,7 @@ static Array(Field*) parse_field_list(Parser *parser, Bool is_struct) {
 			strbuf_init(&buf, context);
 			strbuf_put_formatted(&buf, "__unnamed_%d", CAST(Sint32, i));
 			Identifier *name = tree_new_identifier(parser->tree, strbuf_result(&buf), false);
-			array_push(fields, tree_new_field(parser->tree, type, name, value, flags));
+			array_push(fields, tree_new_field(parser->tree, type, name, value, tag, flags));
 		}
 	}
 
@@ -644,10 +650,15 @@ static Array(Field*) parse_field_list(Parser *parser, Bool is_struct) {
 		if (accepted_assignment(parser, ASSIGNMENT_EQ)) {
 			value = parse_expression(parser, false);
 		}
+		String tag = STRING_NIL;
+		if (type && !value && is_literal(parser->this_token, LITERAL_STRING)) {
+			tag = parser->this_token.string;
+			advancep(parser);
+		}
 		const Size n_names = array_size(names);
 		for (Size i = 0; i < n_names; i++) {
 			Identifier *const name = names[i];
-			array_push(fields, tree_new_field(parser->tree, type, name, value, flags));
+			array_push(fields, tree_new_field(parser->tree, type, name, value, tag, flags));
 		}
 
 		if (!accepted_separator(parser)) {
@@ -684,7 +695,7 @@ static Array(Field*) parse_procedure_results(Parser *parser, Bool *diverging) {
 		Type *const type = parse_type(parser);
 		record(parser);
 		Identifier *const identifier = tree_new_identifier(parser->tree, SCLIT("__unnamed"), false);
-		Field *const field = tree_new_field(parser->tree, type, identifier, 0, 0);
+		Field *const field = tree_new_field(parser->tree, type, identifier, 0, STRING_NIL, 0);
 		array_push(fields, field);
 		TRACE_LEAVE();
 		return fields;
@@ -926,7 +937,7 @@ static Statement *parse_attributes_for_statement(Parser *parser, BlockFlag block
 	Array(Field*) attributes = array_make(context);
 	if (is_kind(parser->this_token, KIND_IDENTIFIER)) {
 		Identifier *const identifier = parse_identifier(parser, false);
-		Field *const field = tree_new_field(parser->tree, 0, identifier, 0, 0);
+		Field *const field = tree_new_field(parser->tree, 0, identifier, 0, STRING_NIL, 0);
 		array_push(attributes, field);
 	} else {
 		expect_operator(parser, OPERATOR_LPAREN);
@@ -939,9 +950,9 @@ static Statement *parse_attributes_for_statement(Parser *parser, BlockFlag block
 			if (is_assignment(parser->this_token, ASSIGNMENT_EQ)) {
 				expect_assignment(parser, ASSIGNMENT_EQ);
 				Expression *value = parse_value(parser);
-				field = tree_new_field(parser->tree, 0, identifier, value, 0);
+				field = tree_new_field(parser->tree, 0, identifier, value, STRING_NIL, 0);
 			} else {
-				field = tree_new_field(parser->tree, 0, identifier, 0, 0);
+				field = tree_new_field(parser->tree, 0, identifier, 0, STRING_NIL, 0);
 			}
 			array_push(attributes, field);
 			if (!accepted_separator(parser)) {
@@ -1395,7 +1406,7 @@ static TypeExpression *parse_enum_type_expression(Parser *parser) {
 	
 		Identifier *const identifier = RCAST(IdentifierExpression *, name)->identifier;
 	
-		Field *const field = tree_new_field(parser->tree, 0, identifier, value, 0);
+		Field *const field = tree_new_field(parser->tree, 0, identifier, value, STRING_NIL, 0);
 		array_push(fields, field);
 	
 		if (!accepted_separator(parser)) {
@@ -1507,6 +1518,15 @@ static Expression *parse_directive_prefix(Parser *parser, Bool lhs) {
 			Expression *const expression = parse_directive_call_expression(parser, SCLIT("config"));
 			TRACE_LEAVE();
 			return expression;
+		}
+	case DIRECTIVE_CALLER_LOCATION:
+		{
+			Identifier *intrinsics_identifier = tree_new_identifier(parser->tree, SCLIT("intrinsics"), false);
+			Identifier *caller_location_identifier = tree_new_identifier(parser->tree, SCLIT("caller_location"), false);
+			IdentifierExpression *operand = tree_new_identifier_expression(parser->tree, intrinsics_identifier);
+			SelectorExpression *expression = tree_new_selector_expression(parser->tree, RCAST(Expression *, operand), caller_location_identifier);
+			TRACE_LEAVE();
+			return RCAST(Expression *, expression);
 		}
 	default:
 		{
@@ -1818,10 +1838,10 @@ static CompoundLiteralExpression *parse_compound_literal_expression(Parser *pars
 		if (is_assignment(parser->this_token, ASSIGNMENT_EQ)) {
 			expect_assignment(parser, ASSIGNMENT_EQ);
 			Expression *const value = parse_value(parser);
-			Field *const field = tree_new_field(parser->tree, 0, name, value, 0);
+			Field *const field = tree_new_field(parser->tree, 0, name, value, STRING_NIL, 0);
 			array_push(fields, field);
 		} else {
-			Field *const field = tree_new_field(parser->tree, 0, name, 0, 0);
+			Field *const field = tree_new_field(parser->tree, 0, name, 0, STRING_NIL, 0);
 			array_push(fields, field);
 		}
 		if (!accepted_separator(parser)) {

@@ -480,12 +480,13 @@ GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) 
 	return type;
 }
 
-Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value, FieldFlag flags) {
+Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value, String tag, FieldFlag flags) {
 	Allocator *allocator = tree->context->allocator;
 	Field *field = CAST(Field*, allocator->allocate(allocator, sizeof *field));
 	field->type = type;
 	field->name = name;
 	field->value = value;
+	field->tag = tag;
 	field->flags = flags;
 	return field;
 }

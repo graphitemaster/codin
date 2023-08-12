@@ -609,7 +609,7 @@ static Token lexer_tokenize(Lexer *lexer) {
 		if (directive_find(token.string, &token.as_directive)) {
 			token.kind = KIND_DIRECTIVE;
 		} else {
-			token.kind = KIND_INVALID;
+			LEX_ERROR("Unknown directive '%.*s'", SFMT(token.string));
 		}
 		return token;
 	CASE(FSLASH, '/'):

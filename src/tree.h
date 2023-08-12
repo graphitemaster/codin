@@ -626,9 +626,10 @@ struct Identifier {
 };
 
 struct Field {
-	Identifier *name; // Always present
-	Type *type; // Optional.
-	Expression *value;
+	Identifier *name;  // Always present
+	Type *type;        // Optional.
+	Expression *value; // Optional.
+	String tag;        // Optional.
 	FieldFlag flags;
 };
 
@@ -708,7 +709,7 @@ ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Exp
 GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Field*) parameters, Array(Type*) variants, ListExpression *where_clauses);
 PolyType *tree_new_poly_type(Tree *tree, Type *type, Type *specialization);
 
-Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value, FieldFlag flags);
+Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value, String tag, FieldFlag flags);
 Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly);
 
 #endif // CODIN_TREE_H

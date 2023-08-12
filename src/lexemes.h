@@ -190,6 +190,7 @@ DIRECTIVE(LOAD_HASH,                "load_hash")
 DIRECTIVE(DEFINED,                  "defined")
 DIRECTIVE(CONFIG,                   "config")
 DIRECTIVE(MAYBE,                    "maybe")
+DIRECTIVE(CALLER_LOCATION,          "caller_location")
 
 //        ENUM,                     MATCH,                    WHERE
 ATTRIBUTE(TEST,                     "test",                   ATTRIBUTE_FOR_PROC)
