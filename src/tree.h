@@ -40,6 +40,7 @@ typedef struct IfStatement IfStatement;
 typedef struct WhenStatement WhenStatement;
 typedef struct ReturnStatement ReturnStatement;
 typedef struct ForStatement ForStatement;
+typedef struct SwitchStatement SwitchStatement;
 typedef struct DeferStatement DeferStatement;
 typedef struct BranchStatement BranchStatement;
 typedef struct ForeignBlockStatement ForeignBlockStatement;
@@ -75,6 +76,7 @@ typedef struct PolyType PolyType;
 // Misc.
 typedef struct Identifier Identifier;
 typedef struct Field Field;
+typedef struct CaseClause CaseClause;
 
 enum ExpressionKind {
 	EXPRESSION_LIST             = 0,
@@ -107,11 +109,12 @@ enum StatementKind {
 	STATEMENT_WHEN           = 7,
 	STATEMENT_RETURN         = 8,
 	STATEMENT_FOR            = 9,
-	STATEMENT_DEFER          = 10,
-	STATEMENT_BRANCH         = 11, // break, continue, fallthrough
-	STATEMENT_FOREIGN_BLOCK  = 12,
-	STATEMENT_FOREIGN_IMPORT = 13,
-	STATEMENT_USING          = 14,
+	STATEMENT_SWITCH         = 10,
+	STATEMENT_DEFER          = 11,
+	STATEMENT_BRANCH         = 12, // break, continue, fallthrough
+	STATEMENT_FOREIGN_BLOCK  = 13,
+	STATEMENT_FOREIGN_IMPORT = 14,
+	STATEMENT_USING          = 15,
 };
 
 enum ProcedureKind {
@@ -303,7 +306,7 @@ struct SelectorExpression {
 struct CallExpression {
 	Expression base;
 	Expression *operand;
-	Array(Expression*) arguments;
+	Array(Field*) arguments;
 };
 
 // <operand>.(T)
@@ -438,6 +441,13 @@ struct ForStatement {
 	BlockStatement *body;
 	Statement *post;
 	Identifier *label;
+};
+
+struct SwitchStatement {
+	Statement base;
+	Statement *init;
+	Expression *cond;
+	Array(CaseClause*) clauses;
 };
 
 struct DeferStatement {
@@ -633,6 +643,11 @@ struct Field {
 	FieldFlag flags;
 };
 
+struct CaseClause {
+	ListExpression *expressions;
+	Array(Statement*) statements;
+};
+
 static inline String calling_convention_to_string(CallingConvention cc) {
 	#define CCONVENTION(enumerator, name, ...) SLIT(name),
 	static const String TABLE[] = {
@@ -659,7 +674,7 @@ BinaryExpression *tree_new_binary_expression(Tree *tree, OperatorKind operation,
 TernaryExpression *tree_new_ternary_expression(Tree *tree, Expression *on_true, KeywordKind operation, Expression *cond, Expression *on_false);
 CastExpression *tree_new_cast_expression(Tree *tree, OperatorKind kind, Type *type, Expression *expression);
 SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand, Identifier *identifier);
-CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Expression*) arguments);
+CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Field*) arguments);
 AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Type *type);
 ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, ListExpression *where_clauses, BlockStatement *body);
 TypeExpression *tree_new_type_expression(Tree *tree, Type *type);
@@ -681,6 +696,7 @@ DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Arr
 IfStatement *tree_new_if_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, BlockStatement *elif);
 WhenStatement *tree_new_when_statement(Tree *tree, Expression *cond, BlockStatement *body, BlockStatement *elif);
 ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, Statement *post);
+SwitchStatement *tree_new_switch_statement(Tree *tree, Statement *init, Expression *cond, Array(CaseClause*) clauses);
 ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) results);
 DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
 BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label);
@@ -711,5 +727,6 @@ PolyType *tree_new_poly_type(Tree *tree, Type *type, Type *specialization);
 
 Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value, String tag, FieldFlag flags);
 Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly);
+CaseClause *tree_new_case_clause(Tree *tree, ListExpression *expressions, Array(Statement*) statements);
 
 #endif // CODIN_TREE_H

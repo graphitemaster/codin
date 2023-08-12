@@ -17,9 +17,6 @@
 #define ICE(...) \
 	PARSE_ERROR(__VA_ARGS__)
 
-#define UNIMPLEMENTED(what) \
-	PARSE_ERROR("Unimplemented: %s", (what))
-
 // Simple operator precedence climbing.
 #define OPERATOR(ident, match, prec, ...) (prec),
 static const Uint8 PRECEDENCE[] = {
@@ -912,6 +909,10 @@ static Statement *parse_directive_for_statement(Parser *parser, BlockFlag block_
 		// Ignore the unroll directive for now.
 		statement = parse_statement(parser, block_flags);
 		break;
+	case DIRECTIVE_FORCE_INLINE:
+		// Ignore the force_inline directive for now.
+		statement = parse_statement(parser, block_flags);
+		break;
 	default:
 		{
 			const String directive = directive_to_string(token.as_directive);
@@ -1753,7 +1754,7 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 
 	TRACE_ENTER();
 
-	Array(Expression*) arguments = array_make(context);
+	Array(Field*) arguments = array_make(context);
 	const Sint32 expression_depth = parser->expression_depth;
 	const Bool allow_newline = parser->allow_newline;
 	parser->expression_depth = 0;
@@ -1761,6 +1762,7 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 
 	expect_operator(parser, OPERATOR_LPAREN);
 
+	Bool seen_ellipsis = false;
 	while (!is_operator(parser->this_token, OPERATOR_RPAREN)
 	    && !is_kind(parser->this_token, KIND_EOF))
 	{
@@ -1782,12 +1784,26 @@ static CallExpression *parse_call_expression(Parser *parser, Expression *operand
 			if (has_ellipsis) {
 				PARSE_ERROR("Cannot apply '..' to field");
 			}
-			UNIMPLEMENTED("named argument");
-		} else if (has_ellipsis) {
-			PARSE_ERROR("Positional arguments not allowed after '..'");
+			// We need to specify the argument name somehow.
+			Identifier *name = evaluate_identifier_expression(argument);
+			if (name) {
+				Expression *value = parse_value(parser);
+				Field *field = tree_new_field(parser->tree, 0, name, value, STRING_NIL, 0);
+				array_push(arguments, field);
+			} else {
+				PARSE_ERROR("Expected identifier for named argument");
+			}
+		} else {
+			if (seen_ellipsis) {
+				PARSE_ERROR("Positional arguments not allowed after '..'");
+			}
+			Field *field = tree_new_field(parser->tree, 0, 0, argument, STRING_NIL, 0);
+			array_push(arguments, field);
 		}
 
-		array_push(arguments, argument);
+		if (has_ellipsis) {
+			seen_ellipsis = true;
+		}
 
 		if (!accepted_separator(parser)) {
 			break;
@@ -2120,11 +2136,11 @@ static TernaryExpression *parse_ternary_expression(Parser *parser, Expression *e
 	Expression *cond = 0;
 	Expression *on_true = 0;
 	KeywordKind kind = KEYWORD_IF;
-	if (is_operator(parser->last_token, OPERATOR_QUESTION)) {
+	if (accepted_operator(parser, OPERATOR_QUESTION)) {
 		cond = expr;
 		on_true = parse_expression(parser, lhs);
 		expect_operator(parser, OPERATOR_COLON);
-	} else {
+	} else if (accepted_keyword(parser, KEYWORD_IF) || accepted_keyword(parser, KEYWORD_WHEN)) {
 		kind = parser->last_token.as_keyword;
 		cond = parse_expression(parser, lhs);
 		on_true = expr;
@@ -2151,6 +2167,12 @@ static Expression *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec
 		Sint32 op_prec = 0;
 		if (is_kind(token, KIND_OPERATOR)) {
 			op_prec = PRECEDENCE[token.as_operator];
+			// 'in' when used outside an expression behaves as a keyword
+			if (is_operator(token, OPERATOR_IN) || is_operator(token, OPERATOR_NOT_IN)) {
+				if (parser->expression_depth < 0 && !parser->allow_in) {
+					op_prec = 0;
+				}
+			}
 		} else if (is_keyword(token, KEYWORD_IF) || is_keyword(token, KEYWORD_WHEN)) {
 			// The 'if' and 'when' keywords become ternary operators with highest precedence.
 			op_prec = 1;
@@ -2167,8 +2189,6 @@ static Expression *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec
 			}
 		}
 
-		expect_kind(parser, KIND_OPERATOR);
-
 		if (is_operator(token, OPERATOR_QUESTION)
 		 || is_keyword(token, KEYWORD_IF)
 		 || is_keyword(token, KEYWORD_WHEN))
@@ -2176,6 +2196,7 @@ static Expression *parse_binary_expression(Parser *parser, Bool lhs, Sint32 prec
 			TernaryExpression *const ternary = parse_ternary_expression(parser, expr, lhs);
 			expr = RCAST(Expression *, ternary);
 		} else {
+			expect_kind(parser, KIND_OPERATOR);
 			Expression *const rhs = parse_binary_expression(parser, false, op_prec + 1);
 			if (!rhs) {
 				PARSE_ERROR("Expected expression on the right-hand side");
@@ -2451,10 +2472,13 @@ static Statement *parse_simple_statement(Parser* parser, BlockFlag block_flags, 
 		case OPERATOR_IN:
 			if (allow_in) {
 				// [lhs] in <Expression>
+				Bool allow_in = parser->allow_in;
+				parser->allow_in = false;
 				accepted_operator(parser, OPERATOR_IN);
 				Expression *const rhs = parse_expression(parser, true);
 				BinaryExpression *const expression = tree_new_binary_expression(parser->tree, OPERATOR_IN, RCAST(Expression *, lhs), rhs);
 				ExpressionStatement *const statement = tree_new_expression_statement(parser->tree, RCAST(Expression *, expression));
+				parser->allow_in = allow_in;
 				TRACE_LEAVE();
 				return RCAST(Statement *, statement);
 			}
@@ -2697,7 +2721,6 @@ static WhenStatement *parse_when_statement(Parser *parser) {
 	return statement;
 }
 
-// TODO(dweiler): EBNF
 static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) {
 	Context *const context = parser->context;
 
@@ -2721,29 +2744,24 @@ static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) 
 		if (is_operator(token, OPERATOR_IN)) {
 			PARSE_ERROR("Use of 'for in' is not allowed. Use 'for _ in' instead.");
 		}
-		if (is_kind(token, KIND_SEMICOLON)) {
-			PARSE_ERROR("Expected init statement or conditional in for statement");
-		}
-
-		// for [...] in <Expression>
-		Statement *const statement = parse_simple_statement(parser, block_flags, true, false);
-		if (statement->kind == STATEMENT_EXPRESSION) {
-			Expression *const expression = RCAST(ExpressionStatement *, statement)->expression;
-			if (expression->kind == EXPRESSION_UNARY) {
-				BinaryExpression *const bin = RCAST(BinaryExpression *, expression);
-				if (bin->operation == OPERATOR_IN) {
-					// for <statement> in <expression>
-					init = statement;
-					range = true;
+		if (!is_kind(token, KIND_SEMICOLON)) {
+			// for [...] in <Expression>
+			Statement *const statement = parse_simple_statement(parser, block_flags, true, false);
+			if (statement->kind == STATEMENT_EXPRESSION) {
+				Expression *const expression = RCAST(ExpressionStatement *, statement)->expression;
+				cond = expression;
+				if (expression->kind == EXPRESSION_BINARY) {
+					BinaryExpression *const bin = RCAST(BinaryExpression *, expression);
+					if (bin->operation == OPERATOR_IN) {
+						range = true;
+					}
 				}
+			} else {
+				// for <init>
+				init = statement;
+				cond = 0;
 			}
-			cond = expression;
-		} else {
-			// for <init>
-			init = statement;
-			cond = 0;
 		}
-
 		if (!range && accepted_control_statement_separator(parser)) {
 			const Token token = parser->this_token;
 			if (is_kind(token, KIND_LBRACE) || is_keyword(token, KEYWORD_DO)) {
@@ -2775,6 +2793,76 @@ static ForStatement *parse_for_statement(Parser *parser, BlockFlag block_flags) 
 	}
 
 	ForStatement *const statement = tree_new_for_statement(parser->tree, init, cond, body, post);
+
+	TRACE_LEAVE();
+
+	return statement;
+}
+
+static CaseClause *parse_case_clause(Parser *parser, BlockFlag block_flags, Bool is_type) {
+	TRACE_ENTER();
+
+	expect_keyword(parser, KEYWORD_CASE);
+
+	const Bool allow_in = parser->allow_in;
+	parser->allow_in = !is_type;
+	ListExpression *list = 0;
+	if (!is_operator(parser->this_token, OPERATOR_COLON)) {
+		list = parse_rhs_list_expression(parser);
+	}
+	parser->allow_in = allow_in;
+
+	expect_operator(parser, OPERATOR_COLON);
+
+	Array(Statement*) statements = parse_statement_list(parser, block_flags);
+	CaseClause *clause = tree_new_case_clause(parser->tree, list, statements);
+
+	TRACE_LEAVE();
+
+	return clause;
+}
+
+static SwitchStatement *parse_switch_statement(Parser *parser, BlockFlag block_flags) {
+	Context *const context = parser->context;
+
+	TRACE_ENTER();
+
+	expect_keyword(parser, KEYWORD_SWITCH);
+
+	Statement *init = 0;
+	Expression *cond = 0;
+	if (!is_kind(parser->this_token, KIND_LBRACE)) {
+		const Sint32 expression_depth = parser->expression_depth;
+		parser->expression_depth = -1;
+
+		Statement *const statement = parse_simple_statement(parser, block_flags, true, false);
+		if (statement->kind == STATEMENT_EXPRESSION) {
+			cond = RCAST(ExpressionStatement *, statement)->expression;
+		} else {
+			init = statement;
+			if (accepted_control_statement_separator(parser)) {
+				cond = parse_expression(parser, false);
+			} else {
+				expect_semicolon(parser);
+			}
+		}
+		parser->expression_depth = expression_depth;
+	}
+
+	const Bool is_type_switch
+		= cond
+				&& cond->kind == EXPRESSION_BINARY
+					&& RCAST(BinaryExpression *, cond)->operation == OPERATOR_IN;
+
+	Array(CaseClause*) clauses = array_make(context);
+	advance_possible_newline(parser);
+	expect_kind(parser, KIND_LBRACE);
+	while (is_keyword(parser->this_token, KEYWORD_CASE)) {
+		array_push(clauses, parse_case_clause(parser, block_flags, is_type_switch));
+	}
+	expect_kind(parser, KIND_RBRACE);
+
+	SwitchStatement *statement = tree_new_switch_statement(parser->tree, init, cond, clauses);
 
 	TRACE_LEAVE();
 
@@ -2829,10 +2917,10 @@ static ReturnStatement *parse_return_statement(Parser *parser) {
 }
 
 // SimpleStatement , Semicolon
-static Statement *parse_basic_simple_statement(Parser *parser, BlockFlag block_flags, Bool allow_in) {
+static Statement *parse_basic_simple_statement(Parser *parser, BlockFlag block_flags) {
 	TRACE_ENTER();
 
-	Statement *const statement = parse_simple_statement(parser, block_flags, allow_in, true);
+	Statement *const statement = parse_simple_statement(parser, block_flags, false, true);
 	expect_semicolon(parser);
 
 	TRACE_LEAVE();
@@ -3005,7 +3093,7 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 		case LITERAL_RUNE:      FALLTHROUGH();
 		case LITERAL_STRING:
 			{
-				Statement *const statement = parse_basic_simple_statement(parser, block_flags, false);
+				Statement *const statement = parse_basic_simple_statement(parser, block_flags);
 				TRACE_LEAVE();
 				return statement;
 			}
@@ -3020,7 +3108,7 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 			FALLTHROUGH();
 		case KEYWORD_PROC:
 			{
-				Statement *const statement = parse_basic_simple_statement(parser, block_flags, false);
+				Statement *const statement = parse_basic_simple_statement(parser, block_flags);
 				TRACE_LEAVE();
 				return statement;
 			}
@@ -3055,7 +3143,11 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 				return RCAST(Statement *, statement);
 			}
 		case KEYWORD_SWITCH:
-			UNIMPLEMENTED("switch statement");
+			{
+				SwitchStatement *const statement = parse_switch_statement(parser, block_flags);
+				TRACE_LEAVE();
+				return RCAST(Statement *, statement);
+			}
 		case KEYWORD_DEFER:
 			{
 				DeferStatement *const statement = parse_defer_statement(parser, block_flags);
@@ -3088,7 +3180,7 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 		break;
 	case KIND_IDENTIFIER:
 		{
-			Statement *const statement = parse_basic_simple_statement(parser, block_flags, false);
+			Statement *const statement = parse_basic_simple_statement(parser, block_flags);
 			TRACE_LEAVE();
 			return statement;
 		}
@@ -3102,7 +3194,7 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 		case OPERATOR_NOT:     FALLTHROUGH();
 		case OPERATOR_AND:
 			{
-				Statement *const statement = parse_basic_simple_statement(parser, block_flags, false);
+				Statement *const statement = parse_basic_simple_statement(parser, block_flags);
 				TRACE_LEAVE();
 				return statement;
 			}

@@ -1,8 +1,7 @@
 package main
 
-X :: struct {
-	x: int,
-}
-
-foo :: proc(x := #caller_location) {
+foo :: proc() {
+	for _, i in args {}
+	if key in sorter.relations {}
+	if bits & (1<<i) == 0 {}
 }

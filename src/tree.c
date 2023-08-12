@@ -58,7 +58,7 @@ SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand
 	return expression;
 }
 
-CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Expression*) arguments) {
+CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Field*) arguments) {
 	Allocator *allocator = tree->context->allocator;
 	CallExpression *expression = CAST(CallExpression*, allocator->allocate(allocator, sizeof *expression));
 	expression->base.kind = EXPRESSION_CALL;
@@ -244,6 +244,16 @@ ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *co
 	return statement;
 }
 
+SwitchStatement *tree_new_switch_statement(Tree *tree, Statement *init, Expression *cond, Array(CaseClause*) clauses) {
+	Allocator *allocator = tree->context->allocator;
+	SwitchStatement *statement = CAST(SwitchStatement *, allocator->allocate(allocator, sizeof *statement));
+	statement->base.kind = STATEMENT_SWITCH;
+	statement->init = init;
+	statement->cond = cond;
+	statement->clauses = clauses;
+	return statement;
+}
+
 ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) results) {
 	Allocator *allocator = tree->context->allocator;
 	ReturnStatement *statement = CAST(ReturnStatement *, allocator->allocate(allocator, sizeof *statement));
@@ -303,6 +313,15 @@ Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly) {
 	identifier->poly = poly;
 	identifier->token = array_size(tree->tokens) - 1;
 	return identifier;
+}
+
+CaseClause *tree_new_case_clause(Tree *tree, ListExpression *expressions, Array(Statement*) statements) {
+	Context *context = tree->context;
+	Allocator *allocator = context->allocator;
+	CaseClause *clause = CAST(CaseClause *, allocator->allocate(allocator, sizeof *clause));
+	clause->expressions = expressions;
+	clause->statements = statements;
+	return clause;
 }
 
 // Types

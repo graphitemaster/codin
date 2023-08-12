@@ -124,17 +124,14 @@ static Rune advancel(Lexer *lexer) {
 	Input *input = &lexer->input;
 	if (input->cur < input->end) {
 		lexer->here = input->cur;
-		const Rune rune = *input->cur;
+		Rune rune = *input->cur;
 		if (rune == 0) {
 			LEX_ERROR("Unexpected EOF");
 			input->cur++;
 		} else if (rune & 0x80) {
-			const Size len = input->end - input->cur;
-			Uint32 state = 0;
-			for (Size i = 0; i < len; i++) {
-				Rune rune;
-				utf8_decode(&state, &rune, *input->cur);
-				input->cur++;
+			Uint32 state = UTF8_ACCEPT;
+			while (input->cur < input->end && *input->cur & 0x80) {
+				utf8_decode(&state, &rune, *input->cur++);
 			}
 			if (state != UTF8_ACCEPT) {
 				LEX_ERROR("Malformed UTF-8");
@@ -653,7 +650,6 @@ static Token lexer_tokenize(Lexer *lexer) {
 			advancel(lexer);
 			return mkop(lexer, OPERATOR_LTEQ);
 		case '<':
-			advancel(lexer);
 			if (advancel(lexer) == '=') {
 				advancel(lexer);
 				return mkassign(lexer, ASSIGNMENT_SHL);

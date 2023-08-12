@@ -83,19 +83,18 @@ Bool dump_call_expression(const Tree *tree, const CallExpression *expression, Si
 	printf("(call");
 	printf("\n");
 	dump_expression(tree, expression->operand, depth + 1);
-	const Size n_arguments = array_size(expression->arguments);
-	for (Size i = 0; i < n_arguments; i++) {
-		printf("\n");
-		dump_expression(tree, expression->arguments[i], depth + 1);
-	}
-	printf(")");
+	printf("\n");
+	dump_fields(tree, expression->arguments, depth + 1);
 	return true;
 }
 
 Bool dump_assertion_expression(const Tree *tree, const AssertionExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(assert-type\n");
-	dump_type(tree, expression->type, depth + 1);
+	printf("(assert-type");
+	if (expression->type) {
+		printf("\n");
+		dump_type(tree, expression->type, depth + 1);
+	}
 	printf("\n");
 	dump_expression(tree, expression->operand, depth + 1);
 	printf(")");
@@ -636,6 +635,40 @@ Bool dump_for_statement(const Tree *tree, const ForStatement *statement, Sint32 
 	return true;
 }
 
+static void dump_case_clause(const Tree *tree, const CaseClause *clause, Sint32 depth) {
+	pad(depth);
+	printf("(case");
+	if (clause->expressions) {
+		printf("\n");
+		dump_list_expression(tree, clause->expressions, depth + 1);
+	}
+	const Size n_statements = array_size(clause->statements);
+	for (Size i = 0; i < n_statements; i++) {
+		printf("\n");
+		dump_statement(tree, clause->statements[i], depth + 1);
+	}
+}
+
+Bool dump_switch_statement(const Tree *tree, const SwitchStatement *statement, Sint32 depth) {
+	pad(depth);
+	printf("(switch");
+	if (statement->init) {
+		printf("\n");
+		dump_statement(tree, statement->init, depth + 1);
+	}
+	if (statement->cond) {
+		printf("\n");
+		dump_expression(tree, statement->cond, depth + 1);
+	}
+	const Size n_clauses = array_size(statement->clauses);
+	for (Size i = 0; i < n_clauses; i++) {
+		printf("\n");
+		const CaseClause *clause = statement->clauses[i];
+		dump_case_clause(tree, clause, depth + 1);
+	}
+	return true;
+}
+
 Bool dump_defer_statement(const Tree *tree, const DeferStatement *statement, Sint32 depth) {
 	pad(depth);
 	printf("(defer");
@@ -701,6 +734,7 @@ Bool dump_statement(const Tree *tree, const Statement *statement, Sint32 depth) 
 	break; case STATEMENT_WHEN:           dump_when_statement(tree, RCAST(const WhenStatement *, statement), depth + 1);
 	break; case STATEMENT_RETURN:         dump_return_statement(tree, RCAST(const ReturnStatement *, statement), depth + 1);
 	break; case STATEMENT_FOR:            dump_for_statement(tree, RCAST(const ForStatement *, statement), depth + 1);
+	break; case STATEMENT_SWITCH:         dump_switch_statement(tree, RCAST(const SwitchStatement *, statement), depth + 1);
 	break; case STATEMENT_DEFER:          dump_defer_statement(tree, RCAST(const DeferStatement *, statement), depth + 1);
 	break; case STATEMENT_BRANCH:         dump_branch_statement(tree, RCAST(const BranchStatement *, statement), depth + 1);
 	break; case STATEMENT_FOREIGN_BLOCK:  dump_foreign_block_statement(tree, RCAST(const ForeignBlockStatement *, statement), depth + 1);
