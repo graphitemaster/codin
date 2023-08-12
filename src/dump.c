@@ -13,91 +13,184 @@ static void pad(Sint32 depth) {
 Bool dump_list_expression(const Tree *tree, const ListExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(list");
+	printf("\n");
+
+	pad(depth + 1);
+	printf("(expressions");
 	const Size n_elements = array_size(expression->expressions);
 	for (Size i = 0; i < n_elements; i++) {
 		printf("\n");
-		dump_expression(tree, expression->expressions[i], depth + 1);
+		dump_expression(tree, expression->expressions[i], depth + 2);
 	}
-	printf(")");
+	printf(")"); // expressions
+
+	printf(")"); // list
 	return true;
 }
 
 Bool dump_unary_expression(const Tree *tree, const UnaryExpression *expression, Sint32 depth) {
-	const String op = operator_to_string(expression->operation);
 	pad(depth);
-	printf("(uop '%.*s'\n", SFMT(op));
-	dump_expression(tree, expression->operand, depth + 1);
-	printf(")");
+	printf("(unary");
+	printf("\n");
+
+	pad(depth + 1);
+	const String op = operator_to_string(expression->operation);
+	printf("(operation '%.*s')", SFMT(op));
+	printf("\n");
+
+	pad(depth + 1);
+	printf("(operands");
+	printf("\n");
+	dump_expression(tree, expression->operand, depth + 2);
+	printf(")"); // operands
+
+	printf(")"); // uop
 	return true;
 }
 
 Bool dump_binary_expression(const Tree *tree, const BinaryExpression *expression, Sint32 depth) {
-	const String op = operator_to_string(expression->operation);
 	pad(depth);
-	printf("(bop '%.*s'\n", SFMT(op));
-	dump_expression(tree, expression->lhs, depth + 1);
+	printf("(binary");
 	printf("\n");
-	dump_expression(tree, expression->rhs, depth + 1);
-	printf(")");
+	
+	pad(depth + 1);
+	const String op = operator_to_string(expression->operation);
+	printf("(operation '%.*s')", SFMT(op));
+	printf("\n");
+
+	pad(depth + 1);
+	printf("(lhs");
+	printf("\n");
+	dump_expression(tree, expression->lhs, depth + 2);
+	printf(")"); // lhs
+
+	printf("\n");
+
+	pad(depth + 1);
+	printf("(rhs");
+	printf("\n");
+	dump_expression(tree, expression->rhs, depth + 2);
+	printf(")"); // rhs
+
+	printf(")"); // bop
 	return true;
 }
 
 Bool dump_ternary_expression(const Tree *tree, const TernaryExpression *expression, Sint32 depth) {
-	const String keyword = keyword_to_string(expression->operation);
 	pad(depth);
-	printf("(top '%.*s'\n", SFMT(keyword));
-	dump_expression(tree, expression->cond, depth + 1);
+	printf("(ternary");
 	printf("\n");
-	dump_expression(tree, expression->on_true, depth + 1);
+
+	pad(depth + 1);
+	const String keyword = keyword_to_string(expression->operation);
+	printf("(operation '%.*s')", SFMT(keyword));
+
 	printf("\n");
-	dump_expression(tree, expression->on_false, depth + 1);
+	pad(depth + 1);
+	printf("(cond");
+	printf("\n");
+	dump_expression(tree, expression->cond, depth + 2);
+	printf(")"); // cond
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(true");
+	printf("\n");
+	dump_expression(tree, expression->on_true, depth + 2);
+	printf(")"); // true
+
+	printf("\n");
+	pad(depth + 1);
+	printf("\n");
+	dump_expression(tree, expression->on_false, depth + 2);
+	printf(")"); // false
+
+	printf(")"); // top
 	return true;
 }
 
 Bool dump_cast_expression(const Tree *tree, const CastExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(cast\n");
+	printf("(cast");
 	if (expression->type) {
-		dump_type(tree, expression->type, depth + 1);
 		printf("\n");
+		pad(depth + 1);
+		printf("(type");
+		printf("\n");
+		dump_type(tree, expression->type, depth + 2);
+		printf(")"); // type
 	}
-	dump_expression(tree, expression->expression, depth + 1);
-	printf(")");
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(expression");
+	printf("\n");
+	dump_expression(tree, expression->expression, depth + 2);
+	printf(")"); // expression
+
+	printf(")"); // cast
 	return true;
 }
 
 Bool dump_selector_expression(const Tree *tree, const SelectorExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(sel\n");
+	printf("(select");
 	if (expression->operand) {
-		dump_expression(tree, expression->operand, depth + 1);
 		printf("\n");
+		pad(depth + 1);
+		printf("(operand");
+		printf("\n");
+		dump_expression(tree, expression->operand, depth + 2);
+		printf(")"); // operand
 	}
+	printf("\n");
 	dump_identifier(tree, expression->identifier, depth + 1);
-	printf(")");
+	printf(")"); // select
 	return true;
 }
 
 Bool dump_call_expression(const Tree *tree, const CallExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(call");
+
 	printf("\n");
-	dump_expression(tree, expression->operand, depth + 1);
+	pad(depth + 1);
+	printf("(operand");
 	printf("\n");
-	dump_fields(tree, expression->arguments, depth + 1);
+	dump_expression(tree, expression->operand, depth + 2);
+	printf(")"); // operand
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(arguments");
+	printf("\n");
+	dump_fields(tree, expression->arguments, depth + 2);
+	printf(")"); // arguments
+
+	printf(")"); // call
 	return true;
 }
 
 Bool dump_assertion_expression(const Tree *tree, const AssertionExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(assert-type");
+	printf("(assert");
 	if (expression->type) {
 		printf("\n");
-		dump_type(tree, expression->type, depth + 1);
+		pad(depth + 1);
+		printf("(type");
+		printf("\n");
+		dump_type(tree, expression->type, depth + 2);
+		printf(")"); // type
 	}
+
 	printf("\n");
-	dump_expression(tree, expression->operand, depth + 1);
-	printf(")");
+	pad(depth + 1);
+	printf("(operand");
+	printf("\n");
+	dump_expression(tree, expression->operand, depth + 2);
+	printf(")"); // operand
+
+	printf(")"); // assert
 	return true;
 }
 
@@ -105,20 +198,32 @@ Bool dump_literal_expression(const Tree *tree, const LiteralExpression *expressi
 	(void)tree;
 	pad(depth);
 	const String kind = literal_to_string(expression->kind);
-	printf("(lit '%.*s' %.*s)", SFMT(kind), SFMT(expression->value));
+	printf("(literal '%.*s' %.*s)", SFMT(kind), SFMT(expression->value));
 	return true;
 }
 
 Bool dump_compound_literal_expression(const Tree *tree, const CompoundLiteralExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(comp");
+	printf("(compound");
 	if (expression->type) {
 		printf("\n");
-		dump_type(tree, expression->type, depth + 1);
+		pad(depth + 1);
+		printf("(type");
+		printf("\n");
+		dump_type(tree, expression->type, depth + 2);
+		printf(")"); // type
 	}
-	printf("\n");
-	dump_fields(tree, expression->fields, depth + 1);
-	printf(")");
+
+	if (array_size(expression->fields)) {
+		printf("\n");
+		pad(depth + 1);
+		printf("(fields");
+		printf("\n");
+		dump_fields(tree, expression->fields, depth + 2);
+		printf(")"); // fields
+	}
+
+	printf(")"); // compound
 	return true;
 }
 
@@ -164,7 +269,7 @@ Bool dump_field(const Tree *tree, const Field *field, Sint32 depth) {
 		if (field->flags & FIELD_FLAG_ANY_INT) {
 			printf("'#any_int'");
 		}
-		printf(")");
+		printf(")"); // flags
 	}
 	if (field->name) {
 		printf("\n");
@@ -178,44 +283,56 @@ Bool dump_field(const Tree *tree, const Field *field, Sint32 depth) {
 		printf("\n");
 		dump_expression(tree, field->value, depth + 1);
 	}
-	printf(")");
+	printf(")"); // field
 	return true;
 }
 
 Bool dump_fields(const Tree *tree, Array(Field*) const fields, Sint32 depth) {
-	pad(depth);
-	printf("(fields");
 	const Size n_fields = array_size(fields);
 	for (Size i = 0; i < n_fields; i++) {
-		printf("\n");
-		dump_field(tree, fields[i], depth + 1);
+		dump_field(tree, fields[i], depth);
+		if (i != n_fields - 1) {
+			printf("\n");
+		}
 	}
-	printf(")");
 	return true;
 }
 
 Bool dump_procedure_type(const Tree *tree, const ProcedureType *type, Sint32 depth) {
 	pad(depth);
 	printf("(proc");
+
 	printf("\n");
 	pad(depth + 1);
 	const String cc = calling_convention_to_string(type->convention);
-	printf("(cc '%.*s')", SFMT(cc));
-	if (type->params) {
+	printf("(convention '%.*s')", SFMT(cc));
+
+	if (array_size(type->params) != 0) {
 		printf("\n");
-		dump_fields(tree, type->params, depth + 1);
-	}
-	if (type->results) {
+		pad(depth + 1);
+		printf("(params");
 		printf("\n");
-		dump_fields(tree, type->results, depth + 1);
+		dump_fields(tree, type->params, depth + 2);
+		printf(")"); // params
 	}
-	printf(")");
+
+	if (array_size(type->results) != 0) {
+		printf("\n");
+		pad(depth + 1);
+		printf("(results");
+		printf("\n");
+		dump_fields(tree, type->results, depth + 2);
+		printf(")"); // results
+	}
+
+	printf(")"); // proc
+
 	return true;
 }
 
 Bool dump_pointer_type(const Tree *tree, const PointerType *type, Sint32 depth) {
 	pad(depth);
-	printf("(ptr");
+	printf("(pointer");
 	printf("\n");
 	dump_type(tree, type->type, depth + 1);
 	printf(")");
@@ -224,7 +341,7 @@ Bool dump_pointer_type(const Tree *tree, const PointerType *type, Sint32 depth) 
 
 Bool dump_multi_pointer_type(const Tree *tree, const MultiPointerType *type, Sint32 depth) {
 	pad(depth);
-	printf("(mptr");
+	printf("(multi-pointer");
 	printf("\n");
 	dump_type(tree, type->type, depth + 1);
 	printf(")");
@@ -242,24 +359,24 @@ Bool dump_slice_type(const Tree *tree, const SliceType *type, Sint32 depth) {
 
 Bool dump_array_type(const Tree *tree, const ArrayType *type, Sint32 depth) {
 	pad(depth);
-	printf("(arr");
+	printf("(array");
 	if (type->count) {
 		printf("\n");
 		pad(depth + 1);
 		printf("(count");
 		printf("\n");
 		dump_expression(tree, type->count, depth + 2);
-		printf(")");
+		printf(")"); // count
 	}
 	printf("\n");
 	dump_type(tree, type->type, depth + 1);
-	printf(")");
+	printf(")"); // arr
 	return true;
 }
 
 Bool dump_dynamic_array_type(const Tree *tree, const ArrayType *type, Sint32 depth) {
 	pad(depth);
-	printf("(dynarr");
+	printf("(dynamic-array");
 	printf("\n");
 	dump_type(tree, type->type, depth + 1);
 	printf(")");
@@ -268,7 +385,7 @@ Bool dump_dynamic_array_type(const Tree *tree, const ArrayType *type, Sint32 dep
 
 Bool dump_bit_set_type(const Tree *tree, const BitSetType *type, Sint32 depth) {
 	pad(depth);
-	printf("(bitset");
+	printf("(bit-set");
 	printf("\n");
 	dump_expression(tree, type->expression, depth + 1);
 	if (type->underlying) {
@@ -290,24 +407,52 @@ Bool dump_typeid_type(const Tree *tree, const TypeidType *type, Sint32 depth) {
 Bool dump_map_type(const Tree *tree, const MapType *type, Sint32 depth) {
 	pad(depth);
 	printf("(map");
+
 	printf("\n");
-	dump_type(tree, type->key, depth + 1);
+	pad(depth + 1);
+	printf("(key");
 	printf("\n");
-	dump_type(tree, type->value, depth + 1);
-	printf(")");
+	dump_type(tree, type->key, depth + 2);
+	printf(")"); // key
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(val");
+	printf("\n");
+	dump_type(tree, type->value, depth + 2);
+	printf(")"); // val
+
+	printf(")"); // map
+
 	return true;
 }
 
 Bool dump_matrix_type(const Tree *tree, const MatrixType *type, Sint32 depth) {
 	pad(depth);
-	printf("(mat");
+	printf("(matrix");
 	printf("\n");
-	dump_type(tree, type->type, depth + 1);
+	pad(depth + 1);
+	printf("(type");
 	printf("\n");
-	dump_expression(tree, type->rows, depth + 1);
+	dump_type(tree, type->type, depth + 2);
+	printf(")"); // type
+
 	printf("\n");
-	dump_expression(tree, type->columns, depth + 1);
-	printf(")");
+	pad(depth + 1);
+	printf("(rows");
+	printf("\n");
+	dump_expression(tree, type->rows, depth + 2);
+	printf(")"); // rows
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(cols");
+	printf("\n");
+	dump_expression(tree, type->columns, depth + 2);
+	printf(")"); // cols
+
+	printf(")"); // mat
+
 	return true;
 }
 
@@ -323,13 +468,17 @@ Bool dump_distinct_type(const Tree *tree, const DistinctType *type, Sint32 depth
 Bool dump_enum_type(const Tree *tree, const EnumType *type, Sint32 depth) {
 	pad(depth);
 	printf("(enum");
-	if (type->base_type) {
+	if (type->type) {
 		printf("\n");
-		dump_type(tree, type->base_type, depth + 1);
+		pad(depth + 1);
+		printf("(type");
+		printf("\n");
+		dump_type(tree, type->type, depth + 1);
+		printf(")"); // type
 	}
 	printf("\n");
 	dump_fields(tree, type->fields, depth + 1);
-	printf(")");
+	printf(")"); // enum
 	return true;
 }
 
@@ -346,11 +495,20 @@ Bool dump_struct_type(const Tree *tree, const StructType *type, Sint32 depth) {
 		printf("(align");
 		printf("\n");
 		dump_expression(tree, type->align, depth + 2);
-		printf(")");
+		printf(")"); // align
 	}
-	printf("\n");
-	dump_fields(tree, type->fields, depth + 1);
-	printf(")");
+
+	if (array_size(type->fields)) {
+		printf("\n");
+		pad(depth + 1);
+		printf("(fields");
+		printf("\n");
+		dump_fields(tree, type->fields, depth + 2);
+		printf(")"); // fields
+	}
+
+	printf(")"); // struct
+
 	return true;
 }
 
@@ -363,78 +521,103 @@ Bool dump_union_type(const Tree *tree, const UnionType *type, Sint32 depth) {
 		printf("(align");
 		printf("\n");
 		dump_expression(tree, type->align, depth + 2);
-		printf(")\n");
+		printf(")"); // align
 	}
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(variants");
 	const Size n_variants = array_size(type->variants);
 	for (Size i = 0; i < n_variants; i++) {
 		printf("\n");
-		dump_type(tree, type->variants[i], depth + 1);
+		dump_type(tree, type->variants[i], depth + 2);
 	}
-	printf(")");
+	printf("\n");
+	printf(")"); // variants
+
+	printf(")"); // union
+
 	return true;
 }
 
 Bool dump_poly_type(const Tree *tree, const PolyType *type, Sint32 depth) {
 	pad(depth);
 	printf("(poly");
+
 	printf("\n");
-	dump_type(tree, type->type, depth + 1);
+	pad(depth + 1);
+	printf("(type");
+	printf("\n");
+	dump_type(tree, type->type, depth + 2);
+	printf(")"); // type
+
 	if (type->specialization) {
 		printf("\n");
-		dump_type(tree, type->specialization, depth + 1);
+		printf("(special");
+		printf("\n");
+		dump_type(tree, type->specialization, depth + 2);
+		printf(")"); // special
 	}
-	printf(")");
+	printf(")"); // poly
+
 	return true;
 }
 
 Bool dump_procedure_expression(const Tree *tree, const ProcedureExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(proc");
+
 	printf("\n");
-	dump_type(tree, RCAST(const Type *, expression->type), depth + 1);
-	// dump_procedure_type(tree, expression->type, depth + 1);
+	pad(depth + 1);
+	printf("(type");
+	printf("\n");
+	dump_procedure_type(tree, expression->type, depth + 2);
+	printf(")"); // type
+
 	if (expression->where_clauses) {
 		printf("\n");
 		pad(depth + 1);
 		printf("(where");
 		printf("\n");
 		dump_list_expression(tree, expression->where_clauses, depth + 2);
-		printf(")");
+		printf(")"); // where
 	}
+
 	if (expression->body) {
 		printf("\n");
-		dump_block_statement(tree, expression->body, depth + 1);
+		pad(depth + 1);
+		printf("(body");
+		printf("\n");
+		dump_block_statement(tree, expression->body, depth + 2);
+		printf(")"); // body
 	}
-	printf(")");
+
+	printf(")"); // proc
+
 	return true;
 }
 
 Bool dump_type(const Tree *tree, const Type *type, Sint32 depth) {
-	pad(depth);
-	printf("(type");
-	printf("\n");
 	switch (type->kind) {
-	       case TYPE_BUILTIN:       dump_builtin_type(tree, RCAST(const BuiltinType *, type), depth + 1);
-	break; case TYPE_PROCEDURE:     dump_procedure_type(tree, RCAST(const ProcedureType *, type), depth + 1);
-	break; case TYPE_POINTER:       dump_pointer_type(tree, RCAST(const PointerType *, type), depth + 1);
-	break; case TYPE_MULTI_POINTER: dump_multi_pointer_type(tree, RCAST(const MultiPointerType *, type), depth + 1);
-	break; case TYPE_SLICE:         dump_slice_type(tree, RCAST(const SliceType *, type), depth + 1);
-	break; case TYPE_ARRAY:         dump_array_type(tree, RCAST(const ArrayType *, type), depth + 1);
-	break; case TYPE_DYNAMIC_ARRAY: dump_dynamic_array_type(tree, RCAST(const ArrayType *, type), depth + 1);
-	break; case TYPE_BIT_SET:       dump_bit_set_type(tree, RCAST(const BitSetType *, type), depth + 1);
-	break; case TYPE_TYPEID:        dump_typeid_type(tree, RCAST(const TypeidType *, type), depth + 1);
-	break; case TYPE_MAP:           dump_map_type(tree, RCAST(const MapType *, type), depth + 1);
-	break; case TYPE_MATRIX:        dump_matrix_type(tree, RCAST(const MatrixType *, type), depth + 1);
-	break; case TYPE_DISTINCT:      dump_distinct_type(tree, RCAST(const DistinctType *, type), depth + 1);
-	break; case TYPE_ENUM:          dump_enum_type(tree, RCAST(const EnumType *, type), depth + 1);
-	break; case TYPE_EXPRESSION:    dump_expression_type(tree, RCAST(const ExpressionType *, type), depth + 1);
-	break; case TYPE_STRUCT:        dump_struct_type(tree, RCAST(const StructType *, type), depth + 1);
-	break; case TYPE_UNION:         dump_union_type(tree, RCAST(const UnionType *, type), depth + 1);
-	break; case TYPE_POLY:          dump_poly_type(tree, RCAST(const PolyType *, type), depth + 1);
-	break;
+	case TYPE_BUILTIN:       return dump_builtin_type(tree, RCAST(const BuiltinType *, type), depth);
+	case TYPE_PROCEDURE:     return dump_procedure_type(tree, RCAST(const ProcedureType *, type), depth);
+	case TYPE_POINTER:       return dump_pointer_type(tree, RCAST(const PointerType *, type), depth);
+	case TYPE_MULTI_POINTER: return dump_multi_pointer_type(tree, RCAST(const MultiPointerType *, type), depth);
+	case TYPE_SLICE:         return dump_slice_type(tree, RCAST(const SliceType *, type), depth);
+	case TYPE_ARRAY:         return dump_array_type(tree, RCAST(const ArrayType *, type), depth);
+	case TYPE_DYNAMIC_ARRAY: return dump_dynamic_array_type(tree, RCAST(const ArrayType *, type), depth);
+	case TYPE_BIT_SET:       return dump_bit_set_type(tree, RCAST(const BitSetType *, type), depth);
+	case TYPE_TYPEID:        return dump_typeid_type(tree, RCAST(const TypeidType *, type), depth);
+	case TYPE_MAP:           return dump_map_type(tree, RCAST(const MapType *, type), depth);
+	case TYPE_MATRIX:        return dump_matrix_type(tree, RCAST(const MatrixType *, type), depth);
+	case TYPE_DISTINCT:      return dump_distinct_type(tree, RCAST(const DistinctType *, type), depth);
+	case TYPE_ENUM:          return dump_enum_type(tree, RCAST(const EnumType *, type), depth);
+	case TYPE_EXPRESSION:    return dump_expression_type(tree, RCAST(const ExpressionType *, type), depth);
+	case TYPE_STRUCT:        return dump_struct_type(tree, RCAST(const StructType *, type), depth);
+	case TYPE_UNION:         return dump_union_type(tree, RCAST(const UnionType *, type), depth);
+	case TYPE_POLY:          return dump_poly_type(tree, RCAST(const PolyType *, type), depth);
 	}
-	printf(")");
-	return true;
+	UNREACHABLE();
 }
 
 Bool dump_type_expression(const Tree *tree, const TypeExpression *expression, Sint32 depth) {
@@ -444,61 +627,90 @@ Bool dump_type_expression(const Tree *tree, const TypeExpression *expression, Si
 Bool dump_index_expression(const Tree *tree, const IndexExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(index");
+
 	printf("\n");
-	dump_expression(tree, expression->operand, depth + 1);
+	pad(depth + 1);
+	printf("(operand");
 	printf("\n");
-	dump_expression(tree, expression->lhs, depth + 1);
+	dump_expression(tree, expression->operand, depth + 2);
+	printf(")"); // operand
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(lhs");
+	printf("\n");
+	dump_expression(tree, expression->lhs, depth + 2);
+	printf(")"); // lhs
+
 	if (expression->rhs) {
 		printf("\n");
-		dump_expression(tree, expression->rhs, depth + 1);
+		pad(depth + 1);
+		printf("(rhs");
+		printf("\n");
+		dump_expression(tree, expression->rhs, depth + 2);
+		printf(")"); // rhs
 	}
-	printf(")");
+
+	printf(")"); // index
+
 	return true;
 }
 
 Bool dump_slice_expression(const Tree *tree, const SliceExpression *expression, Sint32 depth) {
 	pad(depth);
 	printf("(slice");
+
 	printf("\n");
-	dump_expression(tree, expression->operand, depth + 1);
+	pad(depth + 1);
+	printf("(operand");
+	printf("\n");
+	dump_expression(tree, expression->operand, depth + 2);
+	printf(")"); // operand
+
 	if (expression->lhs) {
 		printf("\n");
-		dump_expression(tree, expression->lhs, depth + 1);
+		pad(depth + 1);
+		printf("(lhs");
+		printf("\n");
+		dump_expression(tree, expression->lhs, depth + 2);
+		printf(")"); // lhs
 	}
+
 	if (expression->rhs) {
 		printf("\n");
-		dump_expression(tree, expression->rhs, depth + 1);
+		pad(depth + 1);
+		printf("(rhs");
+		printf("\n");
+		dump_expression(tree, expression->rhs, depth + 2);
+		printf(")"); // rhs
 	}
-	printf(")");
+
+	printf(")"); // slice
+
 	return true;
 }
 
 Bool dump_expression(const Tree *tree, const Expression *expression, Sint32 depth) {
-	pad(depth);
-	printf("(expr");
-	printf("\n");
 	switch (expression->kind) {
-	       case EXPRESSION_LIST:             dump_list_expression(tree, RCAST(const ListExpression *, expression), depth + 1);
-	break; case EXPRESSION_UNARY:            dump_unary_expression(tree, RCAST(const UnaryExpression *, expression), depth + 1);
-	break; case EXPRESSION_BINARY:           dump_binary_expression(tree, RCAST(const BinaryExpression *, expression), depth + 1);
-	break; case EXPRESSION_TERNARY:          dump_ternary_expression(tree, RCAST(const TernaryExpression *, expression), depth + 1);
-	break; case EXPRESSION_CAST:             dump_cast_expression(tree, RCAST(const CastExpression *, expression), depth + 1);
-	break; case EXPRESSION_SELECTOR:         dump_selector_expression(tree, RCAST(const SelectorExpression *, expression), depth + 1);
-	break; case EXPRESSION_CALL:             dump_call_expression(tree, RCAST(const CallExpression *, expression), depth + 1);
-	break; case EXPRESSION_ASSERTION:        dump_assertion_expression(tree, RCAST(const AssertionExpression *, expression), depth + 1);
-	break; case EXPRESSION_PROCEDURE:        dump_procedure_expression(tree, RCAST(const ProcedureExpression *, expression), depth + 1);
-	break; case EXPRESSION_TYPE:             dump_type_expression(tree, RCAST(const TypeExpression *, expression), depth + 1);
-	break; case EXPRESSION_INDEX:            dump_index_expression(tree, RCAST(const IndexExpression *, expression), depth + 1);
-	break; case EXPRESSION_SLICE:            dump_slice_expression(tree, RCAST(const SliceExpression *, expression), depth + 1);
-	break; case EXPRESSION_LITERAL:          dump_literal_expression(tree, RCAST(const LiteralExpression *, expression), depth + 1);
-	break; case EXPRESSION_COMPOUND_LITERAL: dump_compound_literal_expression(tree, RCAST(const CompoundLiteralExpression *, expression), depth + 1);
-	break; case EXPRESSION_IDENTIFIER:       dump_identifier_expression(tree, RCAST(const IdentifierExpression *, expression), depth + 1);
-	break; case EXPRESSION_UNDEFINED:        dump_undefined_expression(tree, RCAST(const UndefinedExpression *, expression), depth + 1);
-	break; case EXPRESSION_PROCEDURE_GROUP:  dump_procedure_group_expression(tree, RCAST(const ProcedureGroupExpression *, expression), depth + 1);
-	break;
+	case EXPRESSION_LIST:             return dump_list_expression(tree, RCAST(const ListExpression *, expression), depth);
+	case EXPRESSION_UNARY:            return dump_unary_expression(tree, RCAST(const UnaryExpression *, expression), depth);
+	case EXPRESSION_BINARY:           return dump_binary_expression(tree, RCAST(const BinaryExpression *, expression), depth);
+	case EXPRESSION_TERNARY:          return dump_ternary_expression(tree, RCAST(const TernaryExpression *, expression), depth);
+	case EXPRESSION_CAST:             return dump_cast_expression(tree, RCAST(const CastExpression *, expression), depth);
+	case EXPRESSION_SELECTOR:         return dump_selector_expression(tree, RCAST(const SelectorExpression *, expression), depth);
+	case EXPRESSION_CALL:             return dump_call_expression(tree, RCAST(const CallExpression *, expression), depth);
+	case EXPRESSION_ASSERTION:        return dump_assertion_expression(tree, RCAST(const AssertionExpression *, expression), depth);
+	case EXPRESSION_PROCEDURE:        return dump_procedure_expression(tree, RCAST(const ProcedureExpression *, expression), depth);
+	case EXPRESSION_TYPE:             return dump_type_expression(tree, RCAST(const TypeExpression *, expression), depth);
+	case EXPRESSION_INDEX:            return dump_index_expression(tree, RCAST(const IndexExpression *, expression), depth);
+	case EXPRESSION_SLICE:            return dump_slice_expression(tree, RCAST(const SliceExpression *, expression), depth);
+	case EXPRESSION_LITERAL:          return dump_literal_expression(tree, RCAST(const LiteralExpression *, expression), depth);
+	case EXPRESSION_COMPOUND_LITERAL: return dump_compound_literal_expression(tree, RCAST(const CompoundLiteralExpression *, expression), depth);
+	case EXPRESSION_IDENTIFIER:       return dump_identifier_expression(tree, RCAST(const IdentifierExpression *, expression), depth);
+	case EXPRESSION_UNDEFINED:        return dump_undefined_expression(tree, RCAST(const UndefinedExpression *, expression), depth);
+	case EXPRESSION_PROCEDURE_GROUP:  return dump_procedure_group_expression(tree, RCAST(const ProcedureGroupExpression *, expression), depth);
 	}
-	printf(")");
-	return true;
+	UNREACHABLE();
 }
 
 Bool dump_block_statement(const Tree *tree, const BlockStatement *statement, Sint32 depth) {
@@ -506,16 +718,32 @@ Bool dump_block_statement(const Tree *tree, const BlockStatement *statement, Sin
 	printf("(block");
 	if (statement->flags) {
 		printf("\n");
-		const String flags = block_flags_to_string(statement->flags);
 		pad(depth + 1);
-		printf("(flags %.*s)", SFMT(flags));
+		printf("(flags");
+		if (statement->flags & BLOCK_FLAG_BOUNDS_CHECK) {
+			printf("\n");
+			pad(depth + 2);
+			printf("'#bounds_check'");
+		}
+		if (statement->flags & BLOCK_FLAG_TYPE_ASSERT) {
+			printf("\n");
+			pad(depth + 2);
+			printf("'#type_assert'");
+		}
+		printf(")"); // flags
 	}
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(statements");
 	const Size n_statements = array_size(statement->statements);
 	for (Size i = 0; i < n_statements; i++) {
 		printf("\n");
-		dump_statement(tree, statement->statements[i], depth + 1);
+		dump_statement(tree, statement->statements[i], depth + 2);
 	}
-	printf(")");
+	printf(")"); // statements
+
+	printf(")"); // blockl
 	return true;
 }
 
@@ -532,13 +760,28 @@ Bool dump_expression_statement(const Tree *tree, const ExpressionStatement *stat
 
 Bool dump_assignment_statement(const Tree *tree, const AssignmentStatement *statement, Sint32 depth) {
 	pad(depth);
+	printf("(assign");
+
+	printf("\n");
+	pad(depth + 1);
 	const String assign = assignment_to_string(statement->assignment);
-	printf("(assign '%.*s'", SFMT(assign));
+	printf("(kind '%.*s')", SFMT(assign));
+
 	printf("\n");
-	dump_list_expression(tree, statement->lhs, depth + 1);
+	pad(depth + 1);
+	printf("(lhs");
 	printf("\n");
-	dump_list_expression(tree, statement->rhs, depth + 1);
-	printf(")");
+	dump_list_expression(tree, statement->lhs, depth + 2);
+	printf(")"); // lhs
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(rhs");
+	printf("\n");
+	dump_list_expression(tree, statement->rhs, depth + 2);
+	printf(")"); // rhs
+
+	printf(")"); // assign
 	return true;
 }
 
@@ -546,92 +789,162 @@ Bool dump_declaration_statement(const Tree *tree, const DeclarationStatement *st
 	Array(Expression*) const values = statement->values->expressions;
 	const Size n_names = array_size(statement->names);
 	const Size n_values = array_size(values);
+
+	pad(depth);
+	printf("(decl");
+	printf("\n");
+
+	pad(depth + 1);
+	printf("(names");
 	for (Size i = 0; i < n_names; i++) {
-		const Identifier *name = statement->names[i];
-		pad(depth);
-		printf("(decl");
 		printf("\n");
-		dump_identifier(tree, name, depth + 1);
-		if (statement->type) {
-			printf("\n");
-			dump_type(tree, statement->type, depth + 1);
-		}
-		if (i < n_values) {
-			printf("\n");
-			dump_expression(tree, values[i], depth + 1);
-		}
-		printf(")");
-		if (i != n_names - 1) {
-			printf("\n");
-		}
+		dump_identifier(tree, statement->names[i], depth + 2);
 	}
+	printf("\n");
+
+	pad(depth + 1);
+	printf("(values");
+	for (Size i = 0; i < n_values; i++) {
+		printf("\n");
+		dump_expression(tree, values[i], depth + 2);
+	}
+	printf(")");
+
 	return true;
 }
 
 Bool dump_if_statement(const Tree *tree, const IfStatement *statement, Sint32 depth) {
 	pad(depth);
 	printf("(if");
+
 	if (statement->init) {
 		printf("\n");
-		dump_statement(tree, statement->init, depth + 1);
+		pad(depth + 1);
+		printf("(init");
+		printf("\n");
+		dump_statement(tree, statement->init, depth + 2);
+		printf(")"); // init
 	}
+
 	printf("\n");
-	dump_expression(tree, statement->cond, depth + 1);
+	pad(depth + 1);
+	printf("(cond");
 	printf("\n");
-	dump_block_statement(tree, statement->body, depth + 1);
+	dump_expression(tree, statement->cond, depth + 2);
+	printf(")"); // cond
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(body");
+	printf("\n");
+	dump_block_statement(tree, statement->body, depth + 2);
+	printf(")"); // body
+
 	if (statement->elif) {
 		printf("\n");
-		dump_block_statement(tree, statement->elif, depth + 1);
+		pad(depth + 1);
+		printf("(elif");
+		printf("\n");
+		dump_block_statement(tree, statement->elif, depth + 2);
+		printf(")"); // elif
 	}
-	printf(")");
+
+	printf(")"); // if
+
 	return true;
 }
 
 Bool dump_when_statement(const Tree *tree, const WhenStatement *statement, Sint32 depth) {
 	pad(depth);
 	printf("(when");
+
 	printf("\n");
-	dump_expression(tree, statement->cond, depth + 1);
+	pad(depth + 1);
+	printf("(cond");
 	printf("\n");
-	dump_block_statement(tree, statement->body, depth + 1);
+	dump_expression(tree, statement->cond, depth + 2);
+	printf(")"); // cond
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(body");
+	printf("\n");
+	dump_block_statement(tree, statement->body, depth + 2);
+	printf(")"); // body
+
 	if (statement->elif) {
 		printf("\n");
-		dump_block_statement(tree, statement->elif, depth + 1);
+		pad(depth + 1);
+		printf("(elif");
+		printf("\n");
+		dump_block_statement(tree, statement->elif, depth + 2);
+		printf(")"); // elif
 	}
-	printf(")");
+
+	printf(")"); // when
+
 	return true;
 }
 
 Bool dump_return_statement(const Tree *tree, const ReturnStatement *statement, Sint32 depth) {
 	pad(depth);
-	printf("(ret");
+	printf("(return");
+
+	printf("\n");
+	pad(depth + 1);
+	printf("(results");
 	const Size n_results = array_size(statement->results);
 	for (Size i = 0; i < n_results; i++) {
 		printf("\n");
-		dump_expression(tree, statement->results[i], depth + 1);
+		dump_expression(tree, statement->results[i], depth + 2);
 	}
-	printf(")");
+	printf(")"); // results
+
+	printf(")"); // ret
+
 	return true;
 }
 
 Bool dump_for_statement(const Tree *tree, const ForStatement *statement, Sint32 depth) {
 	pad(depth);
 	printf("(for");
+
 	if (statement->init) {
 		printf("\n");
-		dump_statement(tree, statement->init, depth + 1);
+		pad(depth + 1);
+		printf("(init");
+		printf("\n");
+		dump_statement(tree, statement->init, depth + 2);
+		printf(")"); // init
 	}
+
 	if (statement->cond) {
 		printf("\n");
-		dump_expression(tree, statement->cond, depth + 1);
+		pad(depth + 1);
+		printf("(cond");
+		printf("\n");
+		dump_expression(tree, statement->cond, depth + 2);
+		printf(")"); // cond
 	}
+
 	if (statement->post) {
 		printf("\n");
-		dump_statement(tree, statement->post, depth + 1);
+		pad(depth + 1);
+		printf("(post");
+		printf("\n");
+		dump_statement(tree, statement->post, depth + 2);
+		printf(")"); // post
 	}
+
 	printf("\n");
-	dump_block_statement(tree, statement->body, depth + 1);
+	pad(depth + 1);
+	printf("(body");
+	printf("\n");
+	dump_block_statement(tree, statement->body, depth + 2);
+	printf(")"); // body
+
 	printf(")");
+
 	return true;
 }
 
@@ -642,39 +955,64 @@ static void dump_case_clause(const Tree *tree, const CaseClause *clause, Sint32 
 		printf("\n");
 		dump_list_expression(tree, clause->expressions, depth + 1);
 	}
+	printf("\n");
+	pad(depth + 1);
+	printf("(statements");
 	const Size n_statements = array_size(clause->statements);
 	for (Size i = 0; i < n_statements; i++) {
 		printf("\n");
-		dump_statement(tree, clause->statements[i], depth + 1);
+		dump_statement(tree, clause->statements[i], depth + 2);
 	}
+	printf(")"); // statements
+
+	printf(")"); // case
 }
 
 Bool dump_switch_statement(const Tree *tree, const SwitchStatement *statement, Sint32 depth) {
 	pad(depth);
 	printf("(switch");
+
 	if (statement->init) {
 		printf("\n");
-		dump_statement(tree, statement->init, depth + 1);
+		pad(depth + 1);
+		printf("(init");
+		printf("\n");
+		dump_statement(tree, statement->init, depth + 2);
+		printf(")"); // init
 	}
+
 	if (statement->cond) {
 		printf("\n");
-		dump_expression(tree, statement->cond, depth + 1);
+		pad(depth + 1);
+		printf("(cond");
+		printf("\n");
+		dump_expression(tree, statement->cond, depth + 2);
+		printf(")"); // cond
 	}
+
 	const Size n_clauses = array_size(statement->clauses);
 	for (Size i = 0; i < n_clauses; i++) {
 		printf("\n");
-		const CaseClause *clause = statement->clauses[i];
-		dump_case_clause(tree, clause, depth + 1);
+		dump_case_clause(tree, statement->clauses[i], depth + 1);
 	}
+	printf(")"); // switch
+
 	return true;
 }
 
 Bool dump_defer_statement(const Tree *tree, const DeferStatement *statement, Sint32 depth) {
 	pad(depth);
 	printf("(defer");
+
 	printf("\n");
-	dump_statement(tree, statement->statement, depth + 1);
-	printf(")");
+	pad(depth + 1);
+	printf("(statement");
+	printf("\n");
+	dump_statement(tree, statement->statement, depth + 2);
+	printf(")"); // statement
+
+	printf(")"); // defer
+
 	return true;
 }
 
@@ -684,7 +1022,11 @@ Bool dump_branch_statement(const Tree *tree, const BranchStatement *statement, S
 	printf("(%.*s", SFMT(branch));
 	if (statement->label) {
 		printf("\n");
-		dump_identifier(tree, statement->label, depth + 1);
+		pad(depth + 1);
+		printf("(label");
+		printf("\n");
+		dump_identifier(tree, statement->label, depth + 2);
+		printf(")"); // label
 	}
 	printf(")");
 	return true;
@@ -695,11 +1037,22 @@ Bool dump_foreign_block_statement(const Tree *tree, const ForeignBlockStatement 
 	printf("(foreign");
 	if (statement->name) {
 		printf("\n");
-		dump_identifier(tree, statement->name, depth + 1);
+		pad(depth + 1);
+		printf("(name");
+		printf("\n");
+		dump_identifier(tree, statement->name, depth + 2);
+		printf(")"); // name
 	}
+
 	printf("\n");
-	dump_block_statement(tree, statement->body, depth + 1);
-	printf(")");
+	pad(depth + 1);
+	printf("(body");
+	printf("\n");
+	dump_block_statement(tree, statement->body, depth + 2);
+	printf(")"); // body
+
+	printf(")"); // foreign
+
 	return true;
 }
 
@@ -713,44 +1066,41 @@ Bool dump_foreign_import_statement(const Tree *tree, const ForeignImportStatemen
 
 Bool dump_using_statement(const Tree *tree, const UsingStatement *statement, Sint32 depth) {
 	pad(depth);
-	printf("(using\n");
+	printf("(using");
+	printf("\n");
 	dump_list_expression(tree, statement->list, depth + 1);
-	printf(")");
+	printf(")"); // using
 	return true;
 }
 
 Bool dump_statement(const Tree *tree, const Statement *statement, Sint32 depth) {
-	pad(depth);
-	printf("(stmt");
-	printf("\n");
 	switch (statement->kind) {
-	       case STATEMENT_EMPTY:          // Nothing
-	break; case STATEMENT_BLOCK:          dump_block_statement(tree, RCAST(const BlockStatement *, statement), depth + 1);
-	break; case STATEMENT_IMPORT:         dump_import_statement(tree, RCAST(const ImportStatement *, statement), depth + 1);
-	break; case STATEMENT_EXPRESSION:     dump_expression_statement(tree, RCAST(const ExpressionStatement *, statement), depth + 1);
-	break; case STATEMENT_ASSIGNMENT:     dump_assignment_statement(tree, RCAST(const AssignmentStatement *, statement), depth + 1);
-	break; case STATEMENT_DECLARATION:    dump_declaration_statement(tree, RCAST(const DeclarationStatement *, statement), depth + 1);
-	break; case STATEMENT_IF:             dump_if_statement(tree, RCAST(const IfStatement *, statement), depth + 1);
-	break; case STATEMENT_WHEN:           dump_when_statement(tree, RCAST(const WhenStatement *, statement), depth + 1);
-	break; case STATEMENT_RETURN:         dump_return_statement(tree, RCAST(const ReturnStatement *, statement), depth + 1);
-	break; case STATEMENT_FOR:            dump_for_statement(tree, RCAST(const ForStatement *, statement), depth + 1);
-	break; case STATEMENT_SWITCH:         dump_switch_statement(tree, RCAST(const SwitchStatement *, statement), depth + 1);
-	break; case STATEMENT_DEFER:          dump_defer_statement(tree, RCAST(const DeferStatement *, statement), depth + 1);
-	break; case STATEMENT_BRANCH:         dump_branch_statement(tree, RCAST(const BranchStatement *, statement), depth + 1);
-	break; case STATEMENT_FOREIGN_BLOCK:  dump_foreign_block_statement(tree, RCAST(const ForeignBlockStatement *, statement), depth + 1);
-	break; case STATEMENT_FOREIGN_IMPORT: dump_foreign_import_statement(tree, RCAST(const ForeignImportStatement *, statement), depth + 1);
-	break; case STATEMENT_USING:          dump_using_statement(tree, RCAST(const UsingStatement *, statement), depth + 1);
-	break;
+	case STATEMENT_EMPTY:          return false; // Nothing
+	case STATEMENT_BLOCK:          return dump_block_statement(tree, RCAST(const BlockStatement *, statement), depth);
+	case STATEMENT_IMPORT:         return dump_import_statement(tree, RCAST(const ImportStatement *, statement), depth);
+	case STATEMENT_EXPRESSION:     return dump_expression_statement(tree, RCAST(const ExpressionStatement *, statement), depth);
+	case STATEMENT_ASSIGNMENT:     return dump_assignment_statement(tree, RCAST(const AssignmentStatement *, statement), depth);
+	case STATEMENT_DECLARATION:    return dump_declaration_statement(tree, RCAST(const DeclarationStatement *, statement), depth);
+	case STATEMENT_IF:             return dump_if_statement(tree, RCAST(const IfStatement *, statement), depth);
+	case STATEMENT_WHEN:           return dump_when_statement(tree, RCAST(const WhenStatement *, statement), depth);
+	case STATEMENT_RETURN:         return dump_return_statement(tree, RCAST(const ReturnStatement *, statement), depth);
+	case STATEMENT_FOR:            return dump_for_statement(tree, RCAST(const ForStatement *, statement), depth);
+	case STATEMENT_SWITCH:         return dump_switch_statement(tree, RCAST(const SwitchStatement *, statement), depth);
+	case STATEMENT_DEFER:          return dump_defer_statement(tree, RCAST(const DeferStatement *, statement), depth);
+	case STATEMENT_BRANCH:         return dump_branch_statement(tree, RCAST(const BranchStatement *, statement), depth);
+	case STATEMENT_FOREIGN_BLOCK:  return dump_foreign_block_statement(tree, RCAST(const ForeignBlockStatement *, statement), depth);
+	case STATEMENT_FOREIGN_IMPORT: return dump_foreign_import_statement(tree, RCAST(const ForeignImportStatement *, statement), depth);
+	case STATEMENT_USING:          return dump_using_statement(tree, RCAST(const UsingStatement *, statement), depth);
 	}
-	printf(")");
-	return true;
+	UNREACHABLE();
 }
 
 Bool dump_identifier(const Tree *tree, const Identifier *identifier, Sint32 depth) {
+	(void)tree;
 	pad(depth);
 	const String ident = identifier->contents;
-	const Location location = tree->tokens[identifier->token].location;
-	printf("(ident '%.*s' [%d:%d])", SFMT(ident), location.line, location.column);
+	// const Location location = tree->tokens[identifier->token].location;
+	printf("(ident '%.*s')", SFMT(ident));
 	return true;
 }
 

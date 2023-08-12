@@ -414,7 +414,7 @@ DistinctType *tree_new_distinct_type(Tree *tree, Type *base_type) {
 // enum
 EnumType *tree_new_enum_type(Tree *tree, Type *base_type, Array(Field*) fields) {
 	EnumType *type = RCAST(EnumType *, new_type(tree, TYPE_ENUM, sizeof *type));
-	type->base_type = base_type;
+	type->type = base_type;
 	type->fields = fields;
 	return type;
 }

@@ -226,20 +226,6 @@ typedef enum FieldFlag FieldFlag;
 
 typedef enum CallingConvention CallingConvention;
 
-static inline String block_flags_to_string(BlockFlag flags) {
-	switch (CAST(Sint32, flags)) {
-	case BLOCK_FLAG_BOUNDS_CHECK:
-		return SCLIT("'#bounds_check'");
-	case BLOCK_FLAG_TYPE_ASSERT:
-		return SCLIT("'#type_assert'");
-	case BLOCK_FLAG_BOUNDS_CHECK | BLOCK_FLAG_TYPE_ASSERT:
-		return SCLIT("'#bounds_check' '#type_assert'");
-	default:
-		return SCLIT("");
-	}
-	UNREACHABLE();
-}
-
 String procedure_flags_to_string(ProcedureFlag flags, Context *context);
 
 // Expressions.
@@ -574,7 +560,7 @@ struct DistinctType {
 
 struct EnumType {
 	Type base;
-	Type *base_type; // The T in 'enum T'
+	Type *type; // The T in 'enum T'
 	Array(Field*) fields;
 };
 
