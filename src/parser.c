@@ -11,7 +11,7 @@
 #define PARSE_ERROR(...) \
 	do { \
 		report_error(&parser->source, &parser->this_token.location, __VA_ARGS__); \
-		THROW(1); \
+		THROW(ERROR_PARSE); \
 	} while (0)
 
 #define ICE(...) \
@@ -907,6 +907,9 @@ static Statement *parse_directive_for_statement(Parser *parser, BlockFlag block_
 	case DIRECTIVE_PANIC:
 		statement = parse_directive_call_statement(parser, SCLIT("panic"));
 		break;
+	case DIRECTIVE_LOAD:
+		statement = parse_directive_call_statement(parser, SCLIT("load"));
+		break;
 	case DIRECTIVE_UNROLL:
 		// Ignore the unroll directive for now.
 		statement = parse_statement(parser, block_flags);
@@ -1522,6 +1525,12 @@ static Expression *parse_directive_prefix(Parser *parser, Bool lhs) {
 	case DIRECTIVE_CONFIG:
 		{
 			Expression *const expression = parse_directive_call_expression(parser, SCLIT("config"));
+			TRACE_LEAVE();
+			return expression;
+		}
+	case DIRECTIVE_LOAD:
+		{
+			Expression *const expression = parse_directive_call_expression(parser, SCLIT("load"));
 			TRACE_LEAVE();
 			return expression;
 		}

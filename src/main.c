@@ -94,13 +94,14 @@ static Bool dump_ast(String path) {
 		array_push(work, LIT(Work, &ctx, string_copy(file), 0));
 	}
 
-	for (Size i = 0; i < n_files; i++) {
+	const Size n_work = array_size(work);
+	for (Size i = 0; i < n_work; i++) {
 		sched_queue(&sched, &work[i], worker, 0);
 	}
 
 	sched_wait(&sched);
 
-	for (Size i = 0; i < n_files; i++) {
+	for (Size i = 0; i < n_work; i++) {
 		Tree *tree = work[i].tree;
 		if (tree) {
 			dump(tree);

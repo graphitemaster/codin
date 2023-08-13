@@ -30,7 +30,7 @@ struct WaitGroup {
 #define thread_create(thread, proc, data) \
 	_thread_create((thread), (proc), (data), context)
 
-Bool _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *context);
+void _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *context);
 Bool thread_join(Thread *thread);
 
 // Mutex

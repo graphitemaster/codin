@@ -88,6 +88,8 @@ static Bool default_allocator_maybe_rehash_unlocked(DefaultAllocator *allocator)
 		default_allocator_add_unlocked(allocator, old_items[i]);
 	}
 
+	free(old_items);
+
 	return true;
 }
 

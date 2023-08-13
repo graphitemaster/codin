@@ -46,7 +46,7 @@ Bool sched_async_init(Context *context, void **instance) {
 	Allocator *allocator = context->allocator;
 	SchedAsync *sched = allocator->allocate(allocator, sizeof *sched);
 	if (!sched) {
-		return false;
+		THROW(ERROR_OOM);
 	}
 	if (!threadpool_init(&sched->pool, 4, context)) {
 		allocator->deallocate(allocator, sched);
@@ -68,7 +68,7 @@ static void sched_async_fini(void *ctx) {
 	ASSERT(sched->count == 0);
 	mutex_unlock(&sched->mutex);
 	Context *context = sched->context;
-	threadpool_free(&sched->pool);
+	threadpool_fini(&sched->pool);
 	mutex_destroy(&sched->mutex);
 	cond_destroy(&sched->cond);
 	Allocator *allocator = context->allocator;
@@ -76,11 +76,12 @@ static void sched_async_fini(void *ctx) {
 }
 
 static Bool sched_async_queue(void *ctx, void *data, void (*func)(void *data, Context *context), void (*dispose)(void *data, Context *context)) {
-	SchedAsync *sched = CAST(SchedAsync *, ctx);
-	Allocator *allocator = sched->context->allocator;
-	SchedAsyncWork *work = allocator->allocate(allocator, sizeof *work);
+	SchedAsync *const sched = CAST(SchedAsync *, ctx);
+	Context *const context = sched->context;
+	Allocator *const allocator = context->allocator;
+	SchedAsyncWork *const work = allocator->allocate(allocator, sizeof *work);
 	if (!work) {
-		return false;
+		THROW(ERROR_OOM);
 	}
 
 	work->context.allocator = allocator;
@@ -91,14 +92,14 @@ static Bool sched_async_queue(void *ctx, void *data, void (*func)(void *data, Co
 
 	mutex_lock(&sched->mutex);
 	sched->count++;
-	const Bool result = threadpool_queue(
+	threadpool_queue(
 		&sched->pool,
 		_sched_async_work_func,
 		work,
 		_sched_async_work_dispose);
 	mutex_unlock(&sched->mutex);
 
-	return result;
+	return true;
 }
 
 static void sched_async_wait(void *ctx) {

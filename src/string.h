@@ -51,7 +51,7 @@ Bool string_find_last_byte(String string, Uint8 byte, Size *index);
 
 String string_slice(String string, Size from, Size to);
 
-Bool _utf8_to_utf16(const char *source, Uint16 **const destination, Context *context);
+void _utf8_to_utf16(const char *source, Uint16 **const destination, Context *context);
 
 #define UTF8_ACCEPT 0
 #define UTF8_REJECT 12

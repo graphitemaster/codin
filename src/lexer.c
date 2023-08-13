@@ -53,7 +53,7 @@ static const struct NamedOperator { String s; OperatorKind e; } NAMED_OPERATORS[
 #define LEX_ERROR(...) \
 	do { \
 		report_error(lexer->input.source, &lexer->last_location, __VA_ARGS__); \
-		THROW(1); \
+		THROW(ERROR_LEX); \
 	} while (0)
 
 // Searches for a keyword

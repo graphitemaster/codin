@@ -22,7 +22,7 @@ static Bool sched_sync_init(Context *context, void **instance) {
 	Allocator *allocator = context->allocator;
 	SchedSync *sched = allocator->allocate(allocator, sizeof *sched);
 	if (!sched) {
-		return false;
+		THROW(ERROR_OOM);
 	}
 	sched->context.allocator = context->allocator;
 	sched->work = array_make(context);
@@ -44,12 +44,11 @@ static Bool sched_sync_queue(void *ctx, void *data, void (*func)(void *data, Con
 	return array_push(sched->work, LIT(SchedSyncWork, ctx, data, func, dispose));
 }
 
-static Size n_work = 0;
-static Size i = 0;
 static void sched_sync_wait(void *ctx) {
 	SchedSync *sched = CAST(SchedSync *, ctx);
-	n_work = array_size(sched->work);
-	i = 0;
+	Size n_work = array_size(sched->work);
+	// NOTE(dweiler): Needs to be volatile because of setjmp
+	volatile Size i = 0;
 	for (i = 0; i < n_work; i++) {
 		const SchedSyncWork *work = &sched->work[i];
 		if (!setjmp(sched->context.jmp)) {

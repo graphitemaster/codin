@@ -15,8 +15,17 @@ struct Allocator {
 	void *user;
 };
 
+enum Error {
+	ERROR_LEX,
+	ERROR_PARSE,
+	ERROR_OOM,
+	ERROR_UNKNOWN,
+};
+
+typedef enum Error Error;
+
 #define THROW(error) \
-	longjmp(context->jmp, (error))
+	longjmp((context)->jmp, CAST(int, (error)))
 
 extern Allocator DEFAULT_ALLOCATOR;
 

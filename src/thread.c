@@ -41,7 +41,7 @@ static unsigned thread_proc(void *data)
 	return 0;
 }
 
-Bool _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *context) {
+void _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *context) {
 	Allocator *allocator = context->allocator;
 	State *state = allocator->allocate(allocator, sizeof *state);
 	state->allocator = allocator;
@@ -50,8 +50,7 @@ Bool _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *con
 #if defined(OS_POSIX)
 	pthread_t *handle = RCAST(pthread_t*, thread->storage);
 	if (pthread_create(handle, 0, thread_proc, state) != 0) {
-		allocator->deallocate(allocator, state);
-		return false;
+		THROW(ERROR_UNKNOWN);
 	}
 #elif defined(OS_WINDOWS)
 	uintptr_t tid = _beginthreadex(
@@ -62,13 +61,11 @@ Bool _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *con
 		0,
 		0);
 	if (tid == 0) {
-		allocator->deallocate(allocator, state);
-		return false;
+		THROW(ERROR_UNKNOWN);
 	}
 	HANDLE handle = RCAST(HANDLE, tid);
 	*RCAST(HANDLE*, thread->storage) = handle;
 #endif
-	return true;
 }
 
 Bool thread_join(Thread *thread) {

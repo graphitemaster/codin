@@ -30,9 +30,7 @@ Bool path_mkdir(const char *pathname, Context *context) {
 }
 
 Bool dir_list_r_impl(String path, Array(String) *results, Context *context) {
-	char *name = string_to_null(path);
-	DIR *dp = opendir(name);
-	context->allocator->deallocate(context->allocator, name);
+	DIR *dp = opendir(string_to_null(path));
 	if (!dp) {
 		return false;
 	}
@@ -47,9 +45,7 @@ Bool dir_list_r_impl(String path, Array(String) *results, Context *context) {
 		strbuf_put_rune(&buf, '/');
 		strbuf_put_string(&buf, string_from_null(name));
 		const String result = strbuf_result(&buf);
-		if (!array_push(*results, result)) {
-			goto L_error;
-		}
+		array_push(*results, result);
 		if (!dir_list_r_impl(result, results, context)) {
 			goto L_error;
 		}
@@ -75,9 +71,7 @@ Array(String) dir_list_r(String path, Context *context) {
 Array(String) path_list(String path, Context *context) {
 	Array(String) results = array_make(context);
 #if defined(OS_POSIX)
-	char *name = string_to_null(path);
-	DIR *dp = opendir(name);
-	context->allocator->deallocate(context->allocator, name);
+	DIR *dp = opendir(string_to_null(path));
 	if (!dp) {
 		return 0;
 	}
@@ -86,16 +80,10 @@ Array(String) path_list(String path, Context *context) {
 		if (!strcmp(name, ".") || !strcmp(name, "..") || de->d_type == DT_DIR) {
 			continue;
 		}
-		if (!array_push(results, string_copy_from_null(name))) {
-			goto L_error;
-		}
+		array_push(results, string_copy_from_null(name));
 	}
 	closedir(dp);
 	return results;
-
-L_error:
-	closedir(dp);
-	array_free(results);
 #elif defined(OS_WINDOWS)
 	(void)path;
 	(void)context;

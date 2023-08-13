@@ -41,7 +41,7 @@ TernaryExpression *tree_new_ternary_expression(Tree *tree, Expression *on_true, 
 
 CastExpression *tree_new_cast_expression(Tree *tree, OperatorKind kind, Type *type, Expression *expression) {
 	Allocator *allocator = tree->context->allocator;
-	CastExpression *expr = allocator->allocate(allocator, sizeof *expression);
+	CastExpression *expr = allocator->allocate(allocator, sizeof *expr);
 	expr->base.kind = EXPRESSION_CAST;
 	expr->kind = kind;
 	expr->type = type;
@@ -209,6 +209,7 @@ DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Arr
 	statement->names = names;
 	statement->values = values;
 	statement->is_using = is_using;
+	statement->attributes = 0;
 	return statement;
 }
 
@@ -285,6 +286,7 @@ ForeignBlockStatement *tree_new_foreign_block_statement(Tree *tree, Identifier *
 	statement->base.kind = STATEMENT_FOREIGN_BLOCK;
 	statement->name = name;
 	statement->body = body;
+	statement->attributes = 0;
 	return statement;
 }
 
@@ -294,6 +296,7 @@ ForeignImportStatement *tree_new_foreign_import_statement(Tree *tree, String nam
 	statement->base.kind = STATEMENT_FOREIGN_IMPORT;
 	statement->name = name;
 	statement->sources = sources;
+	statement->attributes = 0;
 	return statement;
 }
 

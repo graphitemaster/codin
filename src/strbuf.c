@@ -50,21 +50,18 @@ Bool strbuf_put_string(StrBuf *strbuf, String string) {
 	return false;
 }
 
-Bool strbuf_put_formatted(StrBuf *strbuf, const char *fmt, ...) {
+void strbuf_put_formatted(StrBuf *strbuf, const char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	const long bytes = vsnprintf(0, 0, fmt, va);
 	va_end(va);
 	const Size size = array_size(strbuf->contents);
-	if (array_expand(strbuf->contents, bytes + 1)) {
-		va_list ap;
-		va_start(ap, fmt);
-		vsnprintf(RCAST(char *, &strbuf->contents[size]), bytes + 1, fmt, ap);
-		array_meta(strbuf->contents)->size--; // Remove NUL from vsnprintf.
-		va_end(ap);
-		return true;
-	}
-	return false;
+	array_expand(strbuf->contents, bytes + 1);
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(RCAST(char *, &strbuf->contents[size]), bytes + 1, fmt, ap);
+	array_meta(strbuf->contents)->size--; // Remove NUL from vsnprintf.
+	va_end(ap);
 }
 
 String strbuf_result(StrBuf *strbuf) {

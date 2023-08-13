@@ -20,7 +20,7 @@ String _string_copy_from_data(const Uint8 *data, Size length, Context *context) 
 	Allocator *allocator = context->allocator;
 	Uint8 *storage = allocator->allocate(allocator, length);
 	if (!storage) {
-		return STRING_NIL;
+		THROW(ERROR_OOM);
 	}
 	memcpy(storage, data, length);
 	return LIT(String, storage, length);
@@ -68,7 +68,7 @@ char* _string_to_null(String string, Context *context) {
 	const Size length = string.length;
 	char *result = allocator->allocate(allocator, length + 1);
 	if (!result) {
-		return 0;
+		THROW(ERROR_OOM);
 	}
 	memcpy(result, string.contents, length);
 	result[length] = '\0';
@@ -143,21 +143,19 @@ static void utf8_to_utf16_core(const char *const source, Uint16 *destination, Si
 	}
 }
 
-Bool _utf8_to_utf16(const char *source, Uint16 **const destination, Context *context) {
+void _utf8_to_utf16(const char *source, Uint16 **const destination, Context *context) {
 	Size length = 0;
 	utf8_to_utf16_core(source, 0, &length);
 
 	Allocator *allocator = context->allocator;
 	Uint16 *dest = allocator->allocate(allocator, (length + 1) * sizeof *dest);
 	if (!dest) {
-		return false;
+		THROW(ERROR_OOM);
 	}
 
 	utf8_to_utf16_core(source, dest, 0);
 	dest[length] = 0;
 	*destination = dest;
-
-	return true;
 }
 
 // Copyright (c) 2008-2010 Bjoern Hoehrmann <bjoern@hoehrmann.de>

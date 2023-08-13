@@ -158,12 +158,14 @@ Bool dump_call_expression(const Tree *tree, const CallExpression *expression, Si
 	dump_expression(tree, expression->operand, depth + 2);
 	printf(")"); // operand
 
-	printf("\n");
-	pad(depth + 1);
-	printf("(arguments");
-	printf("\n");
-	dump_fields(tree, expression->arguments, depth + 2);
-	printf(")"); // arguments
+	if (array_size(expression->arguments)) {
+		printf("\n");
+		pad(depth + 1);
+		printf("(arguments");
+		printf("\n");
+		dump_fields(tree, expression->arguments, depth + 2);
+		printf(")"); // arguments
+	}
 
 	printf(")"); // call
 	return true;
@@ -305,7 +307,7 @@ Bool dump_procedure_type(const Tree *tree, const ProcedureType *type, Sint32 dep
 	const String cc = calling_convention_to_string(type->convention);
 	printf("(convention '%.*s')", SFMT(cc));
 
-	if (array_size(type->params) != 0) {
+	if (array_size(type->params)) {
 		printf("\n");
 		pad(depth + 1);
 		printf("(params");
@@ -314,7 +316,7 @@ Bool dump_procedure_type(const Tree *tree, const ProcedureType *type, Sint32 dep
 		printf(")"); // params
 	}
 
-	if (array_size(type->results) != 0) {
+	if (array_size(type->results)) {
 		printf("\n");
 		pad(depth + 1);
 		printf("(results");
@@ -466,16 +468,24 @@ Bool dump_distinct_type(const Tree *tree, const DistinctType *type, Sint32 depth
 Bool dump_enum_type(const Tree *tree, const EnumType *type, Sint32 depth) {
 	pad(depth);
 	printf("(enum");
+
 	if (type->type) {
 		printf("\n");
 		pad(depth + 1);
 		printf("(type");
 		printf("\n");
-		dump_type(tree, type->type, depth + 1);
+		dump_type(tree, type->type, depth + 2);
 		printf(")"); // type
 	}
-	printf("\n");
-	dump_fields(tree, type->fields, depth + 1);
+
+	if (array_size(type->fields)) {
+		printf("\n");
+		pad(depth + 1);
+		printf("(fields");
+		printf("\n");
+		dump_fields(tree, type->fields, depth + 2);
+		printf(")"); // fields
+	}
 	printf(")"); // enum
 	return true;
 }
