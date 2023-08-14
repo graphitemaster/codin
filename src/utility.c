@@ -39,31 +39,19 @@ Array(Uint8) readfile(String filename, Context *context) {
 	if (!sizefile(fp, &size)) {
 		while (!feof(fp)) {
 			const Uint8 ch = fgetc(fp);
-			if (!array_push(result, ch)) {
-				printf("Push failed\n");
-				goto L_error;
-			}
+			array_push(result, ch);
 		}
 		return result;
 	}
 
-	if (!array_resize(result, size)) {
-		printf("Resize failed (size = %zu)\n", CAST(Size, size));
-		goto L_error;
-	}
-
+	array_resize(result, size);
 	if (fread(result, size, 1, fp) != 1) {
-		printf("Fread failed\n");
-		goto L_error;
+		fclose(fp);
+		return 0;
 	}
-
+	
 	fclose(fp);
 	return result;
-
-L_error:
-	fclose(fp);
-	array_free(result);
-	return 0;
 }
 
 // Half float support

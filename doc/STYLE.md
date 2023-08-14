@@ -3,6 +3,7 @@
 This is the style guide of the c-odin compiler.
 
 * C11
+* Must compile as C++ as well
 * Types `PascalCase`
 * Functions `snake_case`
 * Constants `TITLECASE`

@@ -7,7 +7,6 @@
 	#define OS_WINDOWS
 #else
 	#define OS_POSIX
-	#define OS_LINUX
 #endif
 
 // FORCE_INLINE
