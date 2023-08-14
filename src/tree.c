@@ -1,6 +1,7 @@
 #include "tree.h"
 #include "context.h"
 #include "allocator.h"
+#include "path.h"
 
 ListExpression *tree_new_list_expression(Tree *tree, Array(Expression*) expressions) {
 	Allocator *const allocator = &tree->context->allocator;
@@ -164,12 +165,17 @@ EmptyStatement *tree_new_empty_statement(Tree *tree) {
 	return statement;
 }
 
-ImportStatement *tree_new_import_statement(Tree *tree, String name, String package, Bool is_using) {
+ImportStatement *tree_new_import_statement(Tree *tree, String name, String collection, String pathname, Bool is_using) {
 	Allocator *const allocator = &tree->context->allocator;
 	ImportStatement *statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_IMPORT;
 	statement->name = name;
-	statement->package = package;
+	statement->collection = collection;
+	if (string_starts_with(pathname, SCLIT("."))) {
+		statement->pathname = pathname;
+	} else {
+		statement->pathname = path_cat(SCLIT("."), pathname, tree->context);
+	}
 	statement->is_using = is_using;
 	return statement;
 }
@@ -519,10 +525,9 @@ Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *valu
 	return field;
 }
 
-void tree_init(Tree *tree, Context *context) {
+void tree_init(Tree *tree, String filename, Context *context) {
 	tree->context = context;
-	tree->package_name = STRING_NIL;
-	tree->file_name = STRING_NIL;
+	tree->filename = filename;
 	tree->statements = array_make(context);
 	tree->tokens = array_make(context);
 }

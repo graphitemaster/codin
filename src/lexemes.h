@@ -41,7 +41,7 @@ KIND(IDENTIFIER,   "identifier",  true)
 KIND(LITERAL,      "literal",     true)
 KIND(OPERATOR,     "operator",    false) // ASI handled by OPERATOR ASI column
 KIND(KEYWORD,      "keyword",     false) // ASI handled by KEYWORD ASI column
-KIND(ASSIGNMENT,   "assignment",  true)
+KIND(ASSIGNMENT,   "assignment",  false)
 KIND(DIRECTIVE,    "directive",   false) // '#' is a directive (not an operator)
 KIND(ATTRIBUTE,    "attribute",   false) // '@' is a attribute (not an operator)
 KIND(CONST,        "const",       false) // '$' is a constant (not an operator)

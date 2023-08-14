@@ -1971,7 +1971,8 @@ static Expression *parse_atom_expression(Parser *parser, Expression *operand, Bo
 			TRACE_LEAVE();
 			return 0;
 		}
-		PARSE_ERROR("Expected an operand");
+		const String got = token_to_string(parser->this_token);
+		PARSE_ERROR("Expected an operand, got '%.*s'", SFMT(got));
 	}
 
 	Identifier *ident = 0;
@@ -2378,6 +2379,7 @@ static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Ar
 	if (is_assignment(token, ASSIGNMENT_EQ) || is_operator(token, OPERATOR_COLON)) {
 		const Token seperator = advancep(parser);
 		constant = is_operator(seperator, OPERATOR_COLON);
+		advance_possible_newline(parser); // hack?
 		values = parse_rhs_list_expression(parser);
 		const Size n_values = array_size(values->expressions);
 		if (n_values > n_names) {
@@ -2400,7 +2402,9 @@ static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Ar
 
 	if (parser->expression_depth >= 0) {
 		const Token token = parser->this_token;
-		if (is_kind(token, KIND_RBRACE) && token.location.line == parser->last_token.location.line) {
+		if (is_kind(token, KIND_RBRACE)
+			&& token.location.line == parser->last_token.location.line)
+		{
 			// Do nothing.
 		} else {
 			expect_semicolon(parser);
@@ -2579,10 +2583,20 @@ static ImportStatement *parse_import_statement(Parser *parser, Bool is_using) {
 	expect_semicolon(parser);
 
 	const String name = string_unquote(token.string, "\"");
-	const String package = string_unquote(path.string, "\"");
+	const String next = string_unquote(path.string, "\"");
 
-	ImportStatement *const statement = 
-		tree_new_import_statement(parser->tree, name, package, is_using);
+	// Check for collection in package.
+	ImportStatement *statement = 0;
+	Size split = 0;
+	if (string_find_first_byte(next, ':', &split)) {
+		const String collection = string_slice(next, 0, split);
+		const String pathname = string_slice(next, split + 1, next.length - (split + 1));
+		statement = tree_new_import_statement(parser->tree, name, collection, pathname, is_using);
+	} else {
+		const String collection = STRING_NIL;
+		const String pathname = next;
+		statement = tree_new_import_statement(parser->tree, name, collection, pathname, is_using);
+	}
 
 	TRACE_LEAVE();
 
@@ -3282,7 +3296,9 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 	TRACE_LEAVE(); // Unreachable.
 }
 
-Bool parse(Tree *tree, String filename, Context *context) {
+Bool parse(Tree *tree, Context *context) {
+	const String filename = tree->filename;
+
 	Source source;
 	if (!source_read(&source, filename, context)) {
 		return false;

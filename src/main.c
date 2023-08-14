@@ -3,15 +3,12 @@
 #include <string.h> // strcmp
 
 #include "string.h" // String, SCLIT, SFMT
-#include "path.h"
-#include "tree.h"
-#include "parser.h"
+#include "project.h"
 #include "context.h"
-#include "dump.h"
-#include "strbuf.h"
-#include "utility.h"
 #include "sched.h"
-#include "allocator.h"
+#include "path.h"
+#include "parser.h"
+#include "dump.h"
 
 typedef struct Command Command;
 
@@ -52,75 +49,74 @@ static int usage(const char *app) {
 }
 
 typedef struct Work Work;
-
 struct Work {
-	Context *ctx;
-	String file;
-	Tree tree;
+	Sched *sched;
+	Project *project;
+	Tree *tree;
 };
 
 static void worker(void *data, Context *context) {
-	Work *work = RCAST(Work *, data);
+	Work *work = CAST(Work *, data);
+	if (!parse(work->tree, context)) {
+		return;
+	}
 
-	tree_init(&work->tree, context);
+	// Search for all import statements to add the packages
+	const Tree *const tree = work->tree;
+	const Size n_statements = array_size(tree->statements);
+	for (Size i = 0; i < n_statements; i++) {
+		const Statement *const statement = tree->statements[i];
+		if (statement->kind != STATEMENT_IMPORT) {
+			continue;
+		}
 
-	if (!parse(&work->tree, work->file, context)) {
-		tree_fini(&work->tree);
-		THROW(ERROR_PARSE);
+		const ImportStatement *const import = 
+			RCAST(const ImportStatement *const, statement);
+
+		// TODO(dweiler): Handle the import by putting it on the scheduler.
 	}
 }
 
-static Bool dump_ast(String path) {
-	Context ctx;
-	allocator_init(&ctx.allocator, SCLIT("arena"));
+static Bool dump_ast(String pathname) {
+	Context context;
+	allocator_init(&context.allocator, SCLIT("arena"));
 
-	Context *context = &ctx;
-
-	Array(String) files = path_list(path, context);
-	const Size n_files = array_size(files);
+	Project project;
+	project_init(&project, SCLIT("test"), &context);
 
 	Sched sched;
-	sched_init(&sched, SCLIT("async"), &ctx);
+	sched_init(&sched, SCLIT("sync"), &context);
 
-	Array(Work) work = array_make(context);
+	Array(Work*) pending = array_make(&context);
 
-	StrBuf buf;
-	strbuf_init(&buf, context);
+	Package *package = project_add_package(&project, pathname);
+	Array(String) files = path_list(pathname, &context);
+	const Size n_files = array_size(files);
 	for (Size i = 0; i < n_files; i++) {
-		const String name = files[i];
-		if (!string_ends_with(name, SCLIT(".odin"))) {
-			continue;
+		const String filename = files[i];
+		if (string_ends_with(filename, SCLIT(".odin"))) {
+			Work *work = allocator_allocate(&context.allocator, sizeof *work);
+			work->sched = &sched;
+			work->project = &project;
+			work->tree = package_add_tree(package, path_cat(pathname, filename, &context));
+			array_push(pending, work);
+			sched_queue(&sched, work, worker, 0);
 		}
-		strbuf_clear(&buf);
-		strbuf_put_string(&buf, path);
-		if (!string_ends_with(path, SCLIT("/"))) {
-			strbuf_put_rune(&buf, '/');
-		}
-		strbuf_put_string(&buf, name);
-		const String file = strbuf_result(&buf);
-	
-		Work item;
-		item.ctx = context;
-		item.file = string_copy(file);
-		array_push(work, item);
 	}
 
-	const Size n_work = array_size(work);
-	for (Size i = 0; i < n_work; i++) {
-		sched_queue(&sched, &work[i], worker, 0);
-	}
-
+	// Wait for all the work to be complete.
 	sched_wait(&sched);
 
-	for (Size i = 0; i < n_work; i++) {
-		Tree *tree = &work[i].tree;
-		dump(tree);
-		tree_fini(tree);
+	const Size n_pending = array_size(pending);
+	for (Size i = 0; i < n_pending; i++) {
+		Work *const work = pending[i];
+		dump(work->tree);
+		allocator_deallocate(&context.allocator, work);
 	}
 
 	sched_fini(&sched);
-
-	allocator_fini(&ctx.allocator);
+	project_fini(&project);
+	allocator_fini(&context.allocator);
 
 	return true;
 }

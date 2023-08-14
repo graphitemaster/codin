@@ -104,8 +104,8 @@ Bool string_find_last_byte(String string, Uint8 byte, Size *index) {
 	return false;
 }
 
-String string_slice(String string, Size from, Size to) {
-	return LIT(String, string.contents + from, to - from);
+String string_slice(String string, Size from, Size len) {
+	return LIT(String, string.contents + from, len);
 }
 
 static void utf8_to_utf16_core(const char *const source, Uint16 *destination, Size *const length) {

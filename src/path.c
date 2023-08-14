@@ -91,3 +91,19 @@ Array(String) path_list(String path, Context *context) {
 #endif
 	return results;
 }
+
+String path_cat(String pathname, String filename, Context *context) {
+	if (string_ends_with(pathname, SCLIT("/")) ||
+	    string_ends_with(pathname, SCLIT("\\")))
+	{
+		pathname.length--;
+	}
+
+	const Size length = pathname.length + filename.length + 1;
+	Uint8* data = allocator_allocate(&context->allocator, length);
+	memcpy(data, pathname.contents, pathname.length);
+	data[pathname.length] = '/';
+	memcpy(&data[pathname.length + 1], filename.contents, filename.length);
+
+	return LIT(String, data, length);
+}

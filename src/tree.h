@@ -368,8 +368,9 @@ struct EmptyStatement {
 
 struct ImportStatement {
 	Statement base;
-	String name;
-	String package;
+	String name;       // Optional
+	String collection; // "core"
+	String pathname;   // "./fmt"
 	Bool is_using;
 };
 
@@ -651,13 +652,12 @@ static inline String calling_convention_to_string(CallingConvention cc) {
 
 struct Tree {
 	Context *context;
-	String package_name;
-	String file_name;
+	String filename;
 	Array(Statement*) statements;
 	Array(Token) tokens; // Recorded tokens for diagnostics.
 };
 
-void tree_init(Tree *tree, Context *context);
+void tree_init(Tree *tree, String filename, Context *context);
 void tree_fini(Tree *tree);
 
 void tree_record_token(Tree *tree, Token token);
@@ -683,7 +683,7 @@ ProcedureGroupExpression *tree_new_procedure_group_expression(Tree *tree, Array(
 
 // Statements
 EmptyStatement *tree_new_empty_statement(Tree *tree);
-ImportStatement *tree_new_import_statement(Tree *tree, String name, String package, Bool is_using);
+ImportStatement *tree_new_import_statement(Tree *tree, String name, String collection, String pathname, Bool is_using);
 ExpressionStatement *tree_new_expression_statement(Tree *tree, Expression *expression);
 BlockStatement *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Statement*) statements);
 AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, ListExpression *lhs, ListExpression *rhs);

@@ -492,7 +492,7 @@ static Token lexer_tokenize(Lexer *lexer) {
 				if (ch == quote) {
 					break;
 				}
-				if (ch == '\\' && !scan_escape(lexer)) {
+				if (rune == '"' && (ch == '\\' && !scan_escape(lexer))) {
 					LEX_ERROR("Malformed string literal");
 				}
 			}

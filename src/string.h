@@ -49,7 +49,7 @@ Bool string_ends_with(String string, String suffix);
 Bool string_find_first_byte(String String, Uint8 byte, Size *index);
 Bool string_find_last_byte(String string, Uint8 byte, Size *index);
 
-String string_slice(String string, Size from, Size to);
+String string_slice(String string, Size from, Size len);
 
 void _utf8_to_utf16(const char *source, Uint16 **const destination, Context *context);
 

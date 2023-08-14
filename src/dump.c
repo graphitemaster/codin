@@ -260,17 +260,6 @@ Bool dump_builtin_type(const Tree *tree, const BuiltinType *type, Sint32 depth) 
 Bool dump_field(const Tree *tree, const Field *field, Sint32 depth) {
 	pad(depth);
 	printf("(field");
-	if (field->flags) {
-		printf("\n");
-		pad(depth + 1);
-		printf("(flags");
-		printf("\n");
-		pad(depth + 2);
-		if (field->flags & FIELD_FLAG_ANY_INT) {
-			printf("'#any_int'");
-		}
-		printf(")"); // flags
-	}
 	if (field->name) {
 		printf("\n");
 		dump_identifier(tree, field->name, depth + 1);
@@ -282,6 +271,21 @@ Bool dump_field(const Tree *tree, const Field *field, Sint32 depth) {
 	if (field->value) {
 		printf("\n");
 		dump_expression(tree, field->value, depth + 1);
+	}
+	if (field->tag.length) {
+		printf("\n");
+		printf("(tag '%.*s')", SFMT(field->tag));
+	}
+	if (field->flags) {
+		printf("\n");
+		pad(depth + 1);
+		printf("(flags");
+		printf("\n");
+		pad(depth + 2);
+		if (field->flags & FIELD_FLAG_ANY_INT) {
+			printf("'#any_int'");
+		}
+		printf(")"); // flags
 	}
 	printf(")"); // field
 	return true;
@@ -758,7 +762,16 @@ Bool dump_block_statement(const Tree *tree, const BlockStatement *statement, Sin
 Bool dump_import_statement(const Tree *tree, const ImportStatement *statement, Sint32 depth) {
 	(void)tree;
 	pad(depth);
-	printf("(import '%.*s')", SFMT(statement->package));
+	printf("(import");
+	if (statement->collection.length) {
+		printf("\n");
+		pad(depth + 1);
+		printf("(collection '%.*s')", SFMT(statement->collection));
+	}
+	printf("\n");
+	pad(depth + 1);
+	printf("(pathname '%.*s')", SFMT(statement->pathname));
+	printf(")"); // import
 	return true;
 }
 
