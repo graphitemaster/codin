@@ -5,6 +5,6 @@
 typedef struct Context Context;
 typedef struct Tree Tree;
 
-Tree* parse(String filename, Context *context);
+Bool parse(Tree *tree, String file, Context *context);
 
 #endif // CODIN_PARSER_H

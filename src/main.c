@@ -56,12 +56,18 @@ typedef struct Work Work;
 struct Work {
 	Context *ctx;
 	String file;
-	Tree *tree;
+	Tree tree;
 };
 
 static void worker(void *data, Context *context) {
 	Work *work = RCAST(Work *, data);
-	work->tree = parse(work->file, context);
+
+	tree_init(&work->tree, context);
+
+	if (!parse(&work->tree, work->file, context)) {
+		tree_fini(&work->tree);
+		THROW(ERROR_PARSE);
+	}
 }
 
 static Bool dump_ast(String path) {
@@ -92,7 +98,11 @@ static Bool dump_ast(String path) {
 		}
 		strbuf_put_string(&buf, name);
 		const String file = strbuf_result(&buf);
-		array_push(work, LIT(Work, &ctx, string_copy(file), 0));
+	
+		Work item;
+		item.ctx = context;
+		item.file = string_copy(file);
+		array_push(work, item);
 	}
 
 	const Size n_work = array_size(work);
@@ -103,10 +113,9 @@ static Bool dump_ast(String path) {
 	sched_wait(&sched);
 
 	for (Size i = 0; i < n_work; i++) {
-		Tree *tree = work[i].tree;
-		if (tree) {
-			// dump(tree);
-		}
+		Tree *tree = &work[i].tree;
+		dump(tree);
+		tree_fini(tree);
 	}
 
 	sched_fini(&sched);

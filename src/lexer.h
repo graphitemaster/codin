@@ -107,7 +107,7 @@ struct Lexer {
 	Array(Token) peek;
 };
 
-Bool lexer_init(Lexer *lexer, Context *context, const Source *source);
+Bool lexer_init(Lexer *lexer, const Source *source, Context *context);
 Token lexer_next(Lexer *lexer);
 Token lexer_peek(Lexer *lexer);
 

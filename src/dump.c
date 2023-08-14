@@ -1115,6 +1115,14 @@ Bool dump_using_statement(const Tree *tree, const UsingStatement *statement, Sin
 	return true;
 }
 
+Bool dump_package_statement(const Tree *tree, const PackageStatement *statement, Sint32 depth) {
+	(void)tree;
+	pad(depth);
+	const String name = statement->name;
+	printf("(package '%.*s')", SFMT(name));
+	return true;
+}
+
 Bool dump_statement(const Tree *tree, const Statement *statement, Sint32 depth) {
 	switch (statement->kind) {
 	case STATEMENT_EMPTY:          return false; // Nothing
@@ -1133,6 +1141,7 @@ Bool dump_statement(const Tree *tree, const Statement *statement, Sint32 depth) 
 	case STATEMENT_FOREIGN_BLOCK:  return dump_foreign_block_statement(tree, RCAST(const ForeignBlockStatement *, statement), depth);
 	case STATEMENT_FOREIGN_IMPORT: return dump_foreign_import_statement(tree, RCAST(const ForeignImportStatement *, statement), depth);
 	case STATEMENT_USING:          return dump_using_statement(tree, RCAST(const UsingStatement *, statement), depth);
+	case STATEMENT_PACKAGE:        return dump_package_statement(tree, RCAST(const PackageStatement *, statement), depth);
 	}
 	UNREACHABLE();
 }

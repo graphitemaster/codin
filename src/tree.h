@@ -46,6 +46,7 @@ typedef struct BranchStatement BranchStatement;
 typedef struct ForeignBlockStatement ForeignBlockStatement;
 typedef struct ForeignImportStatement ForeignImportStatement;
 typedef struct UsingStatement UsingStatement;
+typedef struct PackageStatement PackageStatement;
 
 // Types.
 typedef struct Type Type;
@@ -112,9 +113,10 @@ enum StatementKind {
 	STATEMENT_SWITCH         = 10,
 	STATEMENT_DEFER          = 11,
 	STATEMENT_BRANCH         = 12, // break, continue, fallthrough
-	STATEMENT_FOREIGN_BLOCK  = 13,
-	STATEMENT_FOREIGN_IMPORT = 14,
-	STATEMENT_USING          = 15,
+	STATEMENT_FOREIGN_BLOCK  = 13, // foreign <name>
+	STATEMENT_FOREIGN_IMPORT = 14, // foreign import
+	STATEMENT_USING          = 15, // using <name>
+	STATEMENT_PACKAGE        = 16, // package <ident>
 };
 
 enum ProcedureKind {
@@ -466,6 +468,11 @@ struct UsingStatement {
 	ListExpression *list;
 };
 
+struct PackageStatement {
+	Statement base;
+	String name;
+};
+
 // Types.
 struct Type {
 	TypeKind kind;
@@ -651,6 +658,8 @@ struct Tree {
 };
 
 void tree_init(Tree *tree, Context *context);
+void tree_fini(Tree *tree);
+
 void tree_record_token(Tree *tree, Token token);
 
 // Expressions
@@ -689,6 +698,7 @@ BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Ident
 ForeignBlockStatement *tree_new_foreign_block_statement(Tree *tree, Identifier *name, BlockStatement *body);
 ForeignImportStatement *tree_new_foreign_import_statement(Tree *tree, String name, Array(String) sources);
 UsingStatement *tree_new_using_statement(Tree *tree, ListExpression *list);
+PackageStatement *tree_new_package_statement(Tree *tree, String package);
 
 // Types
 ConcreteProcedureType *tree_new_concrete_procedure_type(Tree *tree, Array(Field*) params, Array(Field*) results, ProcedureFlag flags, CallingConvention convention);

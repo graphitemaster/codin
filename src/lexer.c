@@ -315,7 +315,7 @@ static Bool scan_escape(Lexer *lexer) {
 	UNREACHABLE();
 }
 
-Bool lexer_init(Lexer *lexer, Context *context, const Source *source) {
+Bool lexer_init(Lexer *lexer, const Source *source, Context *context) {
 	const String *const string = &source->contents;
 	if (string->length == 0) {
 		return false;

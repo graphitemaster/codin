@@ -11,7 +11,7 @@
 
 #define PARSE_ERROR(...) \
 	do { \
-		report_error(&parser->source, &parser->this_token.location, __VA_ARGS__); \
+		report_error(parser->lexer.input.source, &parser->this_token.location, __VA_ARGS__); \
 		THROW(ERROR_PARSE); \
 	} while (0)
 
@@ -40,14 +40,18 @@ typedef struct Parser Parser;
 
 struct Parser {
 	Context *context;
-	Source source;
-	Lexer lexer;
 	Tree *tree;
+
+	Lexer lexer;
+
 	Token this_token; // This token is being processed
 	Token last_token; // Last token processed
+
 	ProcedureType *this_procedure;
+
 	Sint32 trace_depth;
 	Sint32 expression_depth;
+
 	Bool allow_newline;
 	Bool allow_type;
 	Bool allow_in;
@@ -77,24 +81,25 @@ static FORCE_INLINE void parser_trace_leave(Parser *parser) {
 #define TRACE_LEAVE()
 #endif
 
-static Bool parser_init(Parser *parser, String filename, Context *context) {
-	if (!source_read(&parser->source, filename, context)) {
-		return false;
-	}
-
-	if (!lexer_init(&parser->lexer, context, &parser->source)) {
-		return false;
-	}
-
+static Bool parser_init(Parser *parser, const Source *source, Tree *tree, Context *context) {
 	parser->context = context;
+	parser->tree = tree;
+
+	if (!lexer_init(&parser->lexer, source, context)) {
+		return false;
+	}
+
 	parser->this_token = TOKEN_NIL;
 	parser->last_token = TOKEN_NIL;
+
+	parser->this_procedure = 0;
+
 	parser->trace_depth = 0;
 	parser->expression_depth = 0;
+
 	parser->allow_newline = false;
 	parser->allow_type = false;
 	parser->allow_in = false;
-	parser->this_procedure = 0;
 
 	return true;
 }
@@ -3080,6 +3085,19 @@ static Statement *parse_using_statement(Parser *parser) {
 	return RCAST(Statement *, statement);
 }
 
+static PackageStatement *parse_package_statement(Parser *parser) {
+	TRACE_ENTER();
+
+	expect_keyword(parser, KEYWORD_PACKAGE);
+	const Token package = expect_kind(parser, KIND_IDENTIFIER);
+	
+	PackageStatement *statement = tree_new_package_statement(parser->tree, package.string);
+
+	TRACE_LEAVE();
+
+	return statement;
+}
+
 static EmptyStatement *parse_empty_statement(Parser *parser) {
 	TRACE_ENTER();
 
@@ -3189,6 +3207,12 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 				TRACE_LEAVE();
 				return statement;
 			}
+		case KEYWORD_PACKAGE:
+			{
+				PackageStatement *const statement = parse_package_statement(parser);
+				TRACE_LEAVE();
+				return RCAST(Statement *, statement);
+			}
 		default:
 			ICE("Unexpected keyword in statement");
 		}
@@ -3254,60 +3278,27 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 	TRACE_LEAVE(); // Unreachable.
 }
 
-Tree *parse(String filename, Context *context) {
-	Parser parse;
-	Parser *parser = &parse;
-	if (!parser_init(parser, filename, context)) {
-		return 0;
+Bool parse(Tree *tree, String filename, Context *context) {
+	Source source;
+	if (!source_read(&source, filename, context)) {
+		return false;
 	}
 
-	Allocator *allocator = &context->allocator;
-	Tree *tree = allocator_allocate(allocator, sizeof *tree);
-	if (!tree) {
-		return 0;
+	Parser parser;
+	if (!parser_init(&parser, &source, tree, context)) {
+		return false;
 	}
 
-	tree_init(tree, context);
+	// Read in the first token.
+	advancep(&parser);
 
-	parser->tree = tree;
-
-	advancep(parser);
-
-	// Every Odin source file must begin with the package it's part of.
-	if (!is_keyword(parser->this_token, KEYWORD_PACKAGE)) {
-		PARSE_ERROR("Expected a package declaration at the beginning of the file");
-	}
-
-	static const String RESERVED_PACKAGES[] = {
-		SLIT("builtin"),
-		SLIT("intrinsics"),
-	};
-
-	// "package <ident>"
-	expect_keyword(parser, KEYWORD_PACKAGE);
-	const Token package = expect_kind(parser, KIND_IDENTIFIER);
-	if (string_compare(package.string, SCLIT("_"))) {
-		PARSE_ERROR("Cannot name package '_'");
-	}
-
-	for (Size i = 0; i < sizeof RESERVED_PACKAGES / sizeof *RESERVED_PACKAGES; i++) {
-		const String name = RESERVED_PACKAGES[i];
-		if (string_compare(package.string, name)) {
-			PARSE_ERROR("Use of reserved package name '%.*s'", SFMT(name));
-		}
-	}
-
-	tree->package_name = package.string;
-	tree->file_name = string_copy(filename);
-
-	while (!is_kind(parser->this_token, KIND_EOF)) {
-		Statement *const statement = parse_statement(parser, CAST(BlockFlag, 0));
+	// Read all the statements in the top-level.
+	while (!is_kind(parser.this_token, KIND_EOF)) {
+		Statement *const statement = parse_statement(&parser, CAST(BlockFlag, 0));
 		if (statement->kind != STATEMENT_EMPTY) {
 			array_push(tree->statements, statement);
 		}
 	}
 
-	TRACE_LEAVE();
-
-	return tree;
+	return true;
 }
