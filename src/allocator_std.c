@@ -61,7 +61,7 @@ static void std_allocator_fini(Allocator *ctx) {
 	free(allocator->items);
 	mutex_unlock(&allocator->mutex);
 
-	mutex_destroy(&allocator->mutex);
+	mutex_fini(&allocator->mutex);
 	free(allocator);
 }
 

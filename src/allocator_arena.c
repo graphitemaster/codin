@@ -65,11 +65,11 @@ static void arena_allocator_fini(Allocator *allocator) {
 		mutex_lock(&self->mutex);
 		region = region->next;
 		mutex_unlock(&self->mutex);
-		mutex_destroy(&self->mutex);
+		mutex_fini(&self->mutex);
 		free(self);
 	}
 	mutex_unlock(&arena->mutex);
-	mutex_destroy(&arena->mutex);
+	mutex_fini(&arena->mutex);
 	free(arena);
 	allocator->user = 0;
 }

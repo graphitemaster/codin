@@ -74,8 +74,8 @@ void threadpool_fini(ThreadPool *pool) {
 	array_free(pool->work);
 	mutex_unlock(&pool->mutex);
 
-	cond_destroy(&pool->cond);
-	mutex_destroy(&pool->mutex);
+	cond_fini(&pool->cond);
+	mutex_fini(&pool->mutex);
 }
 
 void threadpool_queue(ThreadPool *pool, void (*function)(void*), void *user, void (*dispose)(void*)) {

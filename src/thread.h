@@ -35,7 +35,7 @@ Bool thread_join(Thread *thread);
 
 // Mutex
 void mutex_init(Mutex *mutex);
-void mutex_destroy(Mutex *mutex)
+void mutex_fini(Mutex *mutex)
 	THREAD_EXCLUDES(*mutex);
 void mutex_lock(Mutex *mutex)
 	THREAD_ACQUIRES(*mutex);
@@ -45,14 +45,14 @@ void mutex_unlock(Mutex *mutex)
 
 // Cond
 void cond_init(Cond *cond);
-void cond_destroy(Cond *cond);
+void cond_fini(Cond *cond);
 void cond_wait(Cond *cond, Mutex *mutex) THREAD_REQUIRES(*mutex);
 void cond_signal(Cond *cond);
 void cond_broadcast(Cond *cond);
 
 // WaitGroup
 void waitgroup_init(WaitGroup *wg, Size count);
-void waitgroup_destroy(WaitGroup *wg);
+void waitgroup_fini(WaitGroup *wg);
 void waitgroup_signal(WaitGroup *wg);
 void waitgroup_wait(WaitGroup *wg);
 

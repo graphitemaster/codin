@@ -70,8 +70,8 @@ static void sched_async_fini(void *ctx) {
 	mutex_unlock(&sched->mutex);
 	Context *context = sched->context;
 	threadpool_fini(&sched->pool);
-	mutex_destroy(&sched->mutex);
-	cond_destroy(&sched->cond);
+	mutex_fini(&sched->mutex);
+	cond_fini(&sched->cond);
 	Allocator *allocator = &context->allocator;
 	allocator_deallocate(allocator, sched);
 }
