@@ -1,6 +1,7 @@
 #include "sched.h"
 #include "context.h"
 #include "threadpool.h"
+#include "allocator.h"
 
 typedef struct SchedAsync SchedAsync;
 typedef struct SchedAsyncWork SchedAsyncWork;
@@ -38,18 +39,18 @@ static void _sched_async_work_func(void *data) {
 
 static void _sched_async_work_dispose(void *data) {
 	SchedAsyncWork *work = RCAST(SchedAsyncWork *, data);
-	Allocator *allocator = work->context.allocator;
-	allocator->deallocate(allocator, data);
+	Allocator *allocator = &work->context.allocator;
+	allocator_deallocate(allocator, data);
 }
 
 Bool sched_async_init(Context *context, void **instance) {
-	Allocator *allocator = context->allocator;
-	SchedAsync *sched = allocator->allocate(allocator, sizeof *sched);
+	Allocator *allocator = &context->allocator;
+	SchedAsync *sched = allocator_allocate(allocator, sizeof *sched);
 	if (!sched) {
 		THROW(ERROR_OOM);
 	}
-	if (!threadpool_init(&sched->pool, 4, context)) {
-		allocator->deallocate(allocator, sched);
+	if (!threadpool_init(&sched->pool, 1, context)) {
+		allocator_deallocate(allocator, sched);
 		return false;
 	}
 	sched->context = context;
@@ -71,20 +72,20 @@ static void sched_async_fini(void *ctx) {
 	threadpool_fini(&sched->pool);
 	mutex_destroy(&sched->mutex);
 	cond_destroy(&sched->cond);
-	Allocator *allocator = context->allocator;
-	allocator->deallocate(allocator, sched);
+	Allocator *allocator = &context->allocator;
+	allocator_deallocate(allocator, sched);
 }
 
 static Bool sched_async_queue(void *ctx, void *data, void (*func)(void *data, Context *context), void (*dispose)(void *data, Context *context)) {
 	SchedAsync *const sched = CAST(SchedAsync *, ctx);
 	Context *const context = sched->context;
-	Allocator *const allocator = context->allocator;
-	SchedAsyncWork *const work = allocator->allocate(allocator, sizeof *work);
+	Allocator *const allocator = &context->allocator;
+	SchedAsyncWork *const work = allocator_allocate(allocator, sizeof *work);
 	if (!work) {
 		THROW(ERROR_OOM);
 	}
 
-	work->context.allocator = allocator;
+	work->context.allocator = *allocator;
 	work->sched = sched;
 	work->data = data;
 	work->func = func;

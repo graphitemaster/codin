@@ -1,6 +1,9 @@
 // Unity build script. Just compile this with cl.exe on Windows
+#include "src/allocator_arena.c"
+#include "src/allocator_null.c"
+#include "src/allocator_std.c"
+#include "src/allocator.c"
 #include "src/array.c"
-#include "src/context.c"
 #include "src/dump.c"
 #include "src/lexer.c"
 #include "src/main.c"

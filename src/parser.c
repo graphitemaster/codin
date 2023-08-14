@@ -5,6 +5,7 @@
 #include "strbuf.h"
 #include "report.h"
 #include "utility.h"
+#include "allocator.h"
 
 // #define TRACE
 
@@ -3260,8 +3261,8 @@ Tree *parse(String filename, Context *context) {
 		return 0;
 	}
 
-	Allocator *allocator = context->allocator;
-	Tree *tree = allocator->allocate(allocator, sizeof *tree);
+	Allocator *allocator = &context->allocator;
+	Tree *tree = allocator_allocate(allocator, sizeof *tree);
 	if (!tree) {
 		return 0;
 	}

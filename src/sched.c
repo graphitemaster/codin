@@ -2,6 +2,7 @@
 
 extern const SchedOperations SCHED_SYNC;
 extern const SchedOperations SCHED_ASYNC;
+extern const SchedOperations SCHED_NULL;
 
 Bool sched_init(Sched *sched, String name, Context *context) {
 	const SchedOperations *operations = 0;
@@ -9,6 +10,8 @@ Bool sched_init(Sched *sched, String name, Context *context) {
 		operations = &SCHED_SYNC;
 	} else if (string_compare(name, SCHED_ASYNC.name)) {
 		operations = &SCHED_ASYNC;
+	} else {
+		operations = &SCHED_NULL;
 	}
 	sched->operations = operations;
 	return operations->init(context, &sched->instance);

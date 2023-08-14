@@ -2,6 +2,7 @@
 #include "sched.h"
 #include "array.h"
 #include "context.h"
+#include "allocator.h"
 
 typedef struct SchedSync SchedSync;
 typedef struct SchedSyncWork SchedSyncWork;
@@ -19,8 +20,8 @@ struct SchedSync {
 };
 
 static Bool sched_sync_init(Context *context, void **instance) {
-	Allocator *allocator = context->allocator;
-	SchedSync *sched = allocator->allocate(allocator, sizeof *sched);
+	Allocator *allocator = &context->allocator;
+	SchedSync *sched = allocator_allocate(allocator, sizeof *sched);
 	if (!sched) {
 		THROW(ERROR_OOM);
 	}
@@ -35,8 +36,8 @@ static void sched_sync_fini(void *ctx) {
 	Context *context = &sched->context;
 	ASSERT(array_size(sched->work) == 0);
 	array_free(sched->work);
-	Allocator *allocator = context->allocator;
-	allocator->deallocate(allocator, sched);
+	Allocator *allocator = &context->allocator;
+	allocator_deallocate(allocator, sched);
 }
 
 static Bool sched_sync_queue(void *ctx, void *data, void (*func)(void *data, Context *context), void (*dispose)(void *data, Context *context)) {

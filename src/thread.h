@@ -18,7 +18,7 @@ struct ALIGN(16) Cond {
 };
 
 struct ALIGN(16) THREAD_CAPABILITY("mutex") Mutex { 
-	Uint8 storage[64];
+	Uint8 storage[128];
 };
 
 struct WaitGroup {

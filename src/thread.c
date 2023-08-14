@@ -2,6 +2,7 @@
 
 #include "thread.h"
 #include "context.h"
+#include "allocator.h"
 
 #if defined(OS_POSIX)
 #include <pthread.h>
@@ -37,13 +38,13 @@ static unsigned thread_proc(void *data)
 	pthread_sigmask(SIG_BLOCK, &mask, 0);
 #endif
 	state->proc(state->data);
-	allocator->deallocate(allocator, state);
+	allocator_deallocate(allocator, state);
 	return 0;
 }
 
 void _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *context) {
-	Allocator *allocator = context->allocator;
-	State *state = allocator->allocate(allocator, sizeof *state);
+	Allocator *allocator = &context->allocator;
+	State *state = allocator_allocate(allocator, sizeof *state);
 	state->allocator = allocator;
 	state->proc = proc;
 	state->data = data;
@@ -86,7 +87,7 @@ Bool thread_join(Thread *thread) {
 
 void mutex_init(Mutex *mutex) {
 #if defined(OS_POSIX)
-	pthread_mutex_t *handle = RCAST(pthread_mutex_t*, mutex->storage);
+	pthread_mutex_t *handle = RCAST(pthread_mutex_t *, mutex->storage);
 	pthread_mutexattr_t attributes;
 	if (pthread_mutexattr_init(&attributes) != 0
 	 || pthread_mutexattr_settype(&attributes, PTHREAD_MUTEX_NORMAL) != 0
@@ -103,7 +104,7 @@ void mutex_init(Mutex *mutex) {
 
 void mutex_destroy(Mutex *mutex) {
 #if defined(OS_POSIX)
-	pthread_mutex_t *handle = RCAST(pthread_mutex_t*, mutex->storage);
+	pthread_mutex_t *handle = RCAST(pthread_mutex_t *, mutex->storage);
 	if (pthread_mutex_destroy(handle) != 0) {
 		abort();
 	}
@@ -117,7 +118,7 @@ void mutex_lock(Mutex *mutex)
 	THREAD_INTERNAL
 {
 #if defined(OS_POSIX)
-	pthread_mutex_t *handle = RCAST(pthread_mutex_t*, mutex->storage);
+	pthread_mutex_t *handle = RCAST(pthread_mutex_t *, mutex->storage);
 	if (pthread_mutex_lock(handle) != 0) {
 		abort();
 	}
@@ -131,7 +132,7 @@ void mutex_unlock(Mutex *mutex)
 	THREAD_INTERNAL
 {
 #if defined(OS_POSIX)
-	pthread_mutex_t *handle = RCAST(pthread_mutex_t*, mutex->storage);
+	pthread_mutex_t *handle = RCAST(pthread_mutex_t *, mutex->storage);
 	if (pthread_mutex_unlock(handle) != 0) {
 		abort();
 	}
@@ -143,7 +144,7 @@ void mutex_unlock(Mutex *mutex)
 
 void cond_init(Cond *cond) {
 #if defined(OS_POSIX)
-	pthread_cond_t *handle = RCAST(pthread_cond_t*, cond->storage);
+	pthread_cond_t *handle = RCAST(pthread_cond_t *, cond->storage);
 	if (pthread_cond_init(handle, 0) != 0) {
 		abort();
 	}
@@ -155,7 +156,7 @@ void cond_init(Cond *cond) {
 
 void cond_destroy(Cond *cond) {
 #if defined(OS_POSIX)
-	pthread_cond_t *handle = RCAST(pthread_cond_t*, cond->storage);
+	pthread_cond_t *handle = RCAST(pthread_cond_t *, cond->storage);
 	if (pthread_cond_destroy(handle) != 0) {
 		abort();
 	}
@@ -167,8 +168,8 @@ void cond_destroy(Cond *cond) {
 
 void cond_wait(Cond *cond, Mutex *mutex) {
 #if defined(OS_POSIX)
-	pthread_cond_t *cond_handle = RCAST(pthread_cond_t*, cond->storage);
-	pthread_mutex_t *mutex_handle = RCAST(pthread_mutex_t*, mutex->storage);
+	pthread_cond_t *cond_handle = RCAST(pthread_cond_t *, cond->storage);
+	pthread_mutex_t *mutex_handle = RCAST(pthread_mutex_t *, mutex->storage);
 	if (pthread_cond_wait(cond_handle, mutex_handle) != 0) {
 		abort();
 	}

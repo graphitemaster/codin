@@ -12,7 +12,6 @@ struct Sched {
 	void *instance;
 };
 
-
 struct SchedOperations {
 	String name;
 	Bool (*init)(Context *context, void **instance);

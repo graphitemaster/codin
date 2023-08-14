@@ -2,18 +2,9 @@
 #define CODIN_CONTEXT_H
 #include <setjmp.h>
 
-#include "support.h"
+#include "allocator.h"
 
 typedef struct Context Context;
-typedef struct Allocator Allocator;
-
-struct Allocator {
-	Ptr (*allocate)(Allocator *allocator, Size bytes);
-	Ptr (*reallocate)(Allocator *allocator, void *ptr, Size bytes);
-	void (*deallocate)(Allocator *allocator, void *ptr);
-	void (*finalize)(Allocator *allocator);
-	void *user;
-};
 
 enum Error {
 	ERROR_LEX,
@@ -27,10 +18,8 @@ typedef enum Error Error;
 #define THROW(error) \
 	longjmp((context)->jmp, CAST(int, (error)))
 
-extern Allocator DEFAULT_ALLOCATOR;
-
 struct Context {
-	Allocator *allocator;
+	Allocator allocator;
 	jmp_buf jmp;
 };
 

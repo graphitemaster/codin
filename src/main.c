@@ -11,6 +11,7 @@
 #include "strbuf.h"
 #include "utility.h"
 #include "sched.h"
+#include "allocator.h"
 
 typedef struct Command Command;
 
@@ -65,7 +66,7 @@ static void worker(void *data, Context *context) {
 
 static Bool dump_ast(String path) {
 	Context ctx;
-	ctx.allocator = &DEFAULT_ALLOCATOR;
+	allocator_init(&ctx.allocator, SCLIT("arena"));
 
 	Context *context = &ctx;
 
@@ -104,13 +105,13 @@ static Bool dump_ast(String path) {
 	for (Size i = 0; i < n_work; i++) {
 		Tree *tree = work[i].tree;
 		if (tree) {
-			dump(tree);
+			// dump(tree);
 		}
 	}
 
 	sched_fini(&sched);
 
-	ctx.allocator->finalize(ctx.allocator);
+	allocator_fini(&ctx.allocator);
 
 	return true;
 }

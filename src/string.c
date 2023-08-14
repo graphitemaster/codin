@@ -3,6 +3,7 @@
 
 #include "string.h"
 #include "context.h"
+#include "allocator.h"
 
 static void *our_memrrchr(const void *m, int c, size_t n) {
 	const unsigned char *s = CAST(const unsigned char *, m);
@@ -17,8 +18,8 @@ String _string_copy_from_data(const Uint8 *data, Size length, Context *context) 
 	if (length == 0) {
 		return STRING_NIL;
 	}
-	Allocator *allocator = context->allocator;
-	Uint8 *storage = allocator->allocate(allocator, length);
+	Allocator *allocator = &context->allocator;
+	Uint8 *storage = allocator_allocate(allocator, length);
 	if (!storage) {
 		THROW(ERROR_OOM);
 	}
@@ -59,14 +60,14 @@ String string_unquote(String string, const char *quote_set) {
 }
 
 void _string_free(String string, Context *context) {
-	Allocator *allocator = context->allocator;
-	allocator->deallocate(allocator, string.contents);
+	Allocator *allocator = &context->allocator;
+	allocator_deallocate(allocator, string.contents);
 }
 
 char* _string_to_null(String string, Context *context) {
-	Allocator *allocator = context->allocator;
+	Allocator *allocator = &context->allocator;
 	const Size length = string.length;
-	char *result = allocator->allocate(allocator, length + 1);
+	char *result = allocator_allocate(allocator, length + 1);
 	if (!result) {
 		THROW(ERROR_OOM);
 	}
@@ -147,8 +148,8 @@ void _utf8_to_utf16(const char *source, Uint16 **const destination, Context *con
 	Size length = 0;
 	utf8_to_utf16_core(source, 0, &length);
 
-	Allocator *allocator = context->allocator;
-	Uint16 *dest = allocator->allocate(allocator, (length + 1) * sizeof *dest);
+	Allocator *allocator = &context->allocator;
+	Uint16 *dest = allocator_allocate(allocator, (length + 1) * sizeof *dest);
 	if (!dest) {
 		THROW(ERROR_OOM);
 	}

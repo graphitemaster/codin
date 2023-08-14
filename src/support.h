@@ -126,6 +126,7 @@ NORETURN void report_assertion(const char *expression, const char *file, int lin
 struct Ptr {
 	constexpr Ptr(void *p = 0) noexcept : p{p} {}
 	template <typename T> operator T*() const noexcept { return CAST(T*, p); };
+	constexpr operator bool() const noexcept { return p; }
 	void *p = 0;
 };
 #else

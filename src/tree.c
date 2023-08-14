@@ -1,17 +1,18 @@
 #include "tree.h"
 #include "context.h"
+#include "allocator.h"
 
 ListExpression *tree_new_list_expression(Tree *tree, Array(Expression*) expressions) {
-	Allocator *allocator = tree->context->allocator;
-	ListExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	ListExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_LIST;
 	expression->expressions = expressions;
 	return expression;
 }
 
 UnaryExpression *tree_new_unary_expression(Tree *tree, OperatorKind operation, Expression *operand) {
-	Allocator *allocator = tree->context->allocator;
-	UnaryExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	UnaryExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_UNARY;
 	expression->operation = operation;
 	expression->operand = operand;
@@ -19,8 +20,8 @@ UnaryExpression *tree_new_unary_expression(Tree *tree, OperatorKind operation, E
 }
 
 BinaryExpression *tree_new_binary_expression(Tree *tree, OperatorKind operation, Expression *lhs, Expression *rhs) {
-	Allocator *allocator = tree->context->allocator;
-	BinaryExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	BinaryExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_BINARY;
 	expression->operation = operation;
 	expression->lhs = lhs;
@@ -29,8 +30,8 @@ BinaryExpression *tree_new_binary_expression(Tree *tree, OperatorKind operation,
 }
 
 TernaryExpression *tree_new_ternary_expression(Tree *tree, Expression *on_true, KeywordKind operation, Expression *cond, Expression *on_false) {
-	Allocator *allocator = tree->context->allocator;
-	TernaryExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	TernaryExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_TERNARY;
 	expression->on_true = on_true;
 	expression->operation = operation;
@@ -40,8 +41,8 @@ TernaryExpression *tree_new_ternary_expression(Tree *tree, Expression *on_true, 
 }
 
 CastExpression *tree_new_cast_expression(Tree *tree, OperatorKind kind, Type *type, Expression *expression) {
-	Allocator *allocator = tree->context->allocator;
-	CastExpression *expr = allocator->allocate(allocator, sizeof *expr);
+	Allocator *allocator = &tree->context->allocator;
+	CastExpression *expr = allocator_allocate(allocator, sizeof *expr);
 	expr->base.kind = EXPRESSION_CAST;
 	expr->kind = kind;
 	expr->type = type;
@@ -50,8 +51,8 @@ CastExpression *tree_new_cast_expression(Tree *tree, OperatorKind kind, Type *ty
 }
 
 SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand, Identifier *identifier) {
-	Allocator *allocator = tree->context->allocator;
-	SelectorExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	SelectorExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_SELECTOR;
 	expression->operand = operand;
 	expression->identifier = identifier;
@@ -59,8 +60,8 @@ SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand
 }
 
 CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Field*) arguments) {
-	Allocator *allocator = tree->context->allocator;
-	CallExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	CallExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_CALL;
 	expression->operand = operand;
 	expression->arguments = arguments;
@@ -68,8 +69,8 @@ CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(
 }
 
 AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Type *type) {
-	Allocator *allocator = tree->context->allocator;
-	AssertionExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	AssertionExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_ASSERTION;
 	expression->operand = operand;
 	expression->type = type;
@@ -77,8 +78,8 @@ AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *opera
 }
 
 ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, ListExpression *where_clauses,BlockStatement *body) {
-	Allocator *allocator = tree->context->allocator;
-	ProcedureExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	ProcedureExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_PROCEDURE;
 	expression->type = type;
 	expression->where_clauses = where_clauses;
@@ -87,16 +88,16 @@ ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *ty
 }
 
 TypeExpression *tree_new_type_expression(Tree *tree, Type *type) {
-	Allocator *allocator = tree->context->allocator;
-	TypeExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	TypeExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_TYPE;
 	expression->type = type;
 	return expression;
 }
 
 IndexExpression *tree_new_index_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs) {
-	Allocator *allocator = tree->context->allocator;
-	IndexExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	IndexExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_INDEX;
 	expression->operand = operand;
 	expression->lhs = lhs;
@@ -105,8 +106,8 @@ IndexExpression *tree_new_index_expression(Tree *tree, Expression *operand, Expr
 }
 
 SliceExpression *tree_new_slice_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs) {
-	Allocator *allocator = tree->context->allocator;
-	SliceExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	SliceExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_SLICE;
 	expression->operand = operand;
 	expression->lhs = lhs;
@@ -115,8 +116,8 @@ SliceExpression *tree_new_slice_expression(Tree *tree, Expression *operand, Expr
 }
 
 LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, String value) {
-	Allocator *allocator = tree->context->allocator;
-	LiteralExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	LiteralExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_LITERAL;
 	expression->kind = kind;
 	expression->value = value;
@@ -124,8 +125,8 @@ LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, Str
 }
 
 CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Type *type, Array(Field*) fields) {
-	Allocator *allocator = tree->context->allocator;
-	CompoundLiteralExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	CompoundLiteralExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_COMPOUND_LITERAL;
 	expression->type = type;
 	expression->fields = fields;
@@ -133,23 +134,23 @@ CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Type
 }
 
 IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier) {
-	Allocator *allocator = tree->context->allocator;
-	IdentifierExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	IdentifierExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_IDENTIFIER;
 	expression->identifier = identifier;
 	return expression;
 }
 
 UndefinedExpression *tree_new_undefined_expression(Tree *tree) {
-	Allocator *allocator = tree->context->allocator;
-	UndefinedExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	UndefinedExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_UNDEFINED;
 	return expression;
 }
 
 ProcedureGroupExpression *tree_new_procedure_group_expression(Tree *tree, Array(Expression*) expressions) {
-	Allocator *allocator = tree->context->allocator;
-	ProcedureGroupExpression *expression = allocator->allocate(allocator, sizeof *expression);
+	Allocator *allocator = &tree->context->allocator;
+	ProcedureGroupExpression *expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_PROCEDURE_GROUP;
 	expression->expressions = expressions;
 	return expression;
@@ -157,16 +158,16 @@ ProcedureGroupExpression *tree_new_procedure_group_expression(Tree *tree, Array(
 
 // Statements.
 EmptyStatement *tree_new_empty_statement(Tree *tree) {
-	Allocator *allocator = tree->context->allocator;
-	EmptyStatement *statement = allocator->allocate(allocator, sizeof *statement);
+	Allocator *allocator = &tree->context->allocator;
+	EmptyStatement *statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_EMPTY;
 	return statement;
 }
 
 ImportStatement *tree_new_import_statement(Tree *tree, String name, String package, Bool is_using) {
 	Context *context = tree->context;
-	Allocator *allocator = context->allocator;
-	ImportStatement *statement = allocator->allocate(allocator, sizeof *statement);
+	Allocator *allocator = &context->allocator;
+	ImportStatement *statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_IMPORT;
 	statement->name = string_copy(name);
 	statement->package = string_copy(package);
@@ -175,16 +176,16 @@ ImportStatement *tree_new_import_statement(Tree *tree, String name, String packa
 }
 
 ExpressionStatement *tree_new_expression_statement(Tree *tree, Expression *expression) {
-	Allocator *allocator = tree->context->allocator;
-	ExpressionStatement *statement = allocator->allocate(allocator, sizeof *statement);
+	Allocator *allocator = &tree->context->allocator;
+	ExpressionStatement *statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_EXPRESSION;
 	statement->expression = expression;
 	return statement;
 }
 
 BlockStatement *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Statement*) statements) {
-	Allocator *allocator = tree->context->allocator;
-	BlockStatement *statement = allocator->allocate(allocator, sizeof *statement);
+	Allocator *allocator = &tree->context->allocator;
+	BlockStatement *statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_BLOCK;
 	statement->flags = flags;
 	statement->statements = statements;
@@ -192,8 +193,8 @@ BlockStatement *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Stat
 }
 
 AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, ListExpression *lhs, ListExpression *rhs) {
-	Allocator *allocator = tree->context->allocator;
-	AssignmentStatement *statement = allocator->allocate(allocator, sizeof *statement);
+	Allocator *allocator = &tree->context->allocator;
+	AssignmentStatement *statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_ASSIGNMENT;
 	statement->assignment = assignment;
 	statement->lhs = lhs;
@@ -202,8 +203,8 @@ AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind as
 }
 
 DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values, Bool is_using) {
-	Allocator *allocator = tree->context->allocator;
-	DeclarationStatement *statement = CAST(DeclarationStatement *, allocator->allocate(allocator, sizeof *statement));
+	Allocator *allocator = &tree->context->allocator;
+	DeclarationStatement *statement = CAST(DeclarationStatement *, allocator_allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_DECLARATION;
 	statement->type = type;
 	statement->names = names;
@@ -214,8 +215,8 @@ DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Arr
 }
 
 IfStatement *tree_new_if_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, BlockStatement *elif) {
-	Allocator *allocator = tree->context->allocator;
-	IfStatement *statement = CAST(IfStatement *, allocator->allocate(allocator, sizeof *statement));
+	Allocator *allocator = &tree->context->allocator;
+	IfStatement *statement = CAST(IfStatement *, allocator_allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_IF;
 	statement->body = body;
 	statement->cond = cond;
@@ -225,8 +226,8 @@ IfStatement *tree_new_if_statement(Tree *tree, Statement *init, Expression *cond
 }
 
 WhenStatement *tree_new_when_statement(Tree *tree, Expression *cond, BlockStatement *body, BlockStatement *elif) {
-	Allocator *allocator = tree->context->allocator;
-	WhenStatement *statement = CAST(WhenStatement *, allocator->allocate(allocator, sizeof *statement));
+	Allocator *allocator = &tree->context->allocator;
+	WhenStatement *statement = CAST(WhenStatement *, allocator_allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_WHEN;
 	statement->body = body;
 	statement->cond = cond;
@@ -235,8 +236,8 @@ WhenStatement *tree_new_when_statement(Tree *tree, Expression *cond, BlockStatem
 }
 
 ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, Statement *post) {
-	Allocator *allocator = tree->context->allocator;
-	ForStatement *statement = CAST(ForStatement *, allocator->allocate(allocator, sizeof *statement));
+	Allocator *allocator = &tree->context->allocator;
+	ForStatement *statement = CAST(ForStatement *, allocator_allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_FOR;
 	statement->body = body;
 	statement->cond = cond;
@@ -246,8 +247,8 @@ ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *co
 }
 
 SwitchStatement *tree_new_switch_statement(Tree *tree, Statement *init, Expression *cond, Array(CaseClause*) clauses) {
-	Allocator *allocator = tree->context->allocator;
-	SwitchStatement *statement = CAST(SwitchStatement *, allocator->allocate(allocator, sizeof *statement));
+	Allocator *allocator = &tree->context->allocator;
+	SwitchStatement *statement = CAST(SwitchStatement *, allocator_allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_SWITCH;
 	statement->init = init;
 	statement->cond = cond;
@@ -256,24 +257,24 @@ SwitchStatement *tree_new_switch_statement(Tree *tree, Statement *init, Expressi
 }
 
 ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) results) {
-	Allocator *allocator = tree->context->allocator;
-	ReturnStatement *statement = CAST(ReturnStatement *, allocator->allocate(allocator, sizeof *statement));
+	Allocator *allocator = &tree->context->allocator;
+	ReturnStatement *statement = CAST(ReturnStatement *, allocator_allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_RETURN;
 	statement->results = results;
 	return statement;
 }
 
 DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt) {
-	Allocator *allocator = tree->context->allocator;
-	DeferStatement *statement = CAST(DeferStatement *, allocator->allocate(allocator, sizeof *statement));
+	Allocator *allocator = &tree->context->allocator;
+	DeferStatement *statement = CAST(DeferStatement *, allocator_allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_DEFER;
 	statement->statement = stmt;
 	return statement;
 }
 
 BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label) {
-	Allocator *allocator = tree->context->allocator;
-	BranchStatement *statement = CAST(BranchStatement *, allocator->allocate(allocator, sizeof *statement));
+	Allocator *allocator = &tree->context->allocator;
+	BranchStatement *statement = CAST(BranchStatement *, allocator_allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_BRANCH;
 	statement->branch = branch;
 	statement->label = label;
@@ -281,8 +282,8 @@ BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Ident
 }
 
 ForeignBlockStatement *tree_new_foreign_block_statement(Tree *tree, Identifier *name, BlockStatement *body) {
-	Allocator *allocator = tree->context->allocator;
-	ForeignBlockStatement *statement = CAST(ForeignBlockStatement *, allocator->allocate(allocator, sizeof *statement));
+	Allocator *allocator = &tree->context->allocator;
+	ForeignBlockStatement *statement = CAST(ForeignBlockStatement *, allocator_allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_FOREIGN_BLOCK;
 	statement->name = name;
 	statement->body = body;
@@ -291,8 +292,8 @@ ForeignBlockStatement *tree_new_foreign_block_statement(Tree *tree, Identifier *
 }
 
 ForeignImportStatement *tree_new_foreign_import_statement(Tree *tree, String name, Array(String) sources) {
-	Allocator *allocator = tree->context->allocator;
-	ForeignImportStatement *statement = CAST(ForeignImportStatement *, allocator->allocate(allocator, sizeof *statement));
+	Allocator *allocator = &tree->context->allocator;
+	ForeignImportStatement *statement = CAST(ForeignImportStatement *, allocator_allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_FOREIGN_IMPORT;
 	statement->name = name;
 	statement->sources = sources;
@@ -301,8 +302,8 @@ ForeignImportStatement *tree_new_foreign_import_statement(Tree *tree, String nam
 }
 
 UsingStatement *tree_new_using_statement(Tree *tree, ListExpression *list) {
-	Allocator *allocator = tree->context->allocator;
-	UsingStatement *statement = CAST(UsingStatement *, allocator->allocate(allocator, sizeof *statement));
+	Allocator *allocator = &tree->context->allocator;
+	UsingStatement *statement = CAST(UsingStatement *, allocator_allocate(allocator, sizeof *statement));
 	statement->base.kind = STATEMENT_USING;
 	statement->list = list;
 	return statement;
@@ -310,8 +311,8 @@ UsingStatement *tree_new_using_statement(Tree *tree, ListExpression *list) {
 
 Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly) {
 	Context *context = tree->context;
-	Allocator *allocator = context->allocator;
-	Identifier *identifier = CAST(Identifier *, allocator->allocate(allocator, sizeof *identifier));
+	Allocator *allocator = &context->allocator;
+	Identifier *identifier = CAST(Identifier *, allocator_allocate(allocator, sizeof *identifier));
 	identifier->contents = string_copy(contents);
 	identifier->poly = poly;
 	identifier->token = array_size(tree->tokens) - 1;
@@ -320,8 +321,8 @@ Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly) {
 
 CaseClause *tree_new_case_clause(Tree *tree, ListExpression *expressions, Array(Statement*) statements) {
 	Context *context = tree->context;
-	Allocator *allocator = context->allocator;
-	CaseClause *clause = CAST(CaseClause *, allocator->allocate(allocator, sizeof *clause));
+	Allocator *allocator = &context->allocator;
+	CaseClause *clause = CAST(CaseClause *, allocator_allocate(allocator, sizeof *clause));
 	clause->expressions = expressions;
 	clause->statements = statements;
 	return clause;
@@ -330,8 +331,8 @@ CaseClause *tree_new_case_clause(Tree *tree, ListExpression *expressions, Array(
 // Types
 
 static Type *new_type(Tree *tree, TypeKind kind, Size sizeof_type) {
-	Allocator *allocator = tree->context->allocator;
-	Type *type = CAST(Type *, allocator->allocate(allocator, sizeof_type));
+	Allocator *allocator = &tree->context->allocator;
+	Type *type = CAST(Type *, allocator_allocate(allocator, sizeof_type));
 	type->kind = kind;
 	type->poly = false;
 	return type;
@@ -503,8 +504,8 @@ GenericProcedureType *tree_new_generic_procedure_type(Tree *tree, Array(Field*) 
 }
 
 Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value, String tag, FieldFlag flags) {
-	Allocator *allocator = tree->context->allocator;
-	Field *field = allocator->allocate(allocator, sizeof *field);
+	Allocator *allocator = &tree->context->allocator;
+	Field *field = allocator_allocate(allocator, sizeof *field);
 	field->type = type;
 	field->name = name;
 	field->value = value;
