@@ -108,6 +108,8 @@ struct Lexer {
 };
 
 Bool lexer_init(Lexer *lexer, const Source *source, Context *context);
+void lexer_fini(Lexer *lexer);
+
 Token lexer_next(Lexer *lexer);
 Token lexer_peek(Lexer *lexer);
 

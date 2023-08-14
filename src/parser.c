@@ -104,6 +104,10 @@ static Bool parser_init(Parser *parser, const Source *source, Tree *tree, Contex
 	return true;
 }
 
+void parser_fini(Parser *parser) {
+	lexer_fini(&parser->lexer);
+}
+
 static FORCE_INLINE Bool is_kind(Token token, Kind kind) {
 	return token.kind == kind;
 }
@@ -3299,6 +3303,8 @@ Bool parse(Tree *tree, String filename, Context *context) {
 			array_push(tree->statements, statement);
 		}
 	}
+
+	parser_fini(&parser);
 
 	return true;
 }

@@ -342,6 +342,10 @@ Bool lexer_init(Lexer *lexer, const Source *source, Context *context) {
 	return true;
 }
 
+void lexer_fini(Lexer *lexer) {
+	array_free(lexer->peek);
+}
+
 static Token lexer_raw_next(Lexer *lexer);
 
 Token lexer_peek(Lexer *lexer) {

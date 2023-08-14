@@ -11,6 +11,7 @@
 #include "src/path.c"
 #include "src/report.c"
 #include "src/sched_async.c"
+#include "src/sched_null.c"
 #include "src/sched_sync.c"
 #include "src/sched.c"
 #include "src/strbuf.c"
