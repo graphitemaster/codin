@@ -29,7 +29,7 @@ static Bool sizefile(FILE *fp, Uint64 *size) {
 
 Array(Uint8) readfile(String filename, Context *context) {
 	// Need to introduce the NUL to call fopen.
-	FILE *fp = fopen(string_to_null(filename), "rb");
+	FILE *fp = fopen(string_to_null(filename, context), "rb");
 	if (!fp) {
 		return 0;
 	}

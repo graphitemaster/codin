@@ -19,77 +19,58 @@ Bool path_mkdir(const char *pathname, Context *context) {
 	return mkdir(pathname, 0777) == 0;
 #elif defined(OS_WINDOWS)
 	Uint16 *pathname_utf16 = 0;
-	if (utf8_to_utf16(pathname, &pathname_utf16)) {
-		return CreateDirectoryW(RCAST(LPCWSTR, pathname_utf16), 0);
-	} else {
-		return false;
-	}
-#elif
-	return false;
+	utf8_to_utf16(pathname, &pathname_utf16, context);
+	return CreateDirectoryW(RCAST(LPCWSTR, pathname_utf16), 0);
+#else
+	#error Missing implementation
 #endif
-}
-
-Bool dir_list_r_impl(String path, Array(String) *results, Context *context) {
-	DIR *dp = opendir(string_to_null(path));
-	if (!dp) {
-		return false;
-	}
-	for (struct dirent *de = readdir(dp); de; de = readdir(dp)) {
-		const char *name = de->d_name;
-		if (!strcmp(name, ".") || !strcmp(name, "..") || de->d_type != DT_DIR) {
-			continue;
-		}
-		StrBuf buf;
-		strbuf_init(&buf, context);
-		strbuf_put_string(&buf, path);
-		strbuf_put_rune(&buf, '/');
-		strbuf_put_string(&buf, string_from_null(name));
-		const String result = strbuf_result(&buf);
-		array_push(*results, result);
-		if (!dir_list_r_impl(result, results, context)) {
-			goto L_error;
-		}
-	}
-
-	closedir(dp);
-	return true;
-
-L_error:
-	closedir(dp);
 	return false;
-}
-
-Array(String) dir_list_r(String path, Context *context) {
-	Array(String) results = array_make(context);
-	if (dir_list_r_impl(path, &results, context)) {
-		return results;
-	}
-	array_free(results);
-	return 0;
 }
 
 Array(String) path_list(String path, Context *context) {
 	Array(String) results = array_make(context);
+	char *terminated = string_to_null(path, context);
 #if defined(OS_POSIX)
-	DIR *dp = opendir(string_to_null(path));
+	DIR *dp = opendir(terminated);
 	if (!dp) {
-		return 0;
+		goto L_error;
 	}
 	for (struct dirent *de = readdir(dp); de; de = readdir(dp)) {
 		const char *name = de->d_name;
-		if (!strcmp(name, ".") || !strcmp(name, "..") || de->d_type == DT_DIR) {
+		if (de->d_type == DT_DIR) {
 			continue;
 		}
-		array_push(results, string_copy_from_null(name));
+		array_push(results, string_copy_from_null(name, context));
 	}
 	closedir(dp);
 	return results;
 #elif defined(OS_WINDOWS)
-	(void)path;
-	(void)context;
-	// TODO(dweiler): Implement.
+	Uint16 *pathname_utf16 = 0;
+	utf8_to_utf16(terminated, &pathname_utf16, context);
+	WIN32_FIND_DATAW ent;
+	HANDLE handle = FindFirstFileW(RCAST(LPCWSTR, pathname_utf16), &ent);
+	allocator_deallocate(&context->allocator, pathname_utf16);
+	if (handle == INVALID_HANDLE_VALUE) {
+		goto L_error;
+	}
+	while (handle != INVALID_HANDLE_VALUE) {
+		if (ent.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			continue;
+		}
+		char *pathname_utf8 = 0;
+		utf16_to_utf8(RCAST(const Uint16 *, ent.cFileName), &pathname_utf8, context);
+		array_push(results, string_from_null(pathname_utf8));
+	}
+	FindClose(handle);
+#else
+	#error Missing implementation
 #endif
 	return results;
+
+L_error:
+	allocator_deallocate(&context->allocator, terminated);
+	array_free(results);
+	return 0;
 }
 
 String path_cat(String pathname, String filename, Context *context) {
@@ -109,8 +90,30 @@ String path_cat(String pathname, String filename, Context *context) {
 }
 
 String path_canonicalize(String pathname, Context *context) {
-	char *resolved = realpath(string_to_null(pathname), 0);
-	String result = string_copy_from_null(resolved);
+	char *terminated = string_to_null(pathname, context);
+#if defined(OS_POSIX)
+	char *resolved = realpath(terminated, 0);
+	String result = string_copy_from_null(resolved, context);
 	free(resolved);
 	return result;
+#elif defined(OS_WINDOWS)
+	Allocator *const allocator = &context->allocator;
+	// Convert pathname to UTF-16.
+	Uint16 *pathname_utf16 = 0;
+	utf8_to_utf16(terminated, &pathname_utf16, context);
+	ULONG length = GetFullPathNameW(RCAST(LPCWSTR, pathname_utf16), 0, 0, 0);
+	PWSTR buffer = allocator_allocate(allocator, length * sizeof(WCHAR));
+	if (GetFullPathNameW(RCAST(LPCWSTR, pathname_utf16), length, buffer, 0)) {
+		allocator_deallocate(allocator, pathname_utf16);
+		char *pathname_utf8 = 0;
+		utf16_to_utf8(RCAST(const Uint16 *, buffer), &pathname_utf8, context);
+		allocator_deallocate(allocator, buffer);
+		return string_from_null(pathname_utf8);
+	}
+	allocator_deallocate(allocator, pathname_utf16);
+	allocator_deallocate(allocator, buffer);
+#else
+	#error Missing implementation
+#endif
+	return STRING_NIL;
 }

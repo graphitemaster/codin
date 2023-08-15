@@ -14,12 +14,12 @@ static void *our_memrrchr(const void *m, int c, size_t n) {
 
 const String STRING_NIL = { 0, 0 };
 
-String _string_copy_from_data(const Uint8 *data, Size length, Context *context) {
+String string_copy_from_data(const Uint8 *data, Size length, Context *context) {
 	if (length == 0) {
 		return STRING_NIL;
 	}
-	Allocator *allocator = &context->allocator;
-	Uint8 *storage = allocator_allocate(allocator, length);
+	Allocator *const allocator = &context->allocator;
+	Uint8 *const storage = allocator_allocate(allocator, length);
 	if (!storage) {
 		THROW(ERROR_OOM);
 	}
@@ -27,20 +27,20 @@ String _string_copy_from_data(const Uint8 *data, Size length, Context *context) 
 	return LIT(String, storage, length);
 }
 
-String _string_copy_from_null(const char *string, Context *context) {
+String string_copy_from_null(const char *string, Context *context) {
 	if (string == 0) {
 		return STRING_NIL;
 	}
 	const Size length = strlen(string);
-	return _string_copy_from_data(RCAST(const Uint8 *, string), length, context);
+	return string_copy_from_data(RCAST(const Uint8 *, string), length, context);
 }
 
 String string_from_null(const char *string) {
 	return LIT(String, RCAST(Uint8*, CCAST(char*, string)), strlen(string));
 }
 
-String _string_copy(String string, Context *context) {
-	return _string_copy_from_data(string.contents, string.length, context);
+String string_copy(String string, Context *context) {
+	return string_copy_from_data(string.contents, string.length, context);
 }
 
 Bool string_compare(String lhs, String rhs) {
@@ -59,15 +59,15 @@ String string_unquote(String string, const char *quote_set) {
 	return string;
 }
 
-void _string_free(String string, Context *context) {
-	Allocator *allocator = &context->allocator;
+void string_free(String string, Context *context) {
+	Allocator *const allocator = &context->allocator;
 	allocator_deallocate(allocator, string.contents);
 }
 
-char* _string_to_null(String string, Context *context) {
-	Allocator *allocator = &context->allocator;
+char *string_to_null(String string, Context *context) {
+	Allocator *const allocator = &context->allocator;
 	const Size length = string.length;
-	char *result = allocator_allocate(allocator, length + 1);
+	char *const result = allocator_allocate(allocator, length + 1);
 	if (!result) {
 		THROW(ERROR_OOM);
 	}
@@ -87,7 +87,7 @@ Bool string_ends_with(String string, String suffix) {
 }
 
 Bool string_find_first_byte(String string, Uint8 byte, Size *index) {
-	const Uint8 *find = CAST(const Uint8*, memchr(string.contents, byte, string.length));
+	const Uint8 *const find = CAST(const Uint8*, memchr(string.contents, byte, string.length));
 	if (find) {
 		*index = find - string.contents;
 		return true;
@@ -96,7 +96,7 @@ Bool string_find_first_byte(String string, Uint8 byte, Size *index) {
 }
 
 Bool string_find_last_byte(String string, Uint8 byte, Size *index) {
-	const Uint8 *find = CAST(const Uint8*, our_memrrchr(string.contents, byte, string.length));
+	const Uint8 *const find = CAST(const Uint8*, our_memrrchr(string.contents, byte, string.length));
 	if (find) {
 		*index = find - string.contents;
 		return true;
@@ -144,7 +144,7 @@ static void utf8_to_utf16_core(const char *const source, Uint16 *destination, Si
 	}
 }
 
-void _utf8_to_utf16(const char *source, Uint16 **const destination, Context *context) {
+void utf8_to_utf16(const char *source, Uint16 **const destination, Context *context) {
 	Size length = 0;
 	utf8_to_utf16_core(source, 0, &length);
 
@@ -155,6 +155,68 @@ void _utf8_to_utf16(const char *source, Uint16 **const destination, Context *con
 	}
 
 	utf8_to_utf16_core(source, dest, 0);
+	dest[length] = 0;
+	*destination = dest;
+}
+
+static void utf16_to_utf8_core(const Uint16 *const source, char *destination, Size *const length) {
+	Size elements = 0;
+	Uint32 code_point = 0;
+	for (const Uint16 *element = source; *element; element++) {
+		if (*element >= 0xd800 && *element <= 0xdbff) {
+			code_point = ((*element - 0xd800) << 10) + 0x10000;
+		} else {
+			if (*element >= 0xdc00 && *element <= 0xdfff) {
+				code_point |= *element - 0xdc00;
+			} else {
+				code_point = *element;
+			}
+			if (code_point < 0x7f) {
+				elements += 1;
+				if (destination) {
+					*destination++ = CAST(char, code_point);
+				}
+			} else if (code_point <= 0x7ff) {
+				elements += 2;
+				if (destination) {
+					*destination++ = CAST(char, 0xc0 | ((code_point >> 6) & 0x1f));
+					*destination++ = CAST(char, 0x80 | (code_point & 0x3f));
+				}
+			} else if (code_point <= 0xffff) {
+				elements += 3;
+				if (destination) {
+					*destination++ = CAST(char, 0xe0 | ((code_point >> 12) & 0x0f));
+					*destination++ = CAST(char, 0x80 | ((code_point >> 6) & 0x3f));
+					*destination++ = CAST(char, 0x80 | (code_point & 0x3f));
+				}
+			} else {
+				elements += 4;
+				if (destination) {
+					*destination++ = CAST(char, 0xf0 | ((code_point >> 18) & 0x07));
+					*destination++ = CAST(char, 0x80 | ((code_point >> 12) & 0x3f));
+					*destination++ = CAST(char, 0x80 | ((code_point >> 6) & 0x3f));
+					*destination++ = CAST(char, 0x80 | (code_point & 0x3f));
+				}
+			}
+			code_point = 0;
+		}
+	}
+	if (length) {
+		*length = elements;
+	}
+}
+
+void utf16_to_utf8(const Uint16 *source, char **destination, Context *context) {
+	Size length = 0;
+	utf16_to_utf8_core(source, 0, &length);
+
+	Allocator *const allocator = &context->allocator;
+	char *dest = allocator_allocate(allocator, (length + 1) * sizeof *dest);
+	if (!dest) {
+		THROW(ERROR_OOM);
+	}
+
+	utf16_to_utf8_core(source, dest, 0);
 	dest[length] = 0;
 	*destination = dest;
 }

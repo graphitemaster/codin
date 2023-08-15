@@ -33,16 +33,16 @@ struct String {
 
 extern const String STRING_NIL;
 
-String _string_copy_from_data(const Uint8 *data, Size size, Context *context);
-String _string_copy_from_null(const char *string, Context *context);
+String string_copy_from_data(const Uint8 *data, Size size, Context *context);
+String string_copy_from_null(const char *string, Context *context);
 
 String string_from_null(const char *string);
 
-String _string_copy(String string, Context *context);
+String string_copy(String string, Context *context);
 Bool string_compare(String lhs, String rhs);
 String string_unquote(String string, const char *quote_set);
-void _string_free(String string, Context *context);
-char* _string_to_null(String string, Context *context);
+void string_free(String string, Context *context);
+char* string_to_null(String string, Context *context);
 Bool string_starts_with(String string, String prefix);
 Bool string_ends_with(String string, String suffix);
 
@@ -51,29 +51,12 @@ Bool string_find_last_byte(String string, Uint8 byte, Size *index);
 
 String string_slice(String string, Size from, Size len);
 
-void _utf8_to_utf16(const char *source, Uint16 **const destination, Context *context);
+void utf8_to_utf16(const char *source, Uint16 **const destination, Context *context);
+void utf16_to_utf8(const Uint16 *source, char **const destination, Context *context);
 
 #define UTF8_ACCEPT 0
 #define UTF8_REJECT 12
 
 Uint32 utf8_decode(Uint32 *state, Rune *codep, Uint32 byte);
-
-#define utf8_to_utf16(source, destination) \
-	_utf8_to_utf16((source), (destination), context)
-
-#define string_copy(string) \
-	_string_copy((string), context)
-
-#define string_copy_from_data(data, size) \
-	_string_copy_from_data((data), (size), context)
-
-#define string_copy_from_null(string) \
-	_string_copy_from_null((string), context)
-
-#define string_free(string) \
-	_string_free((string), context)
-
-#define string_to_null(string) \
-	_string_to_null((string), context)
 
 #endif // CODIN_STRING_H
