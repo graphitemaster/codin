@@ -98,6 +98,9 @@ static FORCE_INLINE Bool is_char(Rune ch) {
 		}
 		return ((CAST(Uint32, ch) | 0x20) - 0x61) < 26; // [a-z][A-Z]
 	}
+	if (ch > 128) {
+		return true;
+	}
 	// TODO(dweiler): UTF-8.
 	return false;
 }
@@ -179,7 +182,7 @@ static void scan(Lexer* lexer, Sint32 base) {
 }
 
 static FORCE_INLINE Token mkkind(const Lexer *lexer, Kind kind) {
-	Token token = {};
+	Token token = {0};
 	token.kind = kind;
 	token.location = lexer->last_location;
 	return token;

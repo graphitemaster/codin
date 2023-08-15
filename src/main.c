@@ -47,8 +47,9 @@ static Bool dump_ast(String pathname) {
 	Bool result = false;
 	BuildContext build;
 	build_init(&build, SCLIT("arena"), SCLIT("async"));
-	build_add_collection(&build, SCLIT("core"), SCLIT("./core"));
-	build_add_collection(&build, SCLIT("vendor"), SCLIT("./vendor"));
+	// build_init(&build, SCLIT("arena"), SCLIT("sync"));
+	build_add_collection(&build, SCLIT("core"), SCLIT("W:/Odin/core"));
+	build_add_collection(&build, SCLIT("vendor"), SCLIT("W:/Odin/vendor"));
 	build_add_package(&build, pathname);
 	build_wait(&build);
 
@@ -58,7 +59,7 @@ static Bool dump_ast(String pathname) {
 		if (work->error) {
 			goto L_error;
 		}
-		dump(work->tree);
+		// dump(work->tree);
 	}
 
 	result = true;
@@ -84,5 +85,5 @@ int main(int argc, char **argv) {
 		return usage(app);
 	}
 
-	return result ? 1 : 0;
+	return result ? 0 : 1;
 }
