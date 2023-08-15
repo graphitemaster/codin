@@ -84,10 +84,9 @@ Tree *package_add_tree(Package *package, String filename) {
 	mutex_lock(&package->mutex);
 
 	Tree *tree = allocator_allocate(&context->allocator, sizeof *tree);
-	tree_init(tree, filename, context);
+	tree->source.name = filename;
 
 	array_push(package->trees, tree);
-
 	mutex_unlock(&package->mutex);
 
 	return tree;

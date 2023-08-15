@@ -3335,6 +3335,8 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 }
 
 Bool parse(Tree *tree, Context *context) {
+	tree_init(tree, tree->source.name, context);
+
 	if (!source_read(&tree->source, context)) {
 		return false;
 	}
