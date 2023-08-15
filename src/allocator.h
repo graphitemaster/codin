@@ -19,7 +19,7 @@ struct Allocator {
 	void *user;
 };
 
-Bool allocator_init(Allocator *allocator, String name);
+Bool allocator_init(Allocator *allocator, const String name);
 void allocator_fini(Allocator *allocator);
 
 Ptr allocator_allocate(Allocator *allocator, Size bytes);

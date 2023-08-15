@@ -67,7 +67,7 @@
 			_Static_assert(expr, message)
 	#else
 		#define STATIC_ASSERT(expr, ...) \
-			typedef int static_assert_ ## __LINE __ [(expr) ? 1 : -1]
+			typedef int static_assert_ ## __LINE__ [(expr) ? 1 : -1]
 	#endif
 #endif
 

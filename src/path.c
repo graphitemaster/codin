@@ -80,13 +80,16 @@ Array(String) path_list(String path, Context *context) {
 	if (handle == INVALID_HANDLE_VALUE) {
 		goto L_error;
 	}
-	while (handle != INVALID_HANDLE_VALUE) {
+	for (;;) {
 		if (ent.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 			continue;
 		}
 		char *pathname_utf8 = 0;
 		utf16_to_utf8(RCAST(const Uint16 *, ent.cFileName), &pathname_utf8, context);
 		array_push(results, string_from_null(pathname_utf8));
+		if (!FindNextFileW(handle, &ent)) {
+			break;
+		}
 	}
 	FindClose(handle);
 #else
