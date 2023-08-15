@@ -97,8 +97,8 @@ void mutex_init(Mutex *mutex) {
 		abort();
 	}
 #elif defined(OS_WINDOWS)
-	CRITICAL_SECTION *handle = RCAST(CRITICAL_SECTION*, mutex->storage);
-	InitializeCriticalSection(handle);
+	SRWLOCK *handle = RCAST(SRWLOCK *, mutex->storage);
+	InitializeSRWLock(handle); // just zeros the memory
 #endif
 }
 
@@ -109,8 +109,6 @@ void mutex_fini(Mutex *mutex) {
 		abort();
 	}
 #elif defined(OS_WINDOWS)
-	CRITICAL_SECTION *handle = RCAST(CRITICAL_SECTION*, mutex->storage);
-	DeleteCriticalSection(handle);
 #endif
 }
 
@@ -123,8 +121,8 @@ void mutex_lock(Mutex *mutex)
 		abort();
 	}
 #elif defined(OS_WINDOWS)
-	CRITICAL_SECTION *handle = RCAST(CRITICAL_SECTION*, mutex->storage);
-	EnterCriticalSection(handle);
+	SRWLOCK *handle = RCAST(SRWLOCK *, mutex->storage);
+	AcquireSRWLockExclusive(handle);
 #endif
 }
 
@@ -137,8 +135,8 @@ void mutex_unlock(Mutex *mutex)
 		abort();
 	}
 #elif defined(OS_WINDOWS)
-	CRITICAL_SECTION *handle = RCAST(CRITICAL_SECTION*, mutex->storage);
-	LeaveCriticalSection(handle);
+	SRWLOCK *handle = RCAST(SRWLOCK *, mutex->storage);
+	ReleaseSRWLockExclusive(handle);
 #endif
 }
 
@@ -175,8 +173,8 @@ void cond_wait(Cond *cond, Mutex *mutex) {
 	}
 #elif defined(OS_WINDOWS)
 	CONDITION_VARIABLE *cond_handle = RCAST(CONDITION_VARIABLE*, cond->storage);
-	CRITICAL_SECTION *mutex_handle = RCAST(CRITICAL_SECTION*, mutex->storage);
-	if (!SleepConditionVariableCS(cond_handle, mutex_handle, INFINITE)) {
+	SRWLOCK *mutex_handle = RCAST(SRWLOCK*, mutex->storage);
+	if (!SleepConditionVariableSRW(cond_handle, mutex_handle, INFINITE, 0)) {
 		abort();
 	}
 #endif
