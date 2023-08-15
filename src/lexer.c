@@ -350,8 +350,9 @@ static Token lexer_raw_next(Lexer *lexer);
 
 Token lexer_peek(Lexer *lexer) {
 	const Token peek = lexer_raw_next(lexer);
+	const Size index = array_size(lexer->peek);
 	array_push(lexer->peek, peek);
-	return peek;
+	return index ? lexer->peek[index - 1] : peek;
 }
 
 static Token lexer_tokenize(Lexer *lexer) {

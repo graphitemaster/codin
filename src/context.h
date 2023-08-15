@@ -1,7 +1,7 @@
 #ifndef CODIN_CONTEXT_H
 #define CODIN_CONTEXT_H
-#include <setjmp.h>
-#include <stdlib.h> // abort
+#include <setjmp.h> // jmp_buf, setjmp, longjmp
+
 #include "allocator.h"
 #include "profiler.h"
 typedef struct Context Context;
