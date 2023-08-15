@@ -621,7 +621,8 @@ static Array(Field*) parse_field_list(Parser *parser, Bool is_struct) {
 			const FieldFlag flags = field_flags[i];
 			StrBuf buf;
 			strbuf_init(&buf, context);
-			strbuf_put_formatted(&buf, "__unnamed_%d", CAST(Sint32, i));
+			strbuf_put_string(&buf, SCLIT("__unnamed_"));
+			strbuf_put_int(&buf, CAST(Sint32, i), 10);
 			Identifier *name = tree_new_identifier(parser->tree, strbuf_result(&buf), false);
 			array_push(fields, tree_new_field(parser->tree, type, name, value, tag, flags));
 		}

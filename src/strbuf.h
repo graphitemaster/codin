@@ -16,6 +16,7 @@ void strbuf_fini(StrBuf *strbuf);
 void strbuf_clear(StrBuf *strbuf);
 Bool strbuf_put_rune(StrBuf *strbuf, Rune ch);
 Bool strbuf_put_string(StrBuf *strbuf, String string);
+Bool strbuf_put_int(StrBuf *strbuf, Sint32 i, Sint32 base);
 String strbuf_result(StrBuf *strbuf);
 void strbuf_put_formatted(StrBuf *strbuf, const char *fmt, ...);
 

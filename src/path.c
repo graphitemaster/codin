@@ -73,12 +73,11 @@ Array(String) path_list(String path, Context *context) {
 	closedir(dp);
 	return results;
 #elif defined(OS_WINDOWS)
-	StrBuf buf;
-	strbuf_init(&buf, context);
-	strbuf_put_formatted(&buf, "%.*s\\*", SFMT(path));
+	const char WILDCARD[] = "\\*";
+	char *terminated = allocator_allocate(&context->allocator, path.length + sizeof WILDCARD);
+	memcpy(terminated, path.contents, path.length);
+	memcpy(terminated + path.length, WILDCARD, sizeof WILDCARD);
 	Uint16 *pathname_utf16 = 0;
-	char *terminated = string_to_null(strbuf_result(&buf), context);
-	strbuf_fini(&buf);
 	utf8_to_utf16(terminated, &pathname_utf16, context);
 	allocator_deallocate(&context->allocator, terminated);
 	WIN32_FIND_DATAW ent;

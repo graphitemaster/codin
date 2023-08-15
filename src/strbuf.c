@@ -50,6 +50,37 @@ Bool strbuf_put_string(StrBuf *strbuf, String string) {
 	return false;
 }
 
+Bool strbuf_put_int(StrBuf *strbuf, Sint32 i, Sint32 base) {
+	char buffer[sizeof(Sint32) * 8 + 1 + 1];
+	static const char DIGITS[36] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+	// Start filling from the end
+	char* p = &buffer[sizeof buffer - 1];
+	*p = '\0';
+
+	// Work with negative `int`
+	int an = i < 0 ? i : -i;
+	do {
+		*(--p) = DIGITS[-(an % base)];
+		an /= base;
+	} while (an);
+
+	if (i < 0) {
+		*(--p) = '-';
+	}
+
+	const Size used = &buffer[sizeof(buffer)] - p;
+	const Size index = array_size(strbuf->contents);
+
+	if (!array_expand(strbuf->contents, used)) {
+		return false;
+	}
+
+	memcpy(&strbuf->contents[index], p, used);
+
+	return true;
+}
+
 void strbuf_put_formatted(StrBuf *strbuf, const char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
