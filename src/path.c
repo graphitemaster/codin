@@ -13,17 +13,44 @@
 #include <windows.h>
 #endif
 
-Bool path_mkdir(const char *pathname, Context *context) {
+Bool path_mkdir(String pathname, Context *context) {
+	char *terminated = string_to_null(pathname, context);
 #if defined(OS_POSIX)
 	(void)context;
-	return mkdir(pathname, 0777) == 0;
+	return mkdir(terminated, 0777) == 0;
 #elif defined(OS_WINDOWS)
 	Uint16 *pathname_utf16 = 0;
-	utf8_to_utf16(pathname, &pathname_utf16, context);
-	return CreateDirectoryW(RCAST(LPCWSTR, pathname_utf16), 0);
+	utf8_to_utf16(terminated, &pathname_utf16, context);
+	allocator_deallocate(&context->allocator, terminated);
+	const Bool result = CreateDirectoryW(RCAST(LPCWSTR, pathname_utf16), 0);
+	allocator_deallocate(&context->allocator, pathname_utf16);
+	return result;
 #else
 	#error Missing implementation
 #endif
+	allocator_deallocate(&context->allocator, terminated);
+	return false;
+}
+
+Bool path_directory_exists(String pathname, Context *context) {
+	char *terminated = string_to_null(pathname, context);
+#if defined(OS_POSIX)
+	struct stat s = {};
+	if (stat(terminated, &s) == 0) {
+		allocator_deallocate(&context->allocator, terminated);
+		return (s.st_mode & S_IFDIR);
+	}
+#elif defined(OS_WINDOWS)
+	Uint16 *pathname_utf16 = 0;
+	utf8_to_utf16(terminated, &pathname_utf16, context);
+	allocator_deallocate(&context->allocator, terminated);
+	const DWORD attributes = GetFileAttributesW(RCAST(LPCWSTR, pathname_utf16));
+	allocator_deallocate(&context->allocator, pathname_utf16);
+	return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY);
+#else
+	#error Missing implementation
+#endif
+	allocator_deallocate(&context->allocator, terminated);
 	return false;
 }
 

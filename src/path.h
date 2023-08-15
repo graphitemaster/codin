@@ -5,7 +5,8 @@
 
 typedef struct Context Context;
 
-Bool path_mkdir(const char *pathname, Context *context);
+Bool path_mkdir(String pathname, Context *context);
+Bool path_directory_exists(String pathname, Context *context);
 Array(String) path_list(String path, Context *context);
 String path_cat(String pathname, String filename, Context *context);
 String path_canonicalize(String pathname, Context *context);

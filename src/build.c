@@ -47,6 +47,10 @@ void build_wait(BuildContext *build) {
 }
 
 Bool build_add_collection(BuildContext *build, String name, String path) {
+	if (!path_directory_exists(path, &build->context)) {
+		return false;
+	}
+
 	const Size n_collections = array_size(build->collections);
 	for (Size i = 0; i < n_collections; i++) {
 		const Collection *const collection = &build->collections[i];

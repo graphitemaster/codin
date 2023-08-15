@@ -46,8 +46,8 @@ static int usage(const char *app) {
 static Bool dump_ast(String pathname) {
 	BuildContext build;
 	build_init(&build, SCLIT("arena"), SCLIT("sync"));
-	// build_add_collection(&build, SCLIT("core"), SCLIT("./core"));
-	// build_add_collection(&build, SCLIT("vendor"), SCLIT("./vendor"));
+	build_add_collection(&build, SCLIT("core"), SCLIT("./core"));
+	build_add_collection(&build, SCLIT("vendor"), SCLIT("./vendor"));
 	build_add_package(&build, pathname);
 	build_wait(&build);
 
