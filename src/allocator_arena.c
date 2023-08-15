@@ -4,6 +4,12 @@
 #include "allocator.h"
 #include "thread.h"
 
+#if defined(OS_WINDOWS)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#undef IN
+#endif
+
 typedef struct Arena Arena;
 typedef struct ArenaRegion ArenaRegion;
 
@@ -23,9 +29,27 @@ struct ArenaRegion {
 	Uint8 data[];
 };
 
+void *my_alloc(Size size) {
+#if defined(OS_WINDOWS)
+	// Because Windows is shit
+	return HeapAlloc(GetProcessHeap(), 0, size);
+#else
+	return malloc(size);
+#endif
+}
+
+void my_free(void *ptr) {
+#if defined(OS_WINDOWS)
+	// Because Windows is shit
+	HeapFree(GetProcessHeap(), 0, ptr);
+#else
+	free(ptr);
+#endif
+}
+
 static ArenaRegion *arena_allocator_new_region(Size capacity) {
 	const Size bytes = sizeof(ArenaRegion) + capacity;
-	ArenaRegion *region = CAST(ArenaRegion *, malloc(bytes));
+	ArenaRegion *region = CAST(ArenaRegion *, my_alloc(bytes));
 	if (!region) {
 		return 0;
 	}
@@ -39,7 +63,7 @@ static ArenaRegion *arena_allocator_new_region(Size capacity) {
 }
 
 static Bool arena_allocator_init(Allocator *allocator) {
-	Arena *arena = CAST(Arena *, malloc(sizeof *arena));
+	Arena *arena = CAST(Arena *, my_alloc(sizeof *arena));
 	if (!arena) {
 		return false;
 	}
@@ -66,11 +90,11 @@ static void arena_allocator_fini(Allocator *allocator) {
 		region = region->next;
 		mutex_unlock(&self->mutex);
 		mutex_fini(&self->mutex);
-		free(self);
+		my_free(self);
 	}
 	mutex_unlock(&arena->mutex);
 	mutex_fini(&arena->mutex);
-	free(arena);
+	my_free(arena);
 	allocator->user = 0;
 }
 
