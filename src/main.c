@@ -59,7 +59,7 @@ static Bool dump_ast(String pathname) {
 		if (work->error) {
 			goto L_error;
 		}
-		// dump(work->tree);
+		dump(work->tree);
 	}
 
 	result = true;

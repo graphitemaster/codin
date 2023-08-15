@@ -1,13 +1,18 @@
 #include "threadpool.h"
+#include "context.h"
 
 struct ThreadPoolWork {
-	void (*function)(void *user);
+	void (*function)(void *user, Context *context);
 	void *user;
-	void (*dispose)(void *user);
+	void (*dispose)(void *user, Context *context);
 };
 
 static int threadpool_worker(void *user) {
 	ThreadPool *pool = CAST(ThreadPool*, user);
+
+	Context context;
+	context_init(&context, pool->context->allocator.ops->name);
+
 	for (;;) {
 		mutex_lock(&pool->mutex);
 		while (!pool->quit && array_size(pool->work) == 0) {
@@ -23,12 +28,14 @@ static int threadpool_worker(void *user) {
 		ThreadPoolWork work = pool->work[--meta->size];
 		mutex_unlock(&pool->mutex);
 
-		work.function(work.user);
+		work.function(work.user, &context);
 
 		if (work.dispose) {
-			work.dispose(work.user);
+			work.dispose(work.user, &context);
 		}
 	}
+
+	context_fini(&context);
 }
 
 Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
@@ -63,22 +70,11 @@ void threadpool_fini(ThreadPool *pool) {
 
 	array_free(pool->threads);
 
-	mutex_lock(&pool->mutex);
-	const Size n_work = array_size(pool->work);
-	for (Size i = 0; i < n_work; i++) {
-		ThreadPoolWork *work = &pool->work[i];
-		if (work->dispose) {
-			work->dispose(work->user);
-		}
-	}
-	array_free(pool->work);
-	mutex_unlock(&pool->mutex);
-
 	cond_fini(&pool->cond);
 	mutex_fini(&pool->mutex);
 }
 
-void threadpool_queue(ThreadPool *pool, void (*function)(void*), void *user, void (*dispose)(void*)) {
+void threadpool_queue(ThreadPool *pool, void (*function)(void*, Context*), void *user, void (*dispose)(void*, Context*)) {
 	mutex_lock(&pool->mutex);
 	const ThreadPoolWork work = LIT(ThreadPoolWork, function, user, dispose);
 	array_push(pool->work, work);

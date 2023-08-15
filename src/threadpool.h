@@ -19,6 +19,6 @@ struct ThreadPool {
 
 Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context);
 void threadpool_fini(ThreadPool *pool);
-void threadpool_queue(ThreadPool *pool, void (*function)(void*), void *user, void (*dispose)(void*));
+void threadpool_queue(ThreadPool *pool, void (*function)(void*, Context *context), void *user, void (*dispose)(void*, Context *context));
 
 #endif // CODIN_THREADPOOL_H

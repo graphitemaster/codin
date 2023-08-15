@@ -1577,7 +1577,7 @@ static Expression *parse_directive_prefix(Parser *parser, Bool lhs) {
 		}
 	case DIRECTIVE_RELATIVE:
 		{
-			Expression *const base_type = parse_directive_call_expression(parser, SCLIT("relative"));
+			parse_directive_call_expression(parser, SCLIT("relative"));
 			Type *const pointer_type = parse_type(parser);
 			TRACE_LEAVE();
 			return RCAST(Expression *, tree_new_type_expression(parser->tree, pointer_type));

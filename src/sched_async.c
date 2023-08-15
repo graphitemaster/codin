@@ -15,20 +15,19 @@ struct SchedAsync {
 };
 
 struct SchedAsyncWork {
-	Context context;
 	SchedAsync *sched;
 	void *data;
 	void (*func)(void *data, Context *context);
 	void (*dispose)(void *data, Context *context);
 };
 
-static void _sched_async_work_func(void *data) {
+static void _sched_async_work_func(void *data, Context *context) {
 	SchedAsyncWork *work = RCAST(SchedAsyncWork *, data);
-	if (!setjmp(work->context.jmp)) {
-		work->func(work->data, &work->context);
+	if (!setjmp(context->jmp)) {
+		work->func(work->data, context);
 	}
 	if (work->dispose) {
-		work->dispose(work->data, &work->context);
+		work->dispose(work->data, context);
 	}
 	SchedAsync *sched = work->sched;
 	mutex_lock(&sched->mutex);
@@ -37,9 +36,8 @@ static void _sched_async_work_func(void *data) {
 	mutex_unlock(&sched->mutex);
 }
 
-static void _sched_async_work_dispose(void *data) {
-	SchedAsyncWork *work = RCAST(SchedAsyncWork *, data);
-	Allocator *allocator = &work->context.allocator;
+static void _sched_async_work_dispose(void *data, Context *context) {
+	Allocator *allocator = &context->allocator;
 	allocator_deallocate(allocator, data);
 }
 
@@ -84,8 +82,6 @@ static Bool sched_async_queue(void *ctx, void *data, void (*func)(void *data, Co
 	if (!work) {
 		THROW(ERROR_OOM);
 	}
-
-	context_copy(&work->context, context);
 
 	work->sched = sched;
 	work->data = data;
