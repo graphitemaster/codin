@@ -25,14 +25,13 @@ static const Uint8 PRECEDENCE[] = {
 	0,
 };
 
-static Bool source_read(Source *source, String filename, Context *context) {
-	Array(Uint8) const contents = readfile(filename, context);
+static Bool source_read(Source *source, Context *context) {
+	Array(Uint8) const contents = readfile(source->name, context);
 	if (!contents) {
 		return false;
 	}
 	source->contents.contents = contents;
 	source->contents.length = array_size(contents);
-	source->name = filename;
 	return true;
 }
 
@@ -81,11 +80,11 @@ static FORCE_INLINE void parser_trace_leave(Parser *parser) {
 #define TRACE_LEAVE()
 #endif
 
-static Bool parser_init(Parser *parser, const Source *source, Tree *tree, Context *context) {
+static Bool parser_init(Parser *parser, Tree *tree, Context *context) {
 	parser->context = context;
 	parser->tree = tree;
 
-	if (!lexer_init(&parser->lexer, source, context)) {
+	if (!lexer_init(&parser->lexer, &tree->source, context)) {
 		return false;
 	}
 
@@ -222,7 +221,7 @@ static Bool advance_possible_newline_within(Parser *parser) {
 	if (token.location.line + 1 < next.location.line) {
 		return false;
 	}
-	if (!is_kind(next, KIND_LBRACE) && !is_keyword(next, KEYWORD_ELSE) && is_keyword(next, KEYWORD_WHERE)) {
+	if (!is_kind(next, KIND_LBRACE) && !is_keyword(next, KEYWORD_ELSE) && !is_keyword(next, KEYWORD_WHERE)) {
 		return false;
 	}
 	advancep(parser);
@@ -327,7 +326,7 @@ static void expect_semicolon(Parser *parser) {
 
 	if (token.location.line == parser->last_token.location.line) {
 		const String got = token_to_string(token);
-		PARSE_ERROR("Expected ';', got '%.*s'", SFMT(got));
+		PARSE_ERROR("Expected semicolon, got '%.*s'", SFMT(got));
 	}
 }
 
@@ -527,6 +526,9 @@ static FieldFlag parse_field_flags(Parser *parser) {
 			break;
 		case DIRECTIVE_SUBTYPE:
 			flags |= FIELD_FLAG_SUBTYPE;
+			break;
+		case DIRECTIVE_CONST:
+			flags |= FIELD_FLAG_CONST;
 			break;
 		default:
 			{
@@ -925,7 +927,9 @@ static Statement *parse_directive_for_statement(Parser *parser, BlockFlag block_
 		statement = parse_statement(parser, block_flags);
 		break;
 	case DIRECTIVE_FORCE_INLINE:
-		// Ignore the force_inline directive for now.
+		FALLTHROUGH();
+	case DIRECTIVE_FORCE_NO_INLINE:
+		// Ignore the force_inline and force_no_inline directives for now.
 		statement = parse_statement(parser, block_flags);
 		break;
 	default:
@@ -1254,10 +1258,13 @@ static TypeExpression *parse_struct_type_expression(Parser *parser) {
 		case DIRECTIVE_RAW_UNION:
 			flags |= STRUCT_FLAG_UNION;
 			break;
+		case DIRECTIVE_NO_COPY:
+			flags |= STRUCT_FLAG_UNCOPYABLE;
+			break;
 		default:
 			{
 				const String name = directive_to_string(directive);
-				PARSE_ERROR("Unexpected directive '%.*s' on structure", name);
+				PARSE_ERROR("Unexpected directive '%.*s' on structure", SFMT(name));
 			}
 		}
 	}
@@ -1538,6 +1545,12 @@ static Expression *parse_directive_prefix(Parser *parser, Bool lhs) {
 			TRACE_LEAVE();
 			return expression;
 		}
+	case DIRECTIVE_DEFINED:
+		{
+			Expression *const expression = parse_directive_call_expression(parser, SCLIT("defined"));
+			TRACE_LEAVE();
+			return expression;
+		}
 	case DIRECTIVE_LOAD:
 		{
 			Expression *const expression = parse_directive_call_expression(parser, SCLIT("load"));
@@ -1550,6 +1563,15 @@ static Expression *parse_directive_prefix(Parser *parser, Bool lhs) {
 			Identifier *caller_location_identifier = tree_new_identifier(parser->tree, SCLIT("caller_location"), false);
 			IdentifierExpression *operand = tree_new_identifier_expression(parser->tree, intrinsics_identifier);
 			SelectorExpression *expression = tree_new_selector_expression(parser->tree, RCAST(Expression *, operand), caller_location_identifier);
+			TRACE_LEAVE();
+			return RCAST(Expression *, expression);
+		}
+	case DIRECTIVE_PROCEDURE:
+		{
+			Identifier *intrinsics_identifier = tree_new_identifier(parser->tree, SCLIT("intrinsics"), false);
+			Identifier *procedure_identifier = tree_new_identifier(parser->tree, SCLIT("procedure"), false);
+			IdentifierExpression *operand = tree_new_identifier_expression(parser->tree, intrinsics_identifier);
+			SelectorExpression *expression = tree_new_selector_expression(parser->tree, RCAST(Expression *, operand), procedure_identifier);
 			TRACE_LEAVE();
 			return RCAST(Expression *, expression);
 		}
@@ -2538,6 +2560,9 @@ static Statement *parse_simple_statement(Parser* parser, BlockFlag block_flags, 
 						case STATEMENT_FOR:
 							RCAST(ForStatement *, statement)->label = label;
 							break;
+						case STATEMENT_SWITCH:
+							RCAST(SwitchStatement *, statement)->label = label;
+							break;
 						default:
 							PARSE_ERROR("Cannot apply label to this statement");
 						}
@@ -2571,7 +2596,7 @@ static Statement *parse_simple_statement(Parser* parser, BlockFlag block_flags, 
 static ImportStatement *parse_import_statement(Parser *parser, Bool is_using) {
 	TRACE_ENTER();
 
-	expect_keyword(parser, KEYWORD_IMPORT);
+	tree_record_token(parser->tree, expect_keyword(parser, KEYWORD_IMPORT));
 
 	Token token = TOKEN_NIL;
 	if (is_kind(parser->this_token, KIND_IDENTIFIER)) {
@@ -2744,6 +2769,7 @@ static WhenStatement *parse_when_statement(Parser *parser) {
 			array_push(statements, RCAST(Statement *, statement));
 			elif = tree_new_block_statement(parser->tree, flags, statements);
 		} else if (is_keyword(parser->this_token, KEYWORD_DO)) {
+			expect_keyword(parser, KEYWORD_DO);
 			elif = parse_do_body(parser, flags);
 		} else if (is_kind(parser->this_token, KIND_LBRACE)) {
 			elif = parse_block_statement(parser, flags, true);
@@ -3108,6 +3134,7 @@ static PackageStatement *parse_package_statement(Parser *parser) {
 
 	expect_keyword(parser, KEYWORD_PACKAGE);
 	const Token package = expect_kind(parser, KIND_IDENTIFIER);
+	tree_record_token(parser->tree, package);
 	
 	PackageStatement *statement = tree_new_package_statement(parser->tree, package.string);
 
@@ -3232,7 +3259,10 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 				return RCAST(Statement *, statement);
 			}
 		default:
-			ICE("Unexpected keyword in statement");
+			{
+				const String keyword = keyword_to_string(token.as_keyword);
+				ICE("Unexpected keyword '%.*s' in statement", SFMT(keyword));
+			}
 		}
 		break;
 	case KIND_IDENTIFIER:
@@ -3297,15 +3327,12 @@ static Statement *parse_statement(Parser *parser, BlockFlag block_flags) {
 }
 
 Bool parse(Tree *tree, Context *context) {
-	const String filename = tree->filename;
-
-	Source source;
-	if (!source_read(&source, filename, context)) {
+	if (!source_read(&tree->source, context)) {
 		return false;
 	}
 
 	Parser parser;
-	if (!parser_init(&parser, &source, tree, context)) {
+	if (!parser_init(&parser, tree, context)) {
 		return false;
 	}
 

@@ -202,7 +202,8 @@ enum FieldFlag {
 	FIELD_FLAG_C_VARARG = 1 << 1, // #c_vararg
 	FIELD_FLAG_NO_ALIAS = 1 << 2, // #no_alias
 	FIELD_FLAG_SUBTYPE  = 1 << 3, // #subtype
-	FIELD_FLAG_USING    = 1 << 3, // using
+	FIELD_FLAG_CONST    = 1 << 4, // #const
+	FIELD_FLAG_USING    = 1 << 5, // using
 };
 
 #define CCONVENTION(enumerator, string) CCONV_ ## enumerator,
@@ -372,6 +373,7 @@ struct ImportStatement {
 	String collection; // "core"
 	String pathname;   // "./fmt"
 	Bool is_using;
+	Location location; // location of the import statement
 };
 
 struct ExpressionStatement {
@@ -437,6 +439,7 @@ struct SwitchStatement {
 	Statement *init;
 	Expression *cond;
 	Array(CaseClause*) clauses;
+	Identifier *label;
 };
 
 struct DeferStatement {
@@ -472,6 +475,7 @@ struct UsingStatement {
 struct PackageStatement {
 	Statement base;
 	String name;
+	Location location;
 };
 
 // Types.
@@ -652,8 +656,9 @@ static inline String calling_convention_to_string(CallingConvention cc) {
 
 struct Tree {
 	Context *context;
-	String filename;
+	Source source;
 	Array(Statement*) statements;
+	Array(ImportStatement*) imports;
 	Array(Token) tokens; // Recorded tokens for diagnostics.
 };
 

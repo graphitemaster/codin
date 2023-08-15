@@ -177,6 +177,8 @@ ImportStatement *tree_new_import_statement(Tree *tree, String name, String colle
 		statement->pathname = path_cat(SCLIT("."), pathname, tree->context);
 	}
 	statement->is_using = is_using;
+	statement->location = tree->tokens[array_size(tree->tokens) - 1].location;
+	array_push(tree->imports, statement);
 	return statement;
 }
 
@@ -319,6 +321,7 @@ PackageStatement *tree_new_package_statement(Tree *tree, String name) {
 	PackageStatement *const statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_PACKAGE;
 	statement->name = name;
+	statement->location = tree->tokens[array_size(tree->tokens) - 1].location;
 	return statement;
 }
 
@@ -527,13 +530,16 @@ Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *valu
 
 void tree_init(Tree *tree, String filename, Context *context) {
 	tree->context = context;
-	tree->filename = filename;
+	tree->source.name = filename;
+	tree->source.contents = STRING_NIL;
 	tree->statements = array_make(context);
+	tree->imports = array_make(context);
 	tree->tokens = array_make(context);
 }
 
 void tree_fini(Tree *tree) {
 	array_free(tree->statements);
+	array_free(tree->imports);
 	array_free(tree->tokens);
 }
 

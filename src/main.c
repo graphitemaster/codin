@@ -1,13 +1,7 @@
-#include <stdio.h> // fprintf
-#include <stdlib.h> // system
-#include <string.h> // strcmp
+#include <stdio.h>
 
 #include "string.h" // String, SCLIT, SFMT
-#include "project.h"
-#include "context.h"
-#include "sched.h"
-#include "path.h"
-#include "parser.h"
+#include "build.h"
 #include "dump.h"
 
 typedef struct Command Command;
@@ -48,76 +42,26 @@ static int usage(const char *app) {
 	return 1;
 }
 
-typedef struct Work Work;
-struct Work {
-	Sched *sched;
-	Project *project;
-	Tree *tree;
-};
-
-static void worker(void *data, Context *context) {
-	Work *work = CAST(Work *, data);
-	if (!parse(work->tree, context)) {
-		return;
-	}
-
-	// Search for all import statements to add the packages
-	const Tree *const tree = work->tree;
-	const Size n_statements = array_size(tree->statements);
-	for (Size i = 0; i < n_statements; i++) {
-		const Statement *const statement = tree->statements[i];
-		if (statement->kind != STATEMENT_IMPORT) {
-			continue;
-		}
-
-		const ImportStatement *const import = 
-			RCAST(const ImportStatement *const, statement);
-
-		// TODO(dweiler): Handle the import by putting it on the scheduler.
-	}
-}
 
 static Bool dump_ast(String pathname) {
-	Context context;
-	allocator_init(&context.allocator, SCLIT("arena"));
+	BuildContext build;
+	build_init(&build, SCLIT("arena"), SCLIT("sync"));
+	// build_add_collection(&build, SCLIT("core"), SCLIT("./core"));
+	// build_add_collection(&build, SCLIT("vendor"), SCLIT("./vendor"));
+	build_add_package(&build, pathname);
+	build_wait(&build);
 
-	Project project;
-	project_init(&project, SCLIT("test"), &context);
-
-	Sched sched;
-	sched_init(&sched, SCLIT("sync"), &context);
-
-	Array(Work*) pending = array_make(&context);
-
-	Package *package = project_add_package(&project, pathname);
-	Array(String) files = path_list(pathname, &context);
-	const Size n_files = array_size(files);
-	for (Size i = 0; i < n_files; i++) {
-		const String filename = files[i];
-		if (string_ends_with(filename, SCLIT(".odin"))) {
-			Work *work = allocator_allocate(&context.allocator, sizeof *work);
-			work->sched = &sched;
-			work->project = &project;
-			work->tree = package_add_tree(package, path_cat(pathname, filename, &context));
-			array_push(pending, work);
-			sched_queue(&sched, work, worker, 0);
+	const Size n_work = array_size(build.work);
+	for (Size i = 0; i < n_work; i++) {
+		const BuildWork *const work = build.work[i];
+		if (work->error) {
+			goto L_error;
 		}
-	}
-
-	// Wait for all the work to be complete.
-	sched_wait(&sched);
-
-	const Size n_pending = array_size(pending);
-	for (Size i = 0; i < n_pending; i++) {
-		Work *const work = pending[i];
 		dump(work->tree);
-		allocator_deallocate(&context.allocator, work);
 	}
 
-	sched_fini(&sched);
-	project_fini(&project);
-	allocator_fini(&context.allocator);
-
+L_error:
+	build_fini(&build);
 	return true;
 }
 

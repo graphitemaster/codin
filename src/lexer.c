@@ -712,7 +712,7 @@ static Token lexer_tokenize(Lexer *lexer) {
 		}
 	}
 
-	UNREACHABLE();
+	LEX_ERROR("Unexpected rune '%d'", rune);
 }
 
 // Simple helper routines

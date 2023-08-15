@@ -5,6 +5,12 @@
 
 typedef struct Project Project;
 typedef struct Package Package;
+typedef struct Collection Collection;
+
+struct Collection {
+	String name;
+	String path;
+};
 
 struct Project {
 	Context *context;

@@ -107,3 +107,10 @@ String path_cat(String pathname, String filename, Context *context) {
 
 	return LIT(String, data, length);
 }
+
+String path_canonicalize(String pathname, Context *context) {
+	char *resolved = realpath(string_to_null(pathname), 0);
+	String result = string_copy_from_null(resolved);
+	free(resolved);
+	return result;
+}

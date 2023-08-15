@@ -185,12 +185,15 @@ DIRECTIVE(ASSERT,                   "assert")
 DIRECTIVE(PANIC,                    "panic")
 DIRECTIVE(UNROLL,                   "unroll")
 DIRECTIVE(LOCATION,                 "location")
+DIRECTIVE(PROCEDURE,                "procedure")
 DIRECTIVE(LOAD,                     "load")
 DIRECTIVE(LOAD_HASH,                "load_hash")
 DIRECTIVE(DEFINED,                  "defined")
 DIRECTIVE(CONFIG,                   "config")
 DIRECTIVE(MAYBE,                    "maybe")
 DIRECTIVE(CALLER_LOCATION,          "caller_location")
+DIRECTIVE(NO_COPY,                  "no_copy")
+DIRECTIVE(CONST,                    "const")
 
 //        ENUM,                     MATCH,                    WHERE
 ATTRIBUTE(TEST,                     "test",                   ATTRIBUTE_FOR_PROC)
@@ -232,6 +235,7 @@ CCONVENTION(NONE,        "none")
 CCONVENTION(NAKED,       "naked")
 CCONVENTION(WIN64,       "win64")
 CCONVENTION(SYSV,        "sysv")
+CCONVENTION(SYSTEM,      "system")
 
 #undef ATTRIBUTE
 #undef DIRECTIVE

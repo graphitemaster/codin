@@ -47,15 +47,13 @@ static Bool sched_sync_queue(void *ctx, void *data, void (*func)(void *data, Con
 
 static void sched_sync_wait(void *ctx) {
 	SchedSync *sched = CAST(SchedSync *, ctx);
-	Size n_work = array_size(sched->work);
-	// NOTE(dweiler): Needs to be volatile because of setjmp
-	volatile Size i = 0;
-	for (i = 0; i < n_work; i++) {
+	for (volatile Size i = 0; i < array_size(sched->work); i++) {
 		const SchedSyncWork *work = &sched->work[i];
 		if (!setjmp(sched->context.jmp)) {
 			work->func(work->data, &sched->context);
 		}
 	}
+	const Size n_work = array_size(sched->work);
 	for (Size i = 0; i < n_work; i++) {
 		const SchedSyncWork *work = &sched->work[i];
 		if (work->dispose) {

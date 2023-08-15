@@ -11,5 +11,6 @@ Array(String) path_list(String path, Context *context);
 Array(String) dir_list_r(String path, Context *context);
 
 String path_cat(String pathname, String filename, Context *context);
+String path_canonicalize(String pathname, Context *context);
 
 #endif // CODIN_PATH_H

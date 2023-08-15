@@ -1140,7 +1140,7 @@ Bool dump_statement(const Tree *tree, const Statement *statement, Sint32 depth) 
 	switch (statement->kind) {
 	case STATEMENT_EMPTY:          return false; // Nothing
 	case STATEMENT_BLOCK:          return dump_block_statement(tree, RCAST(const BlockStatement *, statement), depth);
-	case STATEMENT_IMPORT:         return dump_import_statement(tree, RCAST(const ImportStatement *, statement), depth);
+	case STATEMENT_IMPORT:         return false; // return dump_import_statement(tree, RCAST(const ImportStatement *, statement), depth);
 	case STATEMENT_EXPRESSION:     return dump_expression_statement(tree, RCAST(const ExpressionStatement *, statement), depth);
 	case STATEMENT_ASSIGNMENT:     return dump_assignment_statement(tree, RCAST(const AssignmentStatement *, statement), depth);
 	case STATEMENT_DECLARATION:    return dump_declaration_statement(tree, RCAST(const DeclarationStatement *, statement), depth);
@@ -1151,8 +1151,8 @@ Bool dump_statement(const Tree *tree, const Statement *statement, Sint32 depth) 
 	case STATEMENT_SWITCH:         return dump_switch_statement(tree, RCAST(const SwitchStatement *, statement), depth);
 	case STATEMENT_DEFER:          return dump_defer_statement(tree, RCAST(const DeferStatement *, statement), depth);
 	case STATEMENT_BRANCH:         return dump_branch_statement(tree, RCAST(const BranchStatement *, statement), depth);
-	case STATEMENT_FOREIGN_BLOCK:  return dump_foreign_block_statement(tree, RCAST(const ForeignBlockStatement *, statement), depth);
-	case STATEMENT_FOREIGN_IMPORT: return dump_foreign_import_statement(tree, RCAST(const ForeignImportStatement *, statement), depth);
+	case STATEMENT_FOREIGN_BLOCK:  return false; // dump_foreign_block_statement(tree, RCAST(const ForeignBlockStatement *, statement), depth);
+	case STATEMENT_FOREIGN_IMPORT: return false; // dump_foreign_import_statement(tree, RCAST(const ForeignImportStatement *, statement), depth);
 	case STATEMENT_USING:          return dump_using_statement(tree, RCAST(const UsingStatement *, statement), depth);
 	case STATEMENT_PACKAGE:        return dump_package_statement(tree, RCAST(const PackageStatement *, statement), depth);
 	}
@@ -1172,7 +1172,8 @@ void dump(Tree *tree) {
 	const Size n_statements = array_size(tree->statements);
 	for (Size i = 0; i < n_statements; i++) {
 		const Statement *statement = tree->statements[i];
-		dump_statement(tree, statement, 0);
-		printf("\n");
+		if (dump_statement(tree, statement, 0)) {
+			printf("\n");
+		}
 	}
 }

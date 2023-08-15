@@ -26,7 +26,6 @@ void sched_null_wait(void *ctx) {
 	// Does nothing.
 }
 
-
 const SchedOperations SCHED_NULL = {
 	SLIT("null"),
 	sched_null_init,

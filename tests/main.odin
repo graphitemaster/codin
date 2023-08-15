@@ -1,6 +1,7 @@
 package main
 
-foo :: proc() {
-	a :=
-	10;
+import "core:fmt"
+
+main :: proc() {
+	fmt.printf("Hello, world!");
 }

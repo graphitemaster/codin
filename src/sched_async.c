@@ -49,7 +49,7 @@ Bool sched_async_init(Context *context, void **instance) {
 	if (!sched) {
 		THROW(ERROR_OOM);
 	}
-	if (!threadpool_init(&sched->pool, 1, context)) {
+	if (!threadpool_init(&sched->pool, 4, context)) {
 		allocator_deallocate(allocator, sched);
 		return false;
 	}
@@ -85,7 +85,8 @@ static Bool sched_async_queue(void *ctx, void *data, void (*func)(void *data, Co
 		THROW(ERROR_OOM);
 	}
 
-	work->context.allocator = *allocator;
+	context_copy(&work->context, context);
+
 	work->sched = sched;
 	work->data = data;
 	work->func = func;
@@ -93,12 +94,13 @@ static Bool sched_async_queue(void *ctx, void *data, void (*func)(void *data, Co
 
 	mutex_lock(&sched->mutex);
 	sched->count++;
+	mutex_unlock(&sched->mutex);
+
 	threadpool_queue(
 		&sched->pool,
 		_sched_async_work_func,
 		work,
 		_sched_async_work_dispose);
-	mutex_unlock(&sched->mutex);
 
 	return true;
 }
