@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <stdatomic.h>
 
 #include "allocator.h"
 #include "thread.h"
