@@ -56,9 +56,10 @@ Bool path_directory_exists(String pathname, Context *context) {
 
 Array(String) path_list(String path, Context *context) {
 	Array(String) results = array_make(context);
-	char *terminated = string_to_null(path, context);
 #if defined(OS_POSIX)
+	char *terminated = string_to_null(path, context);
 	DIR *dp = opendir(terminated);
+	allocator_deallocate(&context->allocator, terminated);
 	if (!dp) {
 		goto L_error;
 	}
@@ -72,25 +73,28 @@ Array(String) path_list(String path, Context *context) {
 	closedir(dp);
 	return results;
 #elif defined(OS_WINDOWS)
+	StrBuf buf;
+	strbuf_init(&buf, context);
+	strbuf_put_formatted(&buf, "%.*s\\*", SFMT(path));
 	Uint16 *pathname_utf16 = 0;
+	char *terminated = string_to_null(strbuf_result(&buf), context);
+	strbuf_fini(&buf);
 	utf8_to_utf16(terminated, &pathname_utf16, context);
+	allocator_deallocate(&context->allocator, terminated);
 	WIN32_FIND_DATAW ent;
 	HANDLE handle = FindFirstFileW(RCAST(LPCWSTR, pathname_utf16), &ent);
 	allocator_deallocate(&context->allocator, pathname_utf16);
 	if (handle == INVALID_HANDLE_VALUE) {
 		goto L_error;
 	}
-	for (;;) {
+	do {
 		if (ent.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 			continue;
 		}
 		char *pathname_utf8 = 0;
 		utf16_to_utf8(RCAST(const Uint16 *, ent.cFileName), &pathname_utf8, context);
 		array_push(results, string_from_null(pathname_utf8));
-		if (!FindNextFileW(handle, &ent)) {
-			break;
-		}
-	}
+	} while (FindNextFileW(handle, &ent));
 	FindClose(handle);
 #else
 	#error Missing implementation
@@ -98,7 +102,6 @@ Array(String) path_list(String path, Context *context) {
 	return results;
 
 L_error:
-	allocator_deallocate(&context->allocator, terminated);
 	array_free(results);
 	return 0;
 }

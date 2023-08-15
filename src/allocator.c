@@ -31,5 +31,5 @@ Ptr allocator_reallocate(Allocator *allocator, void *data, Size old_size, Size n
 }
 
 void allocator_deallocate(Allocator *allocator, void *data) {
-	return allocator->ops->deallocate(allocator, data);
+	allocator->ops->deallocate(allocator, data);
 }

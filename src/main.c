@@ -44,6 +44,7 @@ static int usage(const char *app) {
 
 
 static Bool dump_ast(String pathname) {
+	Bool result = false;
 	BuildContext build;
 	build_init(&build, SCLIT("arena"), SCLIT("async"));
 	build_add_collection(&build, SCLIT("core"), SCLIT("./core"));
@@ -60,9 +61,11 @@ static Bool dump_ast(String pathname) {
 		dump(work->tree);
 	}
 
+	result = true;
+
 L_error:
 	build_fini(&build);
-	return true;
+	return result;
 }
 
 int main(int argc, char **argv) {
