@@ -79,6 +79,33 @@ Bool build_add_collection(BuildContext *build, String name, String path) {
 	return true;
 }
 
+static Bool accepted_file(BuildContext *build, String filename) {
+	const Platform target_platform = build->settings.target_platform;
+
+	static const struct {
+		String   suffix;
+		Platform platform;
+	} PLATFORMS[] = {
+		{ SLIT("_linux.odin"),   PLATFORM_LINUX   },
+		{ SLIT("_freebsd.odin"), PLATFORM_FREEBSD },
+		{ SLIT("_darwin.odin"),  PLATFORM_DARWIN  },
+		{ SLIT("_windows.odin"), PLATFORM_WINDOWS },
+	};
+
+	for (Size i = 0; i < sizeof PLATFORMS / sizeof *PLATFORMS; i++) {
+		const String suffix = PLATFORMS[i].suffix;
+		if (string_ends_with(filename, suffix)) {
+			return target_platform == PLATFORMS[i].platform;
+		}
+	}
+
+	if (string_ends_with(filename, SCLIT("_unix.odin"))) {
+		return target_platform != PLATFORM_WINDOWS;
+	}
+
+	return true;
+}
+
 void build_add_package(BuildContext *build, String pathname) {
 	Context *const context = &build->context;
 	Project *const project = &build->project;
@@ -95,15 +122,11 @@ void build_add_package(BuildContext *build, String pathname) {
 		if (!string_ends_with(filename, SCLIT(".odin"))) {
 			continue;
 		}
-		if (string_ends_with(filename, SCLIT("_windows.odin"))
-			&& build->settings.target_platform != PLATFORM_WINDOWS) {
+
+		if (!accepted_file(build, filename)) {
 			continue;
 		}
-		if (string_ends_with(filename, SCLIT("_linux.odin"))
-			&& build->settings.target_platform != PLATFORM_LINUX)
-		{
-			continue;
-		}
+		
 		const String path = path_cat(pathname, filename, context);
 		sched_queue(&build->sched, build_add_work(build, package, path), build_worker, 0);
 	}

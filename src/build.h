@@ -16,8 +16,10 @@ enum Arch {
 };
 
 enum Platform {
-	PLATFORM_WINDOWS,
 	PLATFORM_LINUX,
+	PLATFORM_FREEBSD,
+	PLATFORM_DARWIN,
+	PLATFORM_WINDOWS,
 };
 
 typedef enum Arch Arch;
