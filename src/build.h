@@ -8,6 +8,20 @@ typedef struct Tree Tree;
 
 typedef struct BuildWork BuildWork;
 typedef struct BuildContext BuildContext;
+typedef struct BuildSettings BuildSettings;
+
+enum Arch {
+	ARCH_AMD64,
+	ARCH_AARCH64,
+};
+
+enum Platform {
+	PLATFORM_WINDOWS,
+	PLATFORM_LINUX,
+};
+
+typedef enum Arch Arch;
+typedef enum Platform Platform;
 
 struct BuildWork {
 	BuildContext *build;
@@ -16,11 +30,19 @@ struct BuildWork {
 	Bool error;
 };
 
+struct BuildSettings {
+	Arch host_arch;
+	Arch target_arch;
+	Platform host_platform;
+	Platform target_platform;
+};
+
 struct BuildContext {
 	Context context;
 	Sched sched;
 	Project project;
 	Array(Collection) collections;
+	BuildSettings settings;
 
 	Mutex mutex;
 	Array(BuildWork*) work THREAD_GUARDED(mutex);

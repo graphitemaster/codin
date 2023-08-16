@@ -3,10 +3,23 @@
 #include <stdint.h>
 #include <stddef.h>
 
+// OS_{}
 #if defined(_WIN32)
 	#define OS_WINDOWS
-#else
+#elif defined(__linux__)
 	#define OS_POSIX
+	#define OS_LINUX
+#else
+	#error Unsupported platform
+#endif
+
+// ISA_{}
+#if defined(__x86_64__) || defined(_M_X64)
+	#define ISA_AMD64
+#elif defined(__aarch64__)
+	#define ISA_AARCH64
+#else
+	#error Unsupported architecture
 #endif
 
 // FORCE_INLINE

@@ -21,6 +21,23 @@ void build_init(BuildContext *ctx, String allocator, String scheduler) {
 	ctx->collections = array_create(&ctx->context);
 	mutex_init(&ctx->mutex);
 	ctx->work = array_create(&ctx->context);
+
+	// Set host platform and architecture.
+#if defined(OS_WINDOWS)
+	ctx->settings.host_platform = PLATFORM_WINDOWS;
+#elif defined(OS_LINUX)
+	ctx->settings.host_platform = PLATFORM_LINUX;
+#endif
+
+#if defined(ISA_AMD64)
+	ctx->settings.host_arch = ARCH_AMD64;
+#elif defined(ISA_AARCH64)
+	ctx->settings.host_arch = ARCH_AARCH64;
+#endif
+
+	// TODO(dweiler): Support cross compilation.
+	ctx->settings.target_platform = ctx->settings.host_platform;
+	ctx->settings.target_arch = ctx->settings.host_arch;
 }
 
 void build_fini(BuildContext *build) {
@@ -67,13 +84,24 @@ void build_add_package(BuildContext *build, String pathname) {
 	Project *const project = &build->project;
 
 	Package *package = project_add_package(project, pathname);
-	if (!package) return; // Package already exists
+	if (!package){
+		return; // Package already exists
+	}
 
 	Array(String) filenames = path_list(pathname, context);
 	const Size n_filenames = array_size(filenames);
 	for (Size i = 0; i < n_filenames; i++) {
 		const String filename = filenames[i];
 		if (!string_ends_with(filename, SCLIT(".odin"))) {
+			continue;
+		}
+		if (string_ends_with(filename, SCLIT("_windows.odin"))
+			&& build->settings.target_platform != PLATFORM_WINDOWS) {
+			continue;
+		}
+		if (string_ends_with(filename, SCLIT("_linux.odin"))
+			&& build->settings.target_platform != PLATFORM_LINUX)
+		{
 			continue;
 		}
 		const String path = path_cat(pathname, filename, context);
