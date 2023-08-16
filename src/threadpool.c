@@ -40,11 +40,12 @@ static int threadpool_worker(void *user) {
 	return 0;
 }
 
-Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
+Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context)
+	THREAD_INTERNAL
+{
 	cond_init(&pool->cond);
 	mutex_init(&pool->mutex);
 
-	mutex_lock(&pool->mutex);
 	pool->context = context;
 	pool->threads = array_make(context);
 	pool->work = array_make(context);
@@ -54,8 +55,6 @@ Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
 	for (Size i = 0; i < n_threads; i++) {
 		thread_create(&pool->threads[i], threadpool_worker, pool);
 	}
-	mutex_unlock(&pool->mutex);
-
 	return true;
 }
 

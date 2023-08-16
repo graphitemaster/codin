@@ -48,11 +48,12 @@ static Bool dump_ast(String pathname) {
 	BuildContext build;
 	build_init(&build, SCLIT("arena"), SCLIT("async"));
 	// build_init(&build, SCLIT("arena"), SCLIT("sync"));
-	build_add_collection(&build, SCLIT("core"), SCLIT("W:/Odin/core"));
-	build_add_collection(&build, SCLIT("vendor"), SCLIT("W:/Odin/vendor"));
+	build_add_collection(&build, SCLIT("core"), SCLIT("./core"));
+	build_add_collection(&build, SCLIT("vendor"), SCLIT("./vendor"));
 	build_add_package(&build, pathname);
 	build_wait(&build);
 
+	mutex_lock(&build.mutex);
 	const Size n_work = array_size(build.work);
 	for (Size i = 0; i < n_work; i++) {
 		const BuildWork *const work = build.work[i];
@@ -65,6 +66,7 @@ static Bool dump_ast(String pathname) {
 	result = true;
 
 L_error:
+	mutex_unlock(&build.mutex);
 	build_fini(&build);
 	return result;
 }

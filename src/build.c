@@ -14,12 +14,14 @@
 static BuildWork *build_add_work(BuildContext *build, Package *package, String filename);
 static void build_worker(void *data, Context *context);
 
-void build_init(BuildContext *ctx, String allocator, String scheduler) {
+void build_init(BuildContext *ctx, String allocator, String scheduler)
+	THREAD_INTERNAL
+{
 	context_init(&ctx->context, allocator);
 	sched_init(&ctx->sched, scheduler, &ctx->context);
 	project_init(&ctx->project, SCLIT("test"), &ctx->context);
-	ctx->collections = array_create(&ctx->context);
 	mutex_init(&ctx->mutex);
+	ctx->collections = array_create(&ctx->context);
 	ctx->work = array_create(&ctx->context);
 
 	// Set host platform and architecture.

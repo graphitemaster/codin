@@ -49,7 +49,7 @@ void strbuf_put_string(StrBuf *strbuf, String string) {
 
 void strbuf_put_int(StrBuf *strbuf, Sint32 i, Sint32 base) {
 	char buffer[sizeof(Sint32) * 8 + 1 + 1];
-	static const char DIGITS[36] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	static const char DIGITS[37] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 	// Start filling from the end
 	char* p = &buffer[sizeof buffer - 1];

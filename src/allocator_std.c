@@ -20,23 +20,22 @@ struct StandardAllocator {
 	Mutex mutex;
 };
 
-static Bool std_allocator_init(Allocator *ctx) {
+static Bool std_allocator_init(Allocator *ctx)
+	THREAD_INTERNAL
+{
 	StandardAllocator *allocator = CAST(StandardAllocator*, calloc(1, sizeof *allocator));
 	if (!allocator) {
 		return false;
 	}
 
 	mutex_init(&allocator->mutex);
-	mutex_lock(&allocator->mutex);
 	allocator->size = 0;
 	allocator->capacity = DEFAULT_CAPACITY;
 	allocator->items = CAST(void**, calloc(allocator->capacity, sizeof *allocator->items));
 	if (!allocator->items) {
-		mutex_unlock(&allocator->mutex);
 		free(allocator);
 		return false;
 	}
-	mutex_unlock(&allocator->mutex);
 
 	ctx->user = allocator;
 

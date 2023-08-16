@@ -47,18 +47,18 @@ void my_free(void *ptr) {
 #endif
 }
 
-static ArenaRegion *arena_allocator_new_region(Size capacity) {
+static ArenaRegion *arena_allocator_new_region(Size capacity)
+	THREAD_INTERNAL
+{
 	const Size bytes = sizeof(ArenaRegion) + capacity;
 	ArenaRegion *region = CAST(ArenaRegion *, my_alloc(bytes));
 	if (!region) {
 		return 0;
 	}
 	mutex_init(&region->mutex);
-	mutex_lock(&region->mutex);
 	region->next = 0;
 	region->count = 0;
 	region->capacity = capacity;
-	mutex_unlock(&region->mutex);
 	return region;
 }
 
@@ -87,7 +87,7 @@ static void arena_allocator_fini(Allocator *allocator) {
 	while (region) {
 		ArenaRegion *const self = region;
 		mutex_lock(&self->mutex);
-		region = region->next;
+		region = self->next;
 		mutex_unlock(&self->mutex);
 		mutex_fini(&self->mutex);
 		my_free(self);

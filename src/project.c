@@ -2,13 +2,13 @@
 #include "allocator.h"
 #include "context.h"
 
-void project_init(Project *project, String name, Context *context) {
+void project_init(Project *project, String name, Context *context)
+	THREAD_INTERNAL
+{
 	mutex_init(&project->mutex);
-	mutex_lock(&project->mutex);
 	project->context = context;
 	project->name = name;
 	project->packages = array_make(context);
-	mutex_unlock(&project->mutex);
 }
 
 void project_fini(Project *project) {
@@ -53,13 +53,13 @@ Package *project_add_package(Project *project, String pathname) {
 	return package;
 }
 
-void package_init(Package *package, String pathname, Context *context) {
+void package_init(Package *package, String pathname, Context *context)
+	THREAD_INTERNAL
+{
 	package->context = context;
 	mutex_init(&package->mutex);
-	mutex_lock(&package->mutex);
 	package->pathname = pathname;
 	package->trees = array_make(context);
-	mutex_unlock(&package->mutex);
 }
 
 void package_fini(Package *package) {

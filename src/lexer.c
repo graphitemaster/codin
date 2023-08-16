@@ -179,9 +179,10 @@ static void scan(Lexer* lexer, Sint32 base) {
 }
 
 static FORCE_INLINE Token mkkind(const Lexer *lexer, Kind kind) {
-	Token token = {0};
+	Token token;
 	token.kind = kind;
 	token.location = lexer->last_location;
+	token.string = STRING_NIL;
 	return token;
 }
 

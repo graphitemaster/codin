@@ -41,7 +41,9 @@ static void _sched_async_work_dispose(void *data, Context *context) {
 	allocator_deallocate(allocator, data);
 }
 
-Bool sched_async_init(Context *context, void **instance) {
+Bool sched_async_init(Context *context, void **instance)
+	THREAD_INTERNAL
+{
 	Allocator *allocator = &context->allocator;
 	SchedAsync *sched = allocator_allocate(allocator, sizeof *sched);
 	if (!sched) {
@@ -54,9 +56,7 @@ Bool sched_async_init(Context *context, void **instance) {
 	sched->context = context;
 	mutex_init(&sched->mutex);
 	cond_init(&sched->cond);
-	mutex_lock(&sched->mutex);
 	sched->count = 0;
-	mutex_unlock(&sched->mutex);
 	*instance = RCAST(void *, sched);
 	return true;
 }
