@@ -143,7 +143,10 @@ static Ptr arena_allocator_allocate(Allocator *allocator, Size size) {
 			return 0;
 		}
 		region->next = next;
+
+		mutex_unlock(&region->mutex);
 		region = next;
+		mutex_lock(&region->mutex);
 	}
 
 	void *result = &region->data[region->count];
