@@ -22,6 +22,7 @@ struct SchedAsyncWork {
 };
 
 static void _sched_async_work_func(void *data, Context *context) {
+	PROF_ENTER();
 	SchedAsyncWork *work = RCAST(SchedAsyncWork *, data);
 	if (!setjmp(context->jmp)) {
 		work->func(work->data, context);
@@ -34,11 +35,14 @@ static void _sched_async_work_func(void *data, Context *context) {
 	sched->count--;
 	cond_signal(&sched->cond);
 	mutex_unlock(&sched->mutex);
+	PROF_LEAVE();
 }
 
 static void _sched_async_work_dispose(void *data, Context *context) {
+	PROF_ENTER();
 	Allocator *allocator = &context->allocator;
 	allocator_deallocate(allocator, data);
+	PROF_LEAVE();
 }
 
 Bool sched_async_init(Context *context, void **instance)
@@ -49,7 +53,7 @@ Bool sched_async_init(Context *context, void **instance)
 	if (!sched) {
 		THROW(ERROR_OOM);
 	}
-	if (!threadpool_init(&sched->pool, 4, context)) {
+	if (!threadpool_init(&sched->pool, 16, context)) {
 		allocator_deallocate(allocator, sched);
 		return false;
 	}
@@ -62,16 +66,21 @@ Bool sched_async_init(Context *context, void **instance)
 }
 
 static void sched_async_fini(void *ctx) {
-	SchedAsync *sched = CAST(SchedAsync *, ctx);
+	SchedAsync *const sched = CAST(SchedAsync *, ctx);
+	Context *const context = sched->context;
+
+	PROF_ENTER();
+
 	mutex_lock(&sched->mutex);
 	ASSERT(sched->count == 0);
 	mutex_unlock(&sched->mutex);
-	Context *context = sched->context;
+
 	threadpool_fini(&sched->pool);
 	mutex_fini(&sched->mutex);
 	cond_fini(&sched->cond);
-	Allocator *allocator = &context->allocator;
-	allocator_deallocate(allocator, sched);
+	allocator_deallocate(&context->allocator, sched);
+
+	PROF_LEAVE();
 }
 
 static Bool sched_async_queue(void *ctx, void *data, void (*func)(void *data, Context *context), void (*dispose)(void *data, Context *context)) {

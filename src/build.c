@@ -11,7 +11,7 @@
 		(work)->error = true; \
 	} while (0)
 
-static BuildWork *build_add_work(BuildContext *build, Package *package, String filename);
+static BuildWork *build_add_work(BuildContext *build, Package *package, String filename, Context *context);
 static void build_worker(void *data, Context *context);
 
 void build_init(BuildContext *ctx, String allocator, String scheduler, String profiler)
@@ -108,6 +108,12 @@ Bool build_add_collection(BuildContext *build, String name, String path) {
 	return true;
 }
 
+static void build_add_package_internal(BuildContext *build, String pathname, Context *context);
+
+void build_add_package(BuildContext *build, String pathname) {
+	build_add_package_internal(build, pathname, &build->context);
+}
+
 static Bool accepted_file(BuildContext *build, String filename) {
 	const Platform target_platform = build->settings.target_platform;
 
@@ -135,13 +141,13 @@ static Bool accepted_file(BuildContext *build, String filename) {
 	return true;
 }
 
-void build_add_package(BuildContext *build, String pathname) {
-	Context *const context = &build->context;
+Package *project_add_package_internal(Project *project, String pathname, Context *context);
 
+static void build_add_package_internal(BuildContext *build, String pathname, Context *context) {
 	PROF_ENTER();
 
 	Project *const project = &build->project;
-	Package *package = project_add_package(project, pathname);
+	Package *package = project_add_package_internal(project, pathname, context);
 	if (!package){
 		PROF_LEAVE();
 		return; // Package already exists
@@ -160,15 +166,13 @@ void build_add_package(BuildContext *build, String pathname) {
 		}
 		
 		const String path = path_cat(pathname, filename, context);
-		sched_queue(&build->sched, build_add_work(build, package, path), build_worker, 0);
+		sched_queue(&build->sched, build_add_work(build, package, path, context), build_worker, 0);
 	}
 
 	PROF_LEAVE();
 }
 
-static String build_find_collection(BuildContext *build, String name) {
-	Context *const context = &build->context;
-
+static String build_find_collection(BuildContext *build, String name, Context *context) {
 	PROF_ENTER();
 
 	const Size n_collections = array_size(build->collections);
@@ -185,8 +189,7 @@ static String build_find_collection(BuildContext *build, String name) {
 	return STRING_NIL;
 }
 
-static BuildWork *build_add_work(BuildContext *build, Package *package, String filename) {
-	Context *const context = &build->context;
+static BuildWork *build_add_work(BuildContext *build, Package *package, String filename, Context *context) {
 	PROF_ENTER();
 	Allocator *const allocator = &context->allocator;
 	BuildWork *work = allocator_allocate(allocator, sizeof *work);
@@ -245,7 +248,7 @@ static void build_worker(void *data, Context *context) {
 			pathname = work->package->pathname;
 		} else {
 			// Otherwise it will be relative to the collection.
-			pathname = build_find_collection(work->build, import->collection);
+			pathname = build_find_collection(work->build, import->collection, context);
 			if (pathname.length == 0) {
 				BUILD_ERROR(&import->location, "Cannot find package collection: '%.*s'", SFMT(import->collection));
 			}
@@ -254,7 +257,7 @@ static void build_worker(void *data, Context *context) {
 		const String splice = path_cat(pathname, import->pathname, context);
 		const String result = path_canonicalize(splice, context);
 
-		build_add_package(work->build, result);
+		build_add_package_internal(work->build, result, context);
 	}
 
 	PROF_LEAVE();

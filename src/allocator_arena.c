@@ -13,7 +13,7 @@
 typedef struct Arena Arena;
 typedef struct ArenaRegion ArenaRegion;
 
-static const Size ARENA_DEFAULT_CAPACITY = 1024 * 1024; // 1 MiB
+static const Size ARENA_DEFAULT_CAPACITY = 1024 * 1024 * 1024; // 1 GiB
 static const Size ARENA_DEFAULT_ALIGNMENT = 16;
 
 struct Arena {

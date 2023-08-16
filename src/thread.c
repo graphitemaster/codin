@@ -42,7 +42,7 @@ static unsigned thread_proc(void *data)
 	return 0;
 }
 
-void _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *context) {
+void thread_create(Thread *thread, int (*proc)(void*), void *data, Context *context) {
 	Allocator *allocator = &context->allocator;
 	State *state = allocator_allocate(allocator, sizeof *state);
 	state->allocator = allocator;
@@ -69,19 +69,23 @@ void _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *con
 #endif
 }
 
-Bool thread_join(Thread *thread) {
+Bool thread_join(Thread *thread, Context *context) {
+	PROF_ENTER();
 #if defined(OS_POSIX)
 	pthread_t *handle = RCAST(pthread_t*, thread->storage);
 	if (pthread_join(*handle, 0) != 0) {
+		PROF_LEAVE();
 		return false;
 	}
 #elif defined(OS_WINDOWS)
 	HANDLE handle = *RCAST(HANDLE*, thread->storage);
 	if (WaitForSingleObject(handle, INFINITE) != WAIT_OBJECT_0) {
+		PROF_LEAVE();
 		return false;
 	}
 	CloseHandle(handle);
 #endif
+	PROF_LEAVE();
 	return true;
 }
 

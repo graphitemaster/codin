@@ -1,4 +1,6 @@
 #include <stdatomic.h>
+#include <time.h>
+#include <sys/time.h>
 
 #include "profiler.h"
 #include "allocator.h"
@@ -27,6 +29,12 @@ struct SpallShared {
 	_Atomic(Bool) lock;
 	Size count;
 };
+
+double us() {
+	struct timespec spec;
+	clock_gettime(CLOCK_MONOTONIC, &spec);
+	return (((double)spec.tv_sec) * 1000000) + (((double)spec.tv_nsec) / 1000);
+}
 
 static SpallShared g_spall;
 
@@ -67,7 +75,7 @@ static void *profiler_spall_init(Context *context) {
 	spall_shared_init(&g_spall);
 	Allocator *const allocator = &context->allocator;
 	SpallThread *thread = allocator_allocate(allocator, sizeof *thread);
-	const Size capacity = 1024 * 1024; // 1 MiB
+	const Size capacity = 1024 * 1024 * 1024; // 1 GiB
 	thread->context = context;
 	thread->tid = thread_id();
 	thread->buffer.length = capacity;
@@ -94,7 +102,7 @@ static void profiler_spall_enter(void *ctx, String file, int line, String functi
 		&thread->buffer,
 		CAST(const char *, function.contents),
 		function.length,
-		qpc(),
+		us(),
 		thread->tid,
 		0);
 }
@@ -104,7 +112,7 @@ static void profiler_spall_leave(void *ctx) {
 	spall_buffer_end_ex(
 		&g_spall.ctx,
 		&thread->buffer,
-		qpc(),
+		us(),
 		thread->tid,
 		0);
 }

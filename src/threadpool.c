@@ -13,8 +13,11 @@ static int threadpool_worker(void *user) {
 	const String allocator = pool->context->allocator.ops->name;
 	const String profiler = pool->context->profiler.ops->name;
 
-	Context context;
-	context_init(&context, allocator, profiler);
+	Context ctx;
+	Context *context = &ctx;
+	context_init(context, allocator, profiler);
+
+	PROF_ENTER();
 
 	for (;;) {
 		mutex_lock(&pool->mutex);
@@ -31,14 +34,16 @@ static int threadpool_worker(void *user) {
 		ThreadPoolWork work = pool->work[--meta->size];
 		mutex_unlock(&pool->mutex);
 
-		work.function(work.user, &context);
+		work.function(work.user, context);
 
 		if (work.dispose) {
-			work.dispose(work.user, &context);
+			work.dispose(work.user, context);
 		}
 	}
 
-	context_fini(&context);
+	PROF_LEAVE();
+
+	context_fini(context);
 
 	return 0;
 }
@@ -56,12 +61,16 @@ Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context)
 
 	array_resize(pool->threads, n_threads);
 	for (Size i = 0; i < n_threads; i++) {
-		thread_create(&pool->threads[i], threadpool_worker, pool);
+		thread_create(&pool->threads[i], threadpool_worker, pool, context);
 	}
 	return true;
 }
 
 void threadpool_fini(ThreadPool *pool) {
+	Context *const context = pool->context;
+
+	PROF_ENTER();
+
 	mutex_lock(&pool->mutex);
 	pool->quit = true;
 	cond_broadcast(&pool->cond);
@@ -69,13 +78,15 @@ void threadpool_fini(ThreadPool *pool) {
 
 	const Size n_threads = array_size(pool->threads);
 	for (Size i = 0; i < n_threads; i++) {
-		thread_join(&pool->threads[i]);
+		thread_join(&pool->threads[i], context);
 	}
 
 	array_free(pool->threads);
 
 	cond_fini(&pool->cond);
 	mutex_fini(&pool->mutex);
+
+	PROF_LEAVE();
 }
 
 void threadpool_queue(ThreadPool *pool, void (*function)(void*, Context*), void *user, void (*dispose)(void*, Context*)) {

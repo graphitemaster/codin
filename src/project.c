@@ -14,6 +14,8 @@ void project_init(Project *project, String name, Context *context)
 void project_fini(Project *project) {
 	Context *const context = project->context;
 
+	PROF_ENTER();
+
 	mutex_lock(&project->mutex);
 
 	const Size n_packages = array_size(project->packages);
@@ -27,10 +29,12 @@ void project_fini(Project *project) {
 
 	mutex_unlock(&project->mutex);
 	mutex_fini(&project->mutex);
+
+	PROF_LEAVE();
 }
 
-Package *project_add_package(Project *project, String pathname) {
-	Context *const context = project->context;
+Package *project_add_package_internal(Project *project, String pathname, Context *context) {
+	PROF_ENTER();
 
 	mutex_lock(&project->mutex);
 
@@ -39,6 +43,7 @@ Package *project_add_package(Project *project, String pathname) {
 		Package *const package = project->packages[i];
 		if (string_compare(package->pathname, pathname)) {
 			mutex_unlock(&project->mutex);
+			PROF_LEAVE();
 			return 0;
 		}
 	}
@@ -50,7 +55,13 @@ Package *project_add_package(Project *project, String pathname) {
 
 	mutex_unlock(&project->mutex);
 
+	PROF_LEAVE();
+
 	return package;
+}
+
+Package *project_add_package(Project *project, String pathname) {
+	return project_add_package_internal(project, pathname, project->context);
 }
 
 void package_init(Package *package, String pathname, Context *context)
@@ -65,6 +76,8 @@ void package_init(Package *package, String pathname, Context *context)
 void package_fini(Package *package) {
 	Context *const context = package->context;
 
+	PROF_ENTER();
+
 	mutex_lock(&package->mutex);
 	const Size n_trees = array_size(package->trees);
 	for (Size i = 0; i < n_trees; i++) {
@@ -76,10 +89,14 @@ void package_fini(Package *package) {
 	mutex_unlock(&package->mutex);
 
 	mutex_fini(&package->mutex);
+
+	PROF_LEAVE();
 }
 
 Tree *package_add_tree(Package *package, String filename) {
 	Context *const context = package->context;
+
+	PROF_ENTER();
 
 	mutex_lock(&package->mutex);
 
@@ -88,6 +105,8 @@ Tree *package_add_tree(Package *package, String filename) {
 
 	array_push(package->trees, tree);
 	mutex_unlock(&package->mutex);
+
+	PROF_LEAVE();
 
 	return tree;
 }

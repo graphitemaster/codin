@@ -26,12 +26,15 @@ static const Uint8 PRECEDENCE[] = {
 };
 
 static Bool source_read(Source *source, Context *context) {
+	PROF_ENTER();
 	Array(Uint8) const contents = readfile(source->name, context);
 	if (!contents) {
+		PROF_LEAVE();
 		return false;
 	}
 	source->contents.contents = contents;
 	source->contents.length = array_size(contents);
+	PROF_LEAVE();
 	return true;
 }
 
@@ -61,7 +64,9 @@ static FORCE_INLINE void record(Parser *parser) {
 }
 
 #if defined(TRACE)
-static void parser_trace_enter(Parser *parser, const char *function) {
+static void parser_trace_enter(Parser *parser, String file, int line, String function) {
+	Context *const context = parser->context;
+	profiler_enter(&parser->profiler->context, file, line, function);
 	if (parser->trace_depth) {
 		printf("%*c", parser->trace_depth * 2, ' ');
 	}
@@ -71,13 +76,14 @@ static void parser_trace_enter(Parser *parser, const char *function) {
 
 static FORCE_INLINE void parser_trace_leave(Parser *parser) {
 	parser->trace_depth--;
+	profiler_leave(&parser->profiler->context);
 }
 
-#define TRACE_ENTER() parser_trace_enter(parser, __FUNCTION__)
+#define TRACE_ENTER() parser_trace_enter(parser, SCLIT(__FILE__), __LINE__, SCLIT(__FUNCTION__))
 #define TRACE_LEAVE() parser_trace_leave(parser)
 #else
-#define TRACE_ENTER()
-#define TRACE_LEAVE()
+#define TRACE_ENTER() profiler_enter(&parser->context->profiler, SCLIT(__FILE__), __LINE__, SCLIT(__FUNCTION__))
+#define TRACE_LEAVE() profiler_leave(&parser->context->profiler)
 #endif
 
 static Bool parser_init(Parser *parser, Tree *tree, Context *context) {
@@ -305,22 +311,28 @@ static Token expect_literal(Parser *parser, LiteralKind literal) {
 static void expect_semicolon(Parser *parser) {
 	Context *const context = parser->context;
 
+	TRACE_ENTER();
+
 	if (accepted_kind(parser, KIND_SEMICOLON)) {
+		TRACE_LEAVE();
 		return;
 	}
 
 	const Token token = parser->this_token;
 	if (is_kind(token, KIND_RBRACE) || is_operator(token, OPERATOR_RPAREN)) {
 		if (token.location.line == parser->last_token.location.line) {
+			TRACE_LEAVE();
 			return;
 		}
 	}
 
 	if (is_kind(parser->last_token, KIND_SEMICOLON)) {
+		TRACE_LEAVE();
 		return;
 	}
 
 	if (is_kind(parser->this_token, KIND_EOF)) {
+		TRACE_LEAVE();
 		return;
 	}
 
@@ -328,6 +340,8 @@ static void expect_semicolon(Parser *parser) {
 		const String got = token_to_string(token);
 		PARSE_ERROR("Expected semicolon, got '%.*s'", SFMT(got));
 	}
+
+	TRACE_LEAVE();
 }
 
 #define CCONVENTION(enumerator, string, ...) SLIT(string),
@@ -441,6 +455,7 @@ static Type *parse_variable_name_or_type(Parser *parser) {
 		if (!type) {
 			PARSE_ERROR("Missing type after '..'");
 		}
+		TRACE_LEAVE();
 		return type;
 	} else if (is_keyword(parser->this_token, KEYWORD_TYPEID)) {
 		expect_keyword(parser, KEYWORD_TYPEID);
@@ -876,17 +891,21 @@ static Expression *parse_unary_expression(Parser *parser, Bool lhs);
 
 // Given a name generates a call statement to intrinsics.%s(...)
 static Expression *parse_directive_call_expression(Parser *parser, String name) {
+	TRACE_ENTER();
 	record(parser);
 	Identifier *intrinsics = tree_new_identifier(parser->tree, SCLIT("intrinsics"), false);
 	Identifier *directive = tree_new_identifier(parser->tree, name, false);
 	IdentifierExpression *identifier = tree_new_identifier_expression(parser->tree, intrinsics);
 	SelectorExpression *selector = tree_new_selector_expression(parser->tree, RCAST(Expression *, identifier), directive);
 	CallExpression *expression = parse_call_expression(parser, RCAST(Expression *, selector));
+	TRACE_LEAVE();
 	return RCAST(Expression *, expression);
 }
 
 static Statement *parse_directive_call_statement(Parser *parser, String name) {
+	TRACE_ENTER();
 	Expression *expression = parse_directive_call_expression(parser, name);
+	TRACE_LEAVE();
 	return RCAST(Statement *, tree_new_expression_statement(parser->tree, RCAST(Expression *, expression)));
 }
 

@@ -27,11 +27,9 @@ struct WaitGroup {
 	Size count THREAD_GUARDED(mutex);
 };
 
-#define thread_create(thread, proc, data) \
-	_thread_create((thread), (proc), (data), context)
 
-void _thread_create(Thread *thread, int (*proc)(void*), void *data, Context *context);
-Bool thread_join(Thread *thread);
+void thread_create(Thread *thread, int (*proc)(void*), void *data, Context *context);
+Bool thread_join(Thread *thread, Context *context);
 Uint32 thread_id(void);
 
 // Mutex
