@@ -98,11 +98,8 @@ static FORCE_INLINE Bool is_char(Rune ch) {
 		}
 		return ((CAST(Uint32, ch) | 0x20) - 0x61) < 26; // [a-z][A-Z]
 	}
-	if (ch > 128) {
-		return true;
-	}
 	// TODO(dweiler): UTF-8.
-	return false;
+	return true;
 }
 
 static FORCE_INLINE Bool is_digit(Rune ch) {
