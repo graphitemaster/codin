@@ -71,7 +71,9 @@ char *string_to_null(String string, Context *context) {
 	if (!result) {
 		THROW(ERROR_OOM);
 	}
-	memcpy(result, string.contents, length);
+	if (string.contents) {
+		memcpy(result, string.contents, length);
+	}
 	result[length] = '\0';
 	return result;
 }

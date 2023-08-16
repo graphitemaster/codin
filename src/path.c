@@ -114,10 +114,11 @@ String path_cat(String pathname, String filename, Context *context) {
 
 	const Size length = pathname.length + filename.length + 1;
 	Uint8* data = allocator_allocate(&context->allocator, length);
-	memcpy(data, pathname.contents, pathname.length);
+	if (pathname.contents) {
+		memcpy(data, pathname.contents, pathname.length);
+	}
 	data[pathname.length] = '/';
 	memcpy(&data[pathname.length + 1], filename.contents, filename.length);
-
 	return LIT(String, data, length);
 }
 

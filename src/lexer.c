@@ -52,7 +52,7 @@ static const struct NamedOperator { String s; OperatorKind e; } NAMED_OPERATORS[
 
 #define LEX_ERROR(...) \
 	do { \
-		report_error(lexer->input.source, &lexer->last_location, __VA_ARGS__); \
+		report_error(lexer->input.source, &lexer->last_location, lexer->context, __VA_ARGS__); \
 		THROW(ERROR_LEX); \
 	} while (0)
 
@@ -183,6 +183,7 @@ static FORCE_INLINE Token mkkind(const Lexer *lexer, Kind kind) {
 	token.kind = kind;
 	token.location = lexer->last_location;
 	token.string = STRING_NIL;
+	token.as_opaque = 0;
 	return token;
 }
 

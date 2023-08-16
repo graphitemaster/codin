@@ -11,7 +11,7 @@
 
 #define PARSE_ERROR(...) \
 	do { \
-		report_error(parser->lexer.input.source, &parser->this_token.location, __VA_ARGS__); \
+		report_error(parser->lexer.input.source, &parser->this_token.location, parser->context, __VA_ARGS__); \
 		THROW(ERROR_PARSE); \
 	} while (0)
 

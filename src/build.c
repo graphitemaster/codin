@@ -6,8 +6,8 @@
 
 #define BUILD_ERROR(location, fmt, ...) \
 	do { \
-		const Source *const source = &(work)->tree->source; \
-		report_error(source, (location), (fmt), ## __VA_ARGS__); \
+		const Tree *const tree = (work)->tree; \
+		report_error(&tree->source, (location), tree->context, (fmt), ## __VA_ARGS__); \
 		(work)->error = true; \
 	} while (0)
 

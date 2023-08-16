@@ -13,7 +13,8 @@
 typedef struct Arena Arena;
 typedef struct ArenaRegion ArenaRegion;
 
-static const Size ARENA_DEFAULT_CAPACITY = 1024 * 1024 * 1024; // 1 MiB
+static const Size ARENA_DEFAULT_CAPACITY = 1024 * 1024; // 1 MiB
+static const Size ARENA_DEFAULT_ALIGNMENT = 16;
 
 struct Arena {
 	Mutex mutex;
@@ -26,10 +27,10 @@ struct ArenaRegion {
 	ArenaRegion *next THREAD_GUARDED(mutex);
 	Size count        THREAD_GUARDED(mutex);
 	Size capacity     THREAD_GUARDED(mutex);
-	Uint8 data[];
+	ALIGN(16) char data[]; // This should be 16 byte aligned
 };
 
-void *my_alloc(Size size) {
+static void *raw_alloc(Size size) {
 #if defined(OS_WINDOWS)
 	// Because Windows is shit
 	return HeapAlloc(GetProcessHeap(), 0, size);
@@ -38,7 +39,7 @@ void *my_alloc(Size size) {
 #endif
 }
 
-void my_free(void *ptr) {
+static void raw_free(void *ptr) {
 #if defined(OS_WINDOWS)
 	// Because Windows is shit
 	HeapFree(GetProcessHeap(), 0, ptr);
@@ -47,11 +48,26 @@ void my_free(void *ptr) {
 #endif
 }
 
+static void *raw_aligned_alloc(Size bytes, Size alignment) {
+	const Size offset = alignment - 1 + sizeof(void*);
+	void *p1 = raw_alloc(bytes + offset);
+	if (!p1) {
+		return 0;
+	}
+	void **p2 = RCAST(void **, (RCAST(Size, p1) + offset) & ~(alignment - 1));
+	p2[-1] = p1;
+	return p2;
+}
+
+static void raw_aligned_free(void *p) {
+	raw_free(RCAST(void **, p)[-1]);
+}
+
 static ArenaRegion *arena_allocator_new_region(Size capacity)
 	THREAD_INTERNAL
 {
 	const Size bytes = sizeof(ArenaRegion) + capacity;
-	ArenaRegion *region = CAST(ArenaRegion *, my_alloc(bytes));
+	ArenaRegion *region = CAST(ArenaRegion *, raw_aligned_alloc(bytes, ARENA_DEFAULT_ALIGNMENT));
 	if (!region) {
 		return 0;
 	}
@@ -62,18 +78,18 @@ static ArenaRegion *arena_allocator_new_region(Size capacity)
 	return region;
 }
 
-static Bool arena_allocator_init(Allocator *allocator) {
-	Arena *arena = CAST(Arena *, my_alloc(sizeof *arena));
+static Bool arena_allocator_init(Allocator *allocator)
+	THREAD_INTERNAL
+{
+	Arena *arena = CAST(Arena *, raw_aligned_alloc(sizeof *arena, ARENA_DEFAULT_ALIGNMENT));
 	if (!arena) {
 		return false;
 	}
 
 	mutex_init(&arena->mutex);
 
-	mutex_lock(&arena->mutex);
 	arena->beg = arena_allocator_new_region(ARENA_DEFAULT_CAPACITY);
 	arena->end = arena->beg;
-	mutex_unlock(&arena->mutex);
 
 	allocator->user = arena;
 
@@ -90,17 +106,16 @@ static void arena_allocator_fini(Allocator *allocator) {
 		region = self->next;
 		mutex_unlock(&self->mutex);
 		mutex_fini(&self->mutex);
-		my_free(self);
+		raw_aligned_free(self);
 	}
 	mutex_unlock(&arena->mutex);
 	mutex_fini(&arena->mutex);
-	my_free(arena);
+	raw_aligned_free(arena);
 	allocator->user = 0;
 }
 
 static Ptr arena_allocator_allocate(Allocator *allocator, Size size) {
-	// Round to 16 byte alignment.
-	size = (size + 16 - 1) & -16;
+	size = (size + ARENA_DEFAULT_ALIGNMENT - 1) & CAST(Size, -ARENA_DEFAULT_ALIGNMENT);
 
 	Arena *const arena = CAST(Arena *, allocator->user);
 

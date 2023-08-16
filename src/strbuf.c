@@ -38,7 +38,6 @@ void strbuf_put_rune(StrBuf *strbuf, Rune ch) {
 		strbuf_put_byte(strbuf, ((ch >> 6) & 0x3f));
 		strbuf_put_byte(strbuf, ch & 0x3f);
 	}
-	UNREACHABLE();
 }
 
 void strbuf_put_string(StrBuf *strbuf, String string) {
@@ -75,12 +74,16 @@ void strbuf_put_int(StrBuf *strbuf, Sint32 i, Sint32 base) {
 }
 
 void strbuf_put_fmtv(StrBuf *strbuf, const char *fmt, va_list va) {
+	va_list ap;
+	va_copy(ap, va);
+
 	const long bytes = vsnprintf(0, 0, fmt, va) + 1;
 
 	const Size offset = array_size(strbuf->contents);
 	array_expand(strbuf->contents, bytes);
 
-	vsnprintf(RCAST(char *, &strbuf->contents[offset]), bytes, fmt, va);
+	vsnprintf(RCAST(char *, &strbuf->contents[offset]), bytes, fmt, ap);
+	va_end(ap);
 
 	array_meta(strbuf->contents)->size--;
 }

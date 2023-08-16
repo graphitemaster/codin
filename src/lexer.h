@@ -81,6 +81,7 @@ struct Token {
 		KeywordKind as_keyword;
 		AssignmentKind as_assignment;
 		DirectiveKind as_directive;
+		void *as_opaque;
 	};
 };
 
