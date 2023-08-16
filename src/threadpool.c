@@ -21,7 +21,7 @@ static int threadpool_worker(void *user) {
 
 		if (pool->quit && array_size(pool->work) == 0) {
 			mutex_unlock(&pool->mutex);
-			return 0;
+			break;
 		}
 	
 		Array *meta = array_meta(pool->work);
@@ -36,6 +36,8 @@ static int threadpool_worker(void *user) {
 	}
 
 	context_fini(&context);
+
+	return 0;
 }
 
 Bool threadpool_init(ThreadPool *pool, Size n_threads, Context *context) {
