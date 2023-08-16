@@ -14,15 +14,20 @@
 static BuildWork *build_add_work(BuildContext *build, Package *package, String filename);
 static void build_worker(void *data, Context *context);
 
-void build_init(BuildContext *ctx, String allocator, String scheduler)
+void build_init(BuildContext *ctx, String allocator, String scheduler, String profiler)
 	THREAD_INTERNAL
 {
-	context_init(&ctx->context, allocator);
-	sched_init(&ctx->sched, scheduler, &ctx->context);
-	project_init(&ctx->project, SCLIT("test"), &ctx->context);
+	// Needs to be initialized first.
+	Context *const context = &ctx->context;
+	context_init(context, allocator, profiler);
+
+	PROF_ENTER();
+
+	sched_init(&ctx->sched, scheduler, context);
+	project_init(&ctx->project, SCLIT("test"), context);
 	mutex_init(&ctx->mutex);
-	ctx->collections = array_create(&ctx->context);
-	ctx->work = array_create(&ctx->context);
+	ctx->collections = array_create(context);
+	ctx->work = array_create(context);
 
 	// Set host platform and architecture.
 #if defined(OS_WINDOWS)
@@ -40,10 +45,16 @@ void build_init(BuildContext *ctx, String allocator, String scheduler)
 	// TODO(dweiler): Support cross compilation.
 	ctx->settings.target_platform = ctx->settings.host_platform;
 	ctx->settings.target_arch = ctx->settings.host_arch;
+
+	PROF_LEAVE();
 }
 
 void build_fini(BuildContext *build) {
-	Allocator *const allocator = &build->context.allocator;
+	Context *const context = &build->context;
+
+	PROF_ENTER();
+
+	Allocator *const allocator = &context->allocator;
 	mutex_lock(&build->mutex);
 	const Size n_work = array_size(build->work);
 	for (Size i = 0; i < n_work; i++) {
@@ -58,15 +69,26 @@ void build_fini(BuildContext *build) {
 	mutex_fini(&build->mutex);
 	project_fini(&build->project);
 	sched_fini(&build->sched);
-	context_fini(&build->context);
+
+	PROF_LEAVE();
+
+	context_fini(context);
 }
 
 void build_wait(BuildContext *build) {
+	Context *const context = &build->context;
+	PROF_ENTER();
 	sched_wait(&build->sched);
+	PROF_LEAVE();
 }
 
 Bool build_add_collection(BuildContext *build, String name, String path) {
+	Context *const context = &build->context;
+
+	PROF_ENTER();
+
 	if (!path_directory_exists(path, &build->context)) {
+		PROF_LEAVE();
 		return false;
 	}
 
@@ -74,10 +96,15 @@ Bool build_add_collection(BuildContext *build, String name, String path) {
 	for (Size i = 0; i < n_collections; i++) {
 		const Collection *const collection = &build->collections[i];
 		if (string_compare(collection->name, name)) {
+			PROF_LEAVE();
 			return false;
 		}
 	}
+
 	array_push(build->collections, LIT(Collection, name, path));
+
+	PROF_LEAVE();
+
 	return true;
 }
 
@@ -110,10 +137,13 @@ static Bool accepted_file(BuildContext *build, String filename) {
 
 void build_add_package(BuildContext *build, String pathname) {
 	Context *const context = &build->context;
-	Project *const project = &build->project;
 
+	PROF_ENTER();
+
+	Project *const project = &build->project;
 	Package *package = project_add_package(project, pathname);
 	if (!package){
+		PROF_LEAVE();
 		return; // Package already exists
 	}
 
@@ -132,21 +162,32 @@ void build_add_package(BuildContext *build, String pathname) {
 		const String path = path_cat(pathname, filename, context);
 		sched_queue(&build->sched, build_add_work(build, package, path), build_worker, 0);
 	}
+
+	PROF_LEAVE();
 }
 
 static String build_find_collection(BuildContext *build, String name) {
+	Context *const context = &build->context;
+
+	PROF_ENTER();
+
 	const Size n_collections = array_size(build->collections);
 	for (Size i = 0; i < n_collections; i++) {
 		const Collection *const collection = &build->collections[i];
 		if (string_compare(collection->name, name)) {
+			PROF_LEAVE();
 			return collection->path;
 		}
 	}
+
+	PROF_LEAVE();
+
 	return STRING_NIL;
 }
 
 static BuildWork *build_add_work(BuildContext *build, Package *package, String filename) {
 	Context *const context = &build->context;
+	PROF_ENTER();
 	Allocator *const allocator = &context->allocator;
 	BuildWork *work = allocator_allocate(allocator, sizeof *work);
 	work->build = build;
@@ -156,11 +197,15 @@ static BuildWork *build_add_work(BuildContext *build, Package *package, String f
 	mutex_lock(&build->mutex);
 	array_push(build->work, work);
 	mutex_unlock(&build->mutex);
+	PROF_LEAVE();
 	return work;
 }
 
 static void build_worker(void *data, Context *context) {
 	BuildWork *const work = CAST(BuildWork *, data);
+	
+	PROF_ENTER();
+
 	Tree *const tree = work->tree;
 	if (!parse(tree, context)) {
 		BUILD_ERROR(0, "Could not open file");
@@ -211,4 +256,6 @@ static void build_worker(void *data, Context *context) {
 
 		build_add_package(work->build, result);
 	}
+
+	PROF_LEAVE();
 }

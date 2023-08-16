@@ -25,8 +25,7 @@ struct Context {
 	jmp_buf jmp;
 };
 
-void context_init(Context *context, String allocator);
+void context_init(Context *context, String allocator, String profiler);
 void context_fini(Context *context);
-void context_copy(Context *dst, const Context *src);
 
 #endif // CODIN_CONTEXT_H

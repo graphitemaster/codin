@@ -85,6 +85,15 @@ Bool thread_join(Thread *thread) {
 	return true;
 }
 
+Uint32 thread_id(void) {
+#if defined(OS_POSIX)
+	return CAST(Uint32, pthread_self());
+#elif defined(OS_WINDOWS)
+	return GetCurrentThreadId();
+#endif
+	return 0;
+}
+
 void mutex_init(Mutex *mutex) {
 #if defined(OS_POSIX)
 	pthread_mutex_t *handle = RCAST(pthread_mutex_t *, mutex->storage);

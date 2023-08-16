@@ -50,7 +50,7 @@ struct BuildContext {
 	Array(BuildWork*) work THREAD_GUARDED(mutex);
 };
 
-void build_init(BuildContext *ctx, String allocator, String scheduler);
+void build_init(BuildContext *ctx, String allocator, String scheduler, String profiler);
 void build_fini(BuildContext *build);
 void build_wait(BuildContext *build);
 Bool build_add_collection(BuildContext *build, String name, String path);

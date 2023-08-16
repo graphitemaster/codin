@@ -1,10 +1,7 @@
 package main
 
-// import "core:fmt"
+import "core:fmt"
 
 main :: proc() {
-	if true
-	{
-		fmt.printf("Hello, world!");
-	}
+	fmt.printf("Hello, world!");
 }

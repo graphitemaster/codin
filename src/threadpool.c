@@ -10,8 +10,11 @@ struct ThreadPoolWork {
 static int threadpool_worker(void *user) {
 	ThreadPool *pool = CAST(ThreadPool*, user);
 
+	const String allocator = pool->context->allocator.ops->name;
+	const String profiler = pool->context->profiler.ops->name;
+
 	Context context;
-	context_init(&context, pool->context->allocator.ops->name);
+	context_init(&context, allocator, profiler);
 
 	for (;;) {
 		mutex_lock(&pool->mutex);

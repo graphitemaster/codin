@@ -20,6 +20,7 @@ void array_grow(void **const array, Size elements, Size type_size) {
 	ASSERT(*array);
 	Array *meta = array_meta(*array);
 	Context *const context = meta->context;
+	PROF_ENTER();
 	Allocator *const allocator = &context->allocator;
 	const Size old_capacity = meta->capacity;
 	const Size new_capacity = ((old_capacity + elements) * 3) / 2;
@@ -32,6 +33,7 @@ void array_grow(void **const array, Size elements, Size type_size) {
 	meta = CAST(Array *, data);
 	meta->capacity = new_capacity;
 	*array = meta + 1;
+	PROF_LEAVE();
 }
 
 void array_delete(void *const array) {
