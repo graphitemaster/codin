@@ -166,7 +166,8 @@ EmptyStatement *tree_new_empty_statement(Tree *tree) {
 }
 
 ImportStatement *tree_new_import_statement(Tree *tree, String name, String collection, String pathname, Bool is_using) {
-	Allocator *const allocator = &tree->context->allocator;
+	Context *const context = tree->context;
+	Allocator *const allocator = &context->allocator;
 	ImportStatement *statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_IMPORT;
 	statement->name = name;
@@ -174,7 +175,7 @@ ImportStatement *tree_new_import_statement(Tree *tree, String name, String colle
 	if (string_starts_with(pathname, SCLIT("."))) {
 		statement->pathname = pathname;
 	} else {
-		statement->pathname = path_cat(SCLIT("."), pathname, tree->context);
+		statement->pathname = path_cat(SCLIT("."), pathname, context);
 	}
 	statement->is_using = is_using;
 	statement->location = tree->tokens[array_size(tree->tokens) - 1].location;

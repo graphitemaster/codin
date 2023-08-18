@@ -87,7 +87,7 @@ Bool build_add_collection(BuildContext *build, String name, String path) {
 
 	PROF_ENTER();
 
-	if (!path_directory_exists(path, &build->context)) {
+	if (!path_directory_exists(path, context)) {
 		PROF_LEAVE();
 		return false;
 	}

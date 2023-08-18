@@ -16,11 +16,11 @@ NORETURN void report_assertion(const char *expression, const char *file, int lin
 void report_error(const Source *source, const Location *location, Context *context, const char *fmt, ...) {
 	StrBuf buf;
 	strbuf_init(&buf, context);
-	strbuf_put_string(&buf, source->name);    // %.*s
-	strbuf_put_rune(&buf, ':');               // :
+	strbuf_put_string(&buf, source->name);        // %.*s
+	strbuf_put_rune(&buf, ':');                   // :
 	if (location) {
-		strbuf_put_int(&buf, location->line);   // %d
-		strbuf_put_int(&buf, location->column); // %d
+		strbuf_put_int(&buf, location->line, 10);   // %d
+		strbuf_put_int(&buf, location->column, 10); // %d
 	}
 	strbuf_put_string(&buf, SCLIT(": ERROR "));
 	va_list va;
@@ -35,11 +35,11 @@ void report_error(const Source *source, const Location *location, Context *conte
 void report_warning(const Source *source, const Location *location, Context *context, const char *fmt, ...) {
 	StrBuf buf;
 	strbuf_init(&buf, context);
-	strbuf_put_string(&buf, source->name);    // %.*s
-	strbuf_put_rune(&buf, ':');               // :
+	strbuf_put_string(&buf, source->name);        // %.*s
+	strbuf_put_rune(&buf, ':');                   // :
 	if (location) {
-		strbuf_put_int(&buf, location->line);   // %d
-		strbuf_put_int(&buf, location->column); // %d
+		strbuf_put_int(&buf, location->line, 10);   // %d
+		strbuf_put_int(&buf, location->column, 10); // %d
 	}
 	strbuf_put_string(&buf, SCLIT(": WARNING "));
 	va_list va;

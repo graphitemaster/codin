@@ -23,14 +23,14 @@ struct SchedAsyncWork {
 
 static void _sched_async_work_func(void *data, Context *context) {
 	PROF_ENTER();
-	SchedAsyncWork *work = RCAST(SchedAsyncWork *, data);
+	SchedAsyncWork *const work = RCAST(SchedAsyncWork *, data);
 	if (!setjmp(context->jmp)) {
 		work->func(work->data, context);
 	}
 	if (work->dispose) {
 		work->dispose(work->data, context);
 	}
-	SchedAsync *sched = work->sched;
+	SchedAsync *const sched = work->sched;
 	mutex_lock(&sched->mutex);
 	sched->count--;
 	cond_signal(&sched->cond);
@@ -40,7 +40,7 @@ static void _sched_async_work_func(void *data, Context *context) {
 
 static void _sched_async_work_dispose(void *data, Context *context) {
 	PROF_ENTER();
-	Allocator *allocator = &context->allocator;
+	Allocator *const allocator = &context->allocator;
 	allocator_deallocate(allocator, data);
 	PROF_LEAVE();
 }
@@ -48,8 +48,8 @@ static void _sched_async_work_dispose(void *data, Context *context) {
 Bool sched_async_init(Context *context, void **instance)
 	THREAD_INTERNAL
 {
-	Allocator *allocator = &context->allocator;
-	SchedAsync *sched = allocator_allocate(allocator, sizeof *sched);
+	Allocator *const allocator = &context->allocator;
+	SchedAsync *const sched = allocator_allocate(allocator, sizeof *sched);
 	if (!sched) {
 		THROW(ERROR_OOM);
 	}

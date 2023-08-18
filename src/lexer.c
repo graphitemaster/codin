@@ -358,7 +358,7 @@ Token lexer_peek(Lexer *lexer) {
 }
 
 static Token lexer_tokenize(Lexer *lexer) {
-	Context *context = lexer->context;
+	Context *const context = lexer->context;
 
 	skip_whitespace(lexer, lexer->asi);
 

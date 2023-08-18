@@ -1,6 +1,5 @@
 #include <stdatomic.h>
 #include <time.h>
-#include <sys/time.h>
 
 #include "profiler.h"
 #include "allocator.h"

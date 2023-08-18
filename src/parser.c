@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include "tree.h"
 #include "context.h"
 #include "strbuf.h"

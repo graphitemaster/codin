@@ -1,5 +1,3 @@
-#include <stdlib.h>
-
 #include "array.h"
 #include "context.h"
 #include "allocator.h"

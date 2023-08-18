@@ -1,6 +1,5 @@
 #include <string.h> // memcpy
 #include <stdio.h>
-#include <stdarg.h> 
 
 #include "strbuf.h"
 

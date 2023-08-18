@@ -1,11 +1,9 @@
-#include <stdlib.h> // free
-#include <string.h> // strcmp
-
 #include "path.h"
 #include "context.h"
 #include "strbuf.h"
 
 #if defined(OS_POSIX)
+#include <stdlib.h> // free, realpath
 #include <sys/stat.h> // mkdir
 #include <dirent.h> // DIR, dirent, readdir
 #elif defined(OS_WINDOWS)
