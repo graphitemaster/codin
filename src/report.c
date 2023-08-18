@@ -16,11 +16,13 @@ NORETURN void report_assertion(const char *expression, const char *file, int lin
 void report_error(const Source *source, const Location *location, Context *context, const char *fmt, ...) {
 	StrBuf buf;
 	strbuf_init(&buf, context);
+	strbuf_put_string(&buf, source->name);    // %.*s
+	strbuf_put_rune(&buf, ':');               // :
 	if (location) {
-		strbuf_put_fmt(&buf, "%.*s:%d:%d: ERROR ", SFMT(source->name), location->line, location->column);
-	} else {
-		strbuf_put_fmt(&buf, "%.*s: ERROR ", SFMT(source->name));
+		strbuf_put_int(&buf, location->line);   // %d
+		strbuf_put_int(&buf, location->column); // %d
 	}
+	strbuf_put_string(&buf, SCLIT(": ERROR "));
 	va_list va;
 	va_start(va, fmt);
 	strbuf_put_fmtv(&buf, fmt, va);
@@ -33,11 +35,13 @@ void report_error(const Source *source, const Location *location, Context *conte
 void report_warning(const Source *source, const Location *location, Context *context, const char *fmt, ...) {
 	StrBuf buf;
 	strbuf_init(&buf, context);
+	strbuf_put_string(&buf, source->name);    // %.*s
+	strbuf_put_rune(&buf, ':');               // :
 	if (location) {
-		strbuf_put_fmt(&buf, "%.*s:%d:%d: WARNING ", SFMT(source->name), location->line, location->column);
-	} else {
-		strbuf_put_fmt(&buf, "%.*s: WARNING ", SFMT(source->name));
+		strbuf_put_int(&buf, location->line);   // %d
+		strbuf_put_int(&buf, location->column); // %d
 	}
+	strbuf_put_string(&buf, SCLIT(": WARNING "));
 	va_list va;
 	va_start(va, fmt);
 	strbuf_put_fmtv(&buf, fmt, va);
