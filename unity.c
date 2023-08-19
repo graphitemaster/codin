@@ -11,6 +11,8 @@
 #include "src/main.c"
 #include "src/parser.c"
 #include "src/path.c"
+#include "src/profiler_null.c"
+#include "src/profiler_spall.c"
 #include "src/profiler.c"
 #include "src/project.c"
 #include "src/report.c"

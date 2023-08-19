@@ -227,16 +227,3 @@ Float32 f16_to_f32(Float16 f) {
 	o.u |= (f & 0x8000) << 16;
 	return o.f;
 }
-
-Float64 qpc() {
-#if defined(OS_POSIX)
-	struct timeval t;
-	gettimeofday(&t, 0);
-	return t.tv_sec + t.tv_usec*1e-6;
-#elif defined(OS_WINDOWS)
-	LARGE_INTEGER t, f;
-	QueryPerformanceCounter(&t);
-	QueryPerformanceFrequency(&f);
-	return CAST(Float64, t.QuadPart) / CAST(Float64, f.QuadPart);
-#endif
-}

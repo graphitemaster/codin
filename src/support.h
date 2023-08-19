@@ -13,6 +13,17 @@
 	#error Unsupported platform
 #endif
 
+// COMPILER_{}
+#if defined(__clang__)
+	#define COMPILER_CLANG
+#elif defined(__GNUC__) || defined(__GNUG__)
+	#define COMPILER_GCC
+#elif defined(_MSC_VER)
+	#define COMPILER_MSVC
+#else
+	#error Unsupported compiler
+#endif
+
 // ISA_{}
 #if defined(__x86_64__) || defined(_M_X64)
 	#define ISA_AMD64
@@ -23,21 +34,21 @@
 #endif
 
 // FORCE_INLINE
-#if defined(_MSC_VER)
+#if defined(COMPILER_MSVC)
 	#define FORCE_INLINE __forceinline
 #else
 	#define FORCE_INLINE __attribute__((always_inline)) inline
 #endif
 
 // UNREACHABLE()
-#if defined(_MSC_VER)
+#if defined(COMPILER_MSVC)
 	#define UNREACHABLE() __assume(0)
 #else
 	#define UNREACHABLE() __builtin_unreachable()
 #endif
 
 // FALLTHROUGH()
-#if defined(_MSC_VER)
+#if defined(COMPILER_MSVC)
 	#define FALLTHROUGH()
 #elif defined(__cplusplus)
 	#define FALLTHROUGH() [[fallthrough]]
@@ -46,7 +57,7 @@
 #endif
 
 // NORETURN
-#if defined(_MSC_VER)
+#if defined(COMPILER_MSVC)
 	#define NORETURN      __declspec(noreturn)
 #elif defined(__cplusplus)
 	#define NORETURN      [[noreturn]]
@@ -55,7 +66,7 @@
 #endif
 
 // ALIGN(n)
-#if defined(_MSC_VER)
+#if defined(COMPILER_MSVC)
 	#define ALIGN(n)      __declspec(align(n))
 #elif defined(__cplusplus)
 	#define ALIGN(n)      alignas(n)
