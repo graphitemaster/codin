@@ -11,10 +11,16 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #pragma GCC diagnostic ignored "-Wsign-compare"
+#elif defined(COMPILER_CLANG)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#pragma clang diagnostic ignored "-Wsign-compare"
 #endif
 #include "vendor/spall.h"
 #if defined(COMPILER_GCC)
 #pragma GCC diagnostic pop
+#elif defined(COMPILER_CLANG)
+#pragma clang diagnostic pop
 #endif
 
 #if defined(OS_LINUX)
@@ -54,6 +60,7 @@ static inline Uint64 rdtsc_freq(void) {
 
 	int fd = -1;
 	struct perf_event_mmap_page *page = 0;
+	Uint64 tsc_freq = 0;
 
 	const int page_size = sysconf(_SC_PAGESIZE);
 
@@ -62,18 +69,17 @@ static inline Uint64 rdtsc_freq(void) {
 		goto L_fallback;
 	}
 
-	void *data = mmap(0, page_size, PROT_READ, MAP_SHARED, fd, 0);
-	if (data == MAP_FAILED) {
+	page = RCAST(struct perf_event_mmap_page *, mmap(0, page_size, PROT_READ, MAP_SHARED, fd, 0));
+	if (page == MAP_FAILED) {
 		goto L_fallback;
 	}
 
-	page = CAST(struct perf_event_mmap_page *, data);
 	if (page->cap_user_time != -1) {
 		// User time not supported.
 		goto L_fallback;
 	}
 
-	Uint64 tsc_freq = 1000000000ull << (page->time_shift / 2);
+	tsc_freq = 1000000000ull << (page->time_shift / 2);
 	tsc_freq /= page->time_mult >> (page->time_shift - page->time_shift / 2);
 
 	munmap(page, page_size);
