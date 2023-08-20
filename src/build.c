@@ -7,7 +7,7 @@
 #define BUILD_ERROR(location, fmt, ...) \
 	do { \
 		const Tree *const tree = (work)->tree; \
-		report_error(&tree->source, (location), tree->context, (fmt), ## __VA_ARGS__); \
+		report_error(&tree->source, (location), context, (fmt), ## __VA_ARGS__); \
 		(work)->error = true; \
 	} while (0)
 
@@ -26,8 +26,8 @@ void build_init(BuildContext *ctx, String allocator, String scheduler, String pr
 	sched_init(&ctx->sched, scheduler, context);
 	project_init(&ctx->project, SCLIT("test"), context);
 	mutex_init(&ctx->mutex);
-	ctx->collections = array_create(context);
-	ctx->work = array_create(context);
+	ctx->collections = array_make(context);
+	ctx->work = array_make(context);
 
 	// Set host platform and architecture.
 #if defined(OS_WINDOWS)
