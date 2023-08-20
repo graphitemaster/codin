@@ -18,16 +18,16 @@ static const Size ARENA_DEFAULT_ALIGNMENT = 16;
 
 struct Arena {
 	Mutex mutex;
-	ArenaRegion *beg  THREAD_GUARDED(mutex);
-	ArenaRegion *end  THREAD_GUARDED(mutex);
+	ArenaRegion *beg THREAD_GUARDED(mutex);
+	ArenaRegion *end THREAD_GUARDED(mutex);
 };
 
 struct ArenaRegion {
 	Mutex mutex;
-	ArenaRegion *next THREAD_GUARDED(mutex);
-	Size count        THREAD_GUARDED(mutex);
-	Size capacity     THREAD_GUARDED(mutex);
-	ALIGN(16) char data[]; // This should be 16 byte aligned
+	ArenaRegion *next     THREAD_GUARDED(mutex);
+	Size count            THREAD_GUARDED(mutex);
+	Size capacity         THREAD_GUARDED(mutex);
+	ALIGN(16) char data[] THREAD_GUARDED(mutex); // This should be 16 byte aligned
 };
 
 static void *raw_alloc(Size size) {
