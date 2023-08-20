@@ -154,7 +154,7 @@ struct THREAD_CAPABILITY("mutex") SpallShared {
 static SpallShared g_spall;
 
 struct SpallThread {
-	Context *context;
+	Allocator *allocator;
 	SpallBuffer buffer THREAD_GUARDED(g_spall);
 	_Atomic(Uint32) tid;
 };
@@ -206,9 +206,9 @@ static void *profiler_spall_init(Context *context)
 {
 	spall_shared_init(&g_spall);
 	Allocator *const allocator = &context->allocator;
-	SpallThread *thread = allocator_allocate(allocator, sizeof *thread);
+	SpallThread *const thread = allocator_allocate(allocator, sizeof *thread);
 	const Size capacity = 1024 * 1024 * 1024; // 1 GiB
-	thread->context = context;
+	thread->allocator = allocator;
 	thread->tid = thread_id();
 	thread->buffer.length = capacity;
 	thread->buffer.data = allocator_allocate(allocator, capacity);
@@ -218,7 +218,7 @@ static void *profiler_spall_init(Context *context)
 
 static void profiler_spall_fini(void *ctx) {
 	SpallThread *const thread = CAST(SpallThread *, ctx);
-	Allocator *const allocator = &thread->context->allocator;
+	Allocator *const allocator = thread->allocator;
 	spall_shared_lock(&g_spall);
 	spall_buffer_quit(&g_spall.ctx, &thread->buffer);
 	allocator_deallocate(allocator, thread->buffer.data);
