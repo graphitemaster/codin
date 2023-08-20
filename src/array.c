@@ -2,7 +2,7 @@
 #include "context.h"
 #include "allocator.h"
 
-Ptr array_create(Context *context) {
+static Ptr array_create_(Context *context) {
 	Allocator *allocator = &context->allocator;
 	Array *array = allocator_allocate(allocator, sizeof *array);
 	if (!array) {
@@ -16,6 +16,9 @@ Ptr array_create(Context *context) {
 
 void array_grow(void **const array, Size elements, Size type_size) {
 	ASSERT(*array);
+	if (!array_valid(*array)) {
+		*array = array_create_(tagptr_ptr(*array));
+	}
 	Array *meta = array_meta(*array);
 	Context *const context = meta->context;
 	Allocator *const allocator = &context->allocator;
@@ -33,7 +36,7 @@ void array_grow(void **const array, Size elements, Size type_size) {
 }
 
 void array_delete(void *const array) {
-	ASSERT(array);
+	if (!array) return;
 	Array *const meta = array_meta(array);
 	Context *const context = meta->context;
 	Allocator *const allocator = &context->allocator;

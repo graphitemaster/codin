@@ -16,21 +16,24 @@ struct ALIGN(16) Array {
 #define Array(T) T*
 
 #define array_make(context) \
-	array_create(context)
+	tagptr(context, 0x1)
+
+#define array_valid(array) \
+	(tagptr_tag(array) != 0x1)
 
 #define array_meta(array) \
 	(&RCAST(Array*, (array))[-1])
 
 #define array_try_grow(array, size_) \
-	(((array) && array_meta(array)->size + (size_) < array_meta(array)->capacity) \
+	((array_valid(array) && array_meta(array)->size + (size_) < array_meta(array)->capacity) \
 		? true \
 		: (array_grow(RCAST(void **, &(array)), (size_), sizeof *(array)), true))
 
 #define array_size(array) \
-	((array) ? array_meta(array)->size : 0)
+	(array_valid(array) ? array_meta(array)->size : 0)
 
 #define array_capacity(array) \
-	((arrray) ? array_meta(array)->capacity : 0)
+	(array_valid(array) ? array_meta(array)->capacity : 0)
 
 #define array_expand(array, size_) \
 	(array_try_grow((array), (size_)) \
@@ -50,10 +53,10 @@ struct ALIGN(16) Array {
 		: false)
 
 #define array_free(array) \
-	(void)((array) ? (array_delete(array), (array) = 0) : 0)
+	(void)(array_valid(array) ? (array_delete(array), (array) = 0) : 0)
 
 #define array_resize(array, size_) \
-	((array) \
+	(array_valid(array) \
 		? (array_meta(array)->size >= (size_) \
 			? (array_meta(array)->size = (size_), true) \
 			: array_expand((array), (size_) - array_meta(array)->size)) \
@@ -65,10 +68,9 @@ struct ALIGN(16) Array {
 	((array)[array_size(array) - 1])
 
 #define array_clear(array) \
-	(void)((array) ? array_meta(array)->size = 0 : 0)
+	(void)(array_valid(array) ? array_meta(array)->size = 0 : 0)
 
 void array_grow(void **const array, Size elements, Size type_size);
 void array_delete(void *const array);
-Ptr array_create(Context *context);
 
 #endif // CODIN_ARRAY_H

@@ -152,8 +152,12 @@ struct Ptr {
 	constexpr operator bool() const noexcept { return p; }
 	void *p = 0;
 };
+#define PTR_TO_BITS(ptr) RCAST(Uint64, (ptr).p)
+#define PTR_FROM_BITS(bits) Ptr(RCAST(void *, (bits)))
 #else
 typedef void *Ptr;
+#define PTR_TO_BITS(ptr) RCAST(Uint64, ptr)
+#define PTR_FROM_BITS(bits) RCAST(Ptr, (bits))
 #endif
 
 // Support bitwise operators on enumerators in C++ like C.
@@ -187,6 +191,19 @@ constexpr T& operator^= (T& a, T b) noexcept {
 	return RCAST(T&, RCAST(int&, a) ^= CAST(int, b));
 }
 #endif
+
+// Tagged pointer helpers assuming 16-byte aligned pointers
+static FORCE_INLINE Ptr tagptr(Ptr ptr, Uint8 tag) {
+	return PTR_FROM_BITS(PTR_TO_BITS(ptr) | tag);
+}
+
+static FORCE_INLINE Uint8 tagptr_tag(Ptr ptr) {
+	return PTR_TO_BITS(ptr) & 15;
+}
+
+static FORCE_INLINE Ptr tagptr_ptr(Ptr ptr) {
+	return PTR_FROM_BITS(PTR_TO_BITS(ptr) & ~15);
+}
 
 #if defined(__clang__) && defined(__cplusplus)
 #define THREAD_ATTRIBUTE(x) __attribute__((x))
