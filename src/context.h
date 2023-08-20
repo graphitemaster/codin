@@ -4,6 +4,7 @@
 
 #include "allocator.h"
 #include "profiler.h"
+
 typedef struct Context Context;
 
 enum Error {
@@ -19,7 +20,7 @@ typedef enum Error Error;
 #define THROW(error) \
 	longjmp((context)->jmp, CAST(int, (error)))
 
-struct Context {
+struct ALIGN(16) Context {
 	Allocator allocator;
 	Profiler profiler;
 	jmp_buf jmp;
