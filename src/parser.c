@@ -9,7 +9,7 @@
 
 #define PARSE_ERROR(...) \
 	do { \
-		report_error(parser->lexer.input.source, &parser->this_token.location, parser->context, __VA_ARGS__); \
+		report_error(parser->lexer.input.source, &parser->this_token.location, context, __VA_ARGS__); \
 		THROW(ERROR_PARSE); \
 	} while (0)
 
@@ -1318,7 +1318,7 @@ static TypeExpression *parse_struct_type_expression(Parser *parser) {
 
 // union
 static TypeExpression *parse_union_type_expression(Parser *parser) {
-	Context *context = parser->context;
+	Context *const context = parser->context;
 
 	TRACE_ENTER();
 
