@@ -801,7 +801,7 @@ static ProcedureType *parse_procedure_type(Parser *parser) {
 }
 
 static BlockStatement *parse_body(Parser *parser, BlockFlag flags);
-static ListExpression *parse_rhs_list_expression(Parser *parser);
+static TupleExpression *parse_rhs_tuple_expression(Parser *parser);
 
 static Expression *parse_procedure(Parser *parser) {
 	Context *const context = parser->context;
@@ -812,12 +812,12 @@ static Expression *parse_procedure(Parser *parser) {
 
 	advance_possible_newline_within(parser);
 
-	ListExpression *where_clauses = 0;
+	TupleExpression *where_clauses = 0;
 	if (is_keyword(parser->this_token, KEYWORD_WHERE)) {
 		expect_keyword(parser, KEYWORD_WHERE);
 		const Sint32 expression_depth = parser->expression_depth;
 		parser->expression_depth = -1;
-		where_clauses = parse_rhs_list_expression(parser);
+		where_clauses = parse_rhs_tuple_expression(parser);
 		parser->expression_depth = expression_depth;
 	}
 
@@ -1288,11 +1288,11 @@ static TypeExpression *parse_struct_type_expression(Parser *parser) {
 
 	advance_possible_newline_within(parser);
 
-	ListExpression *where_clauses = 0;
+	TupleExpression *where_clauses = 0;
 	if (accepted_keyword(parser, KEYWORD_WHERE)) {
 		const Sint32 expression_depth = parser->expression_depth;
 		parser->expression_depth = -1;
-		where_clauses = parse_rhs_list_expression(parser);
+		where_clauses = parse_rhs_tuple_expression(parser);
 		parser->expression_depth = expression_depth;
 	}
 
@@ -1362,11 +1362,11 @@ static TypeExpression *parse_union_type_expression(Parser *parser) {
 
 	advance_possible_newline_within(parser);
 
-	ListExpression *where_clauses = 0;
+	TupleExpression *where_clauses = 0;
 	if (accepted_keyword(parser, KEYWORD_WHERE)) {
 		const Sint32 expression_depth = parser->expression_depth;
 		parser->expression_depth = -1;
-		where_clauses = parse_rhs_list_expression(parser);
+		where_clauses = parse_rhs_tuple_expression(parser);
 		parser->expression_depth = expression_depth;
 	}
 
@@ -1735,10 +1735,8 @@ static Expression *parse_operand(Parser *parser, Bool lhs) {
 			}
 		case KEYWORD_CONTEXT:
 			{
-				record(parser);
 				expect_keyword(parser, KEYWORD_CONTEXT);
-				Identifier *const identifier = tree_new_identifier(parser->tree, SCLIT("context"), false);
-				IdentifierExpression *const expression = tree_new_identifier_expression(parser->tree, identifier);
+				ContextExpression *const expression = tree_new_context_expression(parser->tree);
 				TRACE_LEAVE();
 				return RCAST(Expression *, expression);
 			}
@@ -2293,7 +2291,7 @@ static FORCE_INLINE Expression *parse_expression(Parser *parser, Bool lhs) {
 	return expression;
 }
 
-static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
+static TupleExpression *parse_tuple_expression(Parser *parser, Bool lhs) {
 	TRACE_ENTER();
 
 	Context *const context = parser->context;
@@ -2311,7 +2309,7 @@ static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
 		advancep(parser);
 	}
 
-	ListExpression *const expression = tree_new_list_expression(parser->tree, expressions);
+	TupleExpression *const expression = tree_new_tuple_expression(parser->tree, expressions);
 
 	parser->allow_newline = allow_newline;
 
@@ -2320,20 +2318,20 @@ static ListExpression *parse_list_expression(Parser *parser, Bool lhs) {
 	return expression;
 }
 
-static FORCE_INLINE ListExpression *parse_lhs_list_expression(Parser *parser) {
+static FORCE_INLINE TupleExpression *parse_lhs_tuple_expression(Parser *parser) {
 	TRACE_ENTER();
 
-	ListExpression *const result = parse_list_expression(parser, true);
+	TupleExpression *const result = parse_tuple_expression(parser, true);
 
 	TRACE_LEAVE();
 
 	return result;
 }
 
-static FORCE_INLINE ListExpression *parse_rhs_list_expression(Parser *parser) {
+static FORCE_INLINE TupleExpression *parse_rhs_tuple_expression(Parser *parser) {
 	TRACE_ENTER();
 
-	ListExpression *const result = parse_list_expression(parser, false);
+	TupleExpression *const result = parse_tuple_expression(parser, false);
 
 	TRACE_LEAVE();
 
@@ -2415,7 +2413,7 @@ static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Ar
 	// ':'
 	TRACE_ENTER();
 
-	ListExpression *values = 0;
+	TupleExpression *values = 0;
 	Type *const type = parse_type_or_identifier(parser);
 	const Token token = parser->this_token;
 	Bool constant = false;
@@ -2427,7 +2425,7 @@ static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Ar
 		const Token seperator = advancep(parser);
 		constant = is_operator(seperator, OPERATOR_COLON);
 		advance_possible_newline(parser); // hack?
-		values = parse_rhs_list_expression(parser);
+		values = parse_rhs_tuple_expression(parser);
 		const Size n_values = array_size(values->expressions);
 		if (n_values > n_names) {
 			PARSE_ERROR("Too many values on right-hand side of the declaration");
@@ -2470,7 +2468,7 @@ static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Ar
 			CompoundLiteralExpression *const expression = tree_new_compound_literal_expression(parser->tree, type, 0);
 			array_push(expressions, RCAST(Expression *, expression));
 		}
-		values = tree_new_list_expression(parser->tree, expressions);
+		values = tree_new_tuple_expression(parser->tree, expressions);
 	}
 
 	DeclarationStatement *const statement = tree_new_declaration_statement(parser->tree, type, names, values, is_using);
@@ -2480,7 +2478,7 @@ static DeclarationStatement *parse_declaration_statement_tail(Parser *parser, Ar
 	return statement;
 }
 
-static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExpression *lhs, Bool is_using) {
+static DeclarationStatement *parse_declaration_statement(Parser *parser, TupleExpression *lhs, Bool is_using) {
 	Context *const context = parser->context;
 
 	TRACE_ENTER();
@@ -2504,7 +2502,7 @@ static DeclarationStatement *parse_declaration_statement(Parser *parser, ListExp
 	return statement;
 }
 
-static AssignmentStatement *parse_assignment_statement(Parser *parser, ListExpression *lhs) {
+static AssignmentStatement *parse_assignment_statement(Parser *parser, TupleExpression *lhs) {
 	Context *const context = parser->context;
 
 	TRACE_ENTER();
@@ -2516,7 +2514,7 @@ static AssignmentStatement *parse_assignment_statement(Parser *parser, ListExpre
 	const AssignmentKind kind = parser->this_token.as_assignment;
 
 	advancep(parser);
-	ListExpression *const rhs = parse_rhs_list_expression(parser);
+	TupleExpression *const rhs = parse_rhs_tuple_expression(parser);
 	if (array_size(rhs->expressions) == 0) {
 		PARSE_ERROR("Missing right-hand side in assignment");
 	}
@@ -2533,7 +2531,7 @@ static Statement *parse_simple_statement(Parser* parser, BlockFlag block_flags, 
 
 	TRACE_ENTER();
 
-	ListExpression *const lhs = parse_lhs_list_expression(parser);
+	TupleExpression *const lhs = parse_lhs_tuple_expression(parser);
 	const Token token = parser->this_token;
 	switch (token.kind) {
 	case KIND_ASSIGNMENT:
@@ -2895,9 +2893,9 @@ static CaseClause *parse_case_clause(Parser *parser, BlockFlag block_flags, Bool
 
 	const Bool allow_in = parser->allow_in;
 	parser->allow_in = !is_type;
-	ListExpression *list = 0;
+	TupleExpression *list = 0;
 	if (!is_operator(parser->this_token, OPERATOR_COLON)) {
-		list = parse_rhs_list_expression(parser);
+		list = parse_rhs_tuple_expression(parser);
 	}
 	parser->allow_in = allow_in;
 
@@ -2998,7 +2996,8 @@ static ReturnStatement *parse_return_statement(Parser *parser) {
 
 	expect_semicolon(parser);
 
-	ReturnStatement *const statement = tree_new_return_statement(parser->tree, results);
+	TupleExpression *const result = tree_new_tuple_expression(parser->tree, results);
+	ReturnStatement *const statement = tree_new_return_statement(parser->tree, result);
 
 	TRACE_LEAVE();
 
@@ -3137,7 +3136,7 @@ static Statement *parse_using_statement(Parser *parser) {
 		return RCAST(Statement *, statement);
 	}
 
-	ListExpression *const list = parse_rhs_list_expression(parser);
+	TupleExpression *const list = parse_rhs_tuple_expression(parser);
 	if (!is_operator(parser->this_token, OPERATOR_COLON)) {
 		expect_semicolon(parser);
 		UsingStatement *const statement = tree_new_using_statement(parser->tree, list);

@@ -8,9 +8,9 @@ static void pad(Sint32 depth) {
 	}
 }
 
-Bool dump_list_expression(const Tree *tree, const ListExpression *expression, Sint32 depth) {
+Bool dump_tuple_expression(const Tree *tree, const TupleExpression *expression, Sint32 depth) {
 	pad(depth);
-	printf("(list");
+	printf("(tuple");
 	printf("\n");
 
 	pad(depth + 1);
@@ -247,6 +247,14 @@ Bool dump_procedure_group_expression(const Tree *tree, const ProcedureGroupExpre
 		dump_expression(tree, expression->expressions[i], depth + 1);
 	}
 	printf(")");
+	return true;
+}
+
+Bool dump_context_expression(const Tree *tree, const ContextExpression *expression, Sint32 depth) {
+	(void)tree;
+	(void)expression;
+	(void)depth;
+	printf("(context)");
 	return true;
 }
 
@@ -591,7 +599,7 @@ Bool dump_procedure_expression(const Tree *tree, const ProcedureExpression *expr
 		pad(depth + 1);
 		printf("(where");
 		printf("\n");
-		dump_list_expression(tree, expression->where_clauses, depth + 2);
+		dump_tuple_expression(tree, expression->where_clauses, depth + 2);
 		printf(")"); // where
 	}
 
@@ -704,7 +712,7 @@ Bool dump_slice_expression(const Tree *tree, const SliceExpression *expression, 
 
 Bool dump_expression(const Tree *tree, const Expression *expression, Sint32 depth) {
 	switch (expression->kind) {
-	case EXPRESSION_LIST:             return dump_list_expression(tree, RCAST(const ListExpression *, expression), depth);
+	case EXPRESSION_TUPLE:            return dump_tuple_expression(tree, RCAST(const TupleExpression *, expression), depth);
 	case EXPRESSION_UNARY:            return dump_unary_expression(tree, RCAST(const UnaryExpression *, expression), depth);
 	case EXPRESSION_BINARY:           return dump_binary_expression(tree, RCAST(const BinaryExpression *, expression), depth);
 	case EXPRESSION_TERNARY:          return dump_ternary_expression(tree, RCAST(const TernaryExpression *, expression), depth);
@@ -721,6 +729,7 @@ Bool dump_expression(const Tree *tree, const Expression *expression, Sint32 dept
 	case EXPRESSION_IDENTIFIER:       return dump_identifier_expression(tree, RCAST(const IdentifierExpression *, expression), depth);
 	case EXPRESSION_UNDEFINED:        return dump_undefined_expression(tree, RCAST(const UndefinedExpression *, expression), depth);
 	case EXPRESSION_PROCEDURE_GROUP:  return dump_procedure_group_expression(tree, RCAST(const ProcedureGroupExpression *, expression), depth);
+	case EXPRESSION_CONTEXT:          return dump_context_expression(tree, RCAST(const ContextExpression *, expression), depth);
 	}
 	UNREACHABLE();
 }
@@ -792,14 +801,14 @@ Bool dump_assignment_statement(const Tree *tree, const AssignmentStatement *stat
 	pad(depth + 1);
 	printf("(lhs");
 	printf("\n");
-	dump_list_expression(tree, statement->lhs, depth + 2);
+	dump_tuple_expression(tree, statement->lhs, depth + 2);
 	printf(")"); // lhs
 
 	printf("\n");
 	pad(depth + 1);
 	printf("(rhs");
 	printf("\n");
-	dump_list_expression(tree, statement->rhs, depth + 2);
+	dump_tuple_expression(tree, statement->rhs, depth + 2);
 	printf(")"); // rhs
 
 	printf(")"); // assign
@@ -914,11 +923,7 @@ Bool dump_return_statement(const Tree *tree, const ReturnStatement *statement, S
 	printf("\n");
 	pad(depth + 1);
 	printf("(results");
-	const Size n_results = array_size(statement->results);
-	for (Size i = 0; i < n_results; i++) {
-		printf("\n");
-		dump_expression(tree, statement->results[i], depth + 2);
-	}
+	dump_tuple_expression(tree, statement->result, depth + 2);
 	printf(")"); // results
 
 	printf(")"); // ret
@@ -974,7 +979,7 @@ static void dump_case_clause(const Tree *tree, const CaseClause *clause, Sint32 
 	printf("(case");
 	if (clause->expressions) {
 		printf("\n");
-		dump_list_expression(tree, clause->expressions, depth + 1);
+		dump_tuple_expression(tree, clause->expressions, depth + 1);
 	}
 	printf("\n");
 	pad(depth + 1);
@@ -1123,7 +1128,7 @@ Bool dump_using_statement(const Tree *tree, const UsingStatement *statement, Sin
 	pad(depth);
 	printf("(using");
 	printf("\n");
-	dump_list_expression(tree, statement->list, depth + 1);
+	dump_tuple_expression(tree, statement->list, depth + 1);
 	printf(")"); // using
 	return true;
 }

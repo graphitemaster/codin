@@ -2,7 +2,7 @@
 #define CODIN_DUMP_H
 #include "tree.h"
 
-Bool dump_list_expression(const Tree *tree, const ListExpression *expression, Sint32 depth);
+Bool dump_tuple_expression(const Tree *tree, const TupleExpression *expression, Sint32 depth);
 Bool dump_unary_expression(const Tree *tree, const UnaryExpression *expression, Sint32 depth);
 Bool dump_binary_expression(const Tree *tree, const BinaryExpression *expression, Sint32 depth);
 Bool dump_ternary_expression(const Tree *tree, const TernaryExpression *expression, Sint32 depth);

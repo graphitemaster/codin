@@ -3,10 +3,10 @@
 #include "allocator.h"
 #include "path.h"
 
-ListExpression *tree_new_list_expression(Tree *tree, Array(Expression*) expressions) {
+TupleExpression *tree_new_tuple_expression(Tree *tree, Array(Expression*) expressions) {
 	Allocator *const allocator = &tree->context->allocator;
-	ListExpression *const expression = allocator_allocate(allocator, sizeof *expression);
-	expression->base.kind = EXPRESSION_LIST;
+	TupleExpression *const expression = allocator_allocate(allocator, sizeof *expression);
+	expression->base.kind = EXPRESSION_TUPLE;
 	expression->expressions = expressions;
 	return expression;
 }
@@ -78,7 +78,7 @@ AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *opera
 	return expression;
 }
 
-ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, ListExpression *where_clauses,BlockStatement *body) {
+ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, TupleExpression *where_clauses,BlockStatement *body) {
 	Allocator *const allocator = &tree->context->allocator;
 	ProcedureExpression *const expression = allocator_allocate(allocator, sizeof *expression);
 	expression->base.kind = EXPRESSION_PROCEDURE;
@@ -142,6 +142,13 @@ IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *ide
 	return expression;
 }
 
+ContextExpression *tree_new_context_expression(Tree *tree) {
+	Allocator *const allocator = &tree->context->allocator;
+	ContextExpression *const expression = allocator_allocate(allocator, sizeof *expression);
+	expression->base.kind = EXPRESSION_CONTEXT;
+	return expression;
+}
+
 UndefinedExpression *tree_new_undefined_expression(Tree *tree) {
 	Allocator *const allocator = &tree->context->allocator;
 	UndefinedExpression *const expression = allocator_allocate(allocator, sizeof *expression);
@@ -200,7 +207,7 @@ BlockStatement *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Stat
 	return statement;
 }
 
-AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, ListExpression *lhs, ListExpression *rhs) {
+AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, TupleExpression *lhs, TupleExpression *rhs) {
 	Allocator *const allocator = &tree->context->allocator;
 	AssignmentStatement *const statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_ASSIGNMENT;
@@ -210,7 +217,7 @@ AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind as
 	return statement;
 }
 
-DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values, Bool is_using) {
+DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, TupleExpression *values, Bool is_using) {
 	Allocator *const allocator = &tree->context->allocator;
 	DeclarationStatement *const statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_DECLARATION;
@@ -264,11 +271,11 @@ SwitchStatement *tree_new_switch_statement(Tree *tree, Statement *init, Expressi
 	return statement;
 }
 
-ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) results) {
+ReturnStatement *tree_new_return_statement(Tree *tree, TupleExpression *result) {
 	Allocator *const allocator = &tree->context->allocator;
 	ReturnStatement *const statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_RETURN;
-	statement->results = results;
+	statement->result = result;
 	return statement;
 }
 
@@ -309,7 +316,7 @@ ForeignImportStatement *tree_new_foreign_import_statement(Tree *tree, String nam
 	return statement;
 }
 
-UsingStatement *tree_new_using_statement(Tree *tree, ListExpression *list) {
+UsingStatement *tree_new_using_statement(Tree *tree, TupleExpression *list) {
 	Allocator *const allocator = &tree->context->allocator;
 	UsingStatement *const statement = allocator_allocate(allocator, sizeof *statement);
 	statement->base.kind = STATEMENT_USING;
@@ -335,7 +342,7 @@ Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly) {
 	return identifier;
 }
 
-CaseClause *tree_new_case_clause(Tree *tree, ListExpression *expressions, Array(Statement*) statements) {
+CaseClause *tree_new_case_clause(Tree *tree, TupleExpression *expressions, Array(Statement*) statements) {
 	Allocator *const allocator = &tree->context->allocator;
 	CaseClause *const clause = allocator_allocate(allocator, sizeof *clause);
 	clause->expressions = expressions;
@@ -439,7 +446,7 @@ EnumType *tree_new_enum_type(Tree *tree, Type *base_type, Array(Field*) fields) 
 }
 
 // struct
-ConcreteStructType *tree_new_concrete_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) fields, ListExpression *where_clauses) {
+ConcreteStructType *tree_new_concrete_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) fields, TupleExpression *where_clauses) {
 	ConcreteStructType *type = new_type(tree, TYPE_STRUCT, sizeof *type);
 	type->base.kind = STRUCT_CONCRETE;
 	type->base.flags = flags;
@@ -450,7 +457,7 @@ ConcreteStructType *tree_new_concrete_struct_type(Tree *tree, StructFlag flags, 
 }
 
 // struct()
-GenericStructType *tree_new_generic_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) parameters, Array(Field*) fields, ListExpression *where_clauses) {
+GenericStructType *tree_new_generic_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) parameters, Array(Field*) fields, TupleExpression *where_clauses) {
 	GenericStructType *type = new_type(tree, TYPE_STRUCT, sizeof *type);
 	type->base.kind = STRUCT_GENERIC;
 	type->base.flags = flags;
@@ -462,7 +469,7 @@ GenericStructType *tree_new_generic_struct_type(Tree *tree, StructFlag flags, Ex
 }
 
 // union
-ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Type*) variants, ListExpression *where_clauses) {
+ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Type*) variants, TupleExpression *where_clauses) {
 	ConcreteUnionType *type = new_type(tree, TYPE_UNION, sizeof *type);
 	type->base.kind = UNION_GENERIC;
 	type->base.flags = flags;
@@ -473,7 +480,7 @@ ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Exp
 }
 
 // union()
-GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Field*) parameters, Array(Type*) variants, ListExpression *where_clauses) {
+GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Field*) parameters, Array(Type*) variants, TupleExpression *where_clauses) {
 	GenericUnionType *type = new_type(tree, TYPE_UNION, sizeof *type);
 	type->base.kind = UNION_GENERIC;
 	type->base.flags = flags;

@@ -9,7 +9,7 @@ typedef struct Tree Tree;
 
 // Expressions.
 typedef struct Expression Expression;
-typedef struct ListExpression ListExpression;
+typedef struct TupleExpression TupleExpression;
 typedef struct UnaryExpression UnaryExpression;
 typedef struct BinaryExpression BinaryExpression;
 typedef struct TernaryExpression TernaryExpression;
@@ -25,6 +25,7 @@ typedef struct SliceExpression SliceExpression;
 typedef struct LiteralExpression LiteralExpression;
 typedef struct CompoundLiteralExpression CompoundLiteralExpression;
 typedef struct IdentifierExpression IdentifierExpression;
+typedef struct ContextExpression ContextExpression;
 typedef struct UndefinedExpression UndefinedExpression;
 typedef struct ProcedureGroupExpression ProcedureGroupExpression;
 
@@ -80,8 +81,8 @@ typedef struct Field Field;
 typedef struct CaseClause CaseClause;
 
 enum ExpressionKind {
-	EXPRESSION_LIST             = 0,
-  EXPRESSION_UNARY            = 1,  // <op> operand
+	EXPRESSION_TUPLE            = 0,
+	EXPRESSION_UNARY            = 1,  // <op> operand
 	EXPRESSION_BINARY           = 2,  // lhs <op> rhs
 	EXPRESSION_TERNARY          = 3,  // lhs <if|when> cond else rhs
 	EXPRESSION_CAST             = 4,  // auto_cast operand, cast(T)operand, transmute(T)operand
@@ -95,8 +96,9 @@ enum ExpressionKind {
 	EXPRESSION_LITERAL          = 12, // int, float, rune, string
 	EXPRESSION_COMPOUND_LITERAL = 13, // T{...}
 	EXPRESSION_IDENTIFIER       = 14, // ident
-	EXPRESSION_UNDEFINED        = 15, // ---
-	EXPRESSION_PROCEDURE_GROUP  = 16, // proc{...}
+	EXPRESSION_CONTEXT          = 15, // context
+	EXPRESSION_UNDEFINED        = 16, // ---
+	EXPRESSION_PROCEDURE_GROUP  = 17, // proc{...}
 };
 
 enum StatementKind {
@@ -236,7 +238,7 @@ struct Expression {
 	ExpressionKind kind;
 };
 
-struct ListExpression {
+struct TupleExpression {
 	Expression base;
 	Array(Expression*) expressions;
 };
@@ -309,7 +311,7 @@ struct AssertionExpression {
 struct ProcedureExpression {
 	Expression base;
 	ProcedureType *type;
-	ListExpression *where_clauses;
+	TupleExpression *where_clauses;
 	BlockStatement *body;
 };
 
@@ -347,6 +349,10 @@ struct CompoundLiteralExpression {
 struct IdentifierExpression {
 	Expression base;
 	Identifier *identifier;
+};
+
+struct ContextExpression {
+	Expression base;
 };
 
 struct UndefinedExpression {
@@ -391,15 +397,15 @@ struct BlockStatement {
 struct AssignmentStatement {
 	Statement base;
 	AssignmentKind assignment;
-	ListExpression *lhs;
-	ListExpression *rhs;
+	TupleExpression *lhs;
+	TupleExpression *rhs;
 };
 
 struct DeclarationStatement {
 	Statement base;
 	Type *type;
 	Array(Identifier*) names;
-	ListExpression *values;
+	TupleExpression *values;
 	Array(Field*) attributes;
 	Bool is_using;
 };
@@ -422,7 +428,7 @@ struct WhenStatement {
 
 struct ReturnStatement {
 	Statement base;
-	Array(Expression*) results;
+	TupleExpression *result;
 };
 
 struct ForStatement {
@@ -469,7 +475,7 @@ struct ForeignImportStatement {
 
 struct UsingStatement {
 	Statement base;
-	ListExpression *list;
+	TupleExpression *list;
 };
 
 struct PackageStatement {
@@ -590,7 +596,7 @@ struct StructType {
 	StructFlag flags;
 	Expression *align;
 	Array(Field*) fields;
-	ListExpression *where_clauses;
+	TupleExpression *where_clauses;
 };
 
 struct ConcreteStructType {
@@ -608,7 +614,7 @@ struct UnionType {
 	UnionFlag flags;
 	Expression *align;
 	Array(Type*) variants;
-	ListExpression *where_clauses;
+	TupleExpression *where_clauses;
 };
 
 struct ConcreteUnionType {
@@ -642,7 +648,7 @@ struct Field {
 };
 
 struct CaseClause {
-	ListExpression *expressions;
+	TupleExpression *expressions;
 	Array(Statement*) statements;
 };
 
@@ -668,7 +674,7 @@ void tree_fini(Tree *tree);
 void tree_record_token(Tree *tree, Token token);
 
 // Expressions
-ListExpression *tree_new_list_expression(Tree *tree, Array(Expression*) expressions);
+TupleExpression *tree_new_tuple_expression(Tree *tree, Array(Expression*) expressions);
 UnaryExpression *tree_new_unary_expression(Tree *tree, OperatorKind operation, Expression *operand);
 BinaryExpression *tree_new_binary_expression(Tree *tree, OperatorKind operation, Expression *lhs, Expression *rhs);
 TernaryExpression *tree_new_ternary_expression(Tree *tree, Expression *on_true, KeywordKind operation, Expression *cond, Expression *on_false);
@@ -676,13 +682,14 @@ CastExpression *tree_new_cast_expression(Tree *tree, OperatorKind kind, Type *ty
 SelectorExpression *tree_new_selector_expression(Tree *tree, Expression *operand, Identifier *identifier);
 CallExpression *tree_new_call_expression(Tree *tree, Expression *operand, Array(Field*) arguments);
 AssertionExpression *tree_new_assertion_expression(Tree *tree, Expression *operand, Type *type);
-ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, ListExpression *where_clauses, BlockStatement *body);
+ProcedureExpression *tree_new_procedure_expression(Tree *tree, ProcedureType *type, TupleExpression *where_clauses, BlockStatement *body);
 TypeExpression *tree_new_type_expression(Tree *tree, Type *type);
 IndexExpression *tree_new_index_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs);
 SliceExpression *tree_new_slice_expression(Tree *tree, Expression *operand, Expression *lhs, Expression *rhs);
 LiteralExpression *tree_new_literal_expression(Tree *tree, LiteralKind kind, String value);
 CompoundLiteralExpression *tree_new_compound_literal_expression(Tree *tree, Type *type, Array(Field*) fields);
 IdentifierExpression *tree_new_identifier_expression(Tree *tree, Identifier *identifier);
+ContextExpression *tree_new_context_expression(Tree *tree);
 UndefinedExpression *tree_new_undefined_expression(Tree *tree);
 ProcedureGroupExpression *tree_new_procedure_group_expression(Tree *tree, Array(Expression*) expressions);
 
@@ -691,18 +698,18 @@ EmptyStatement *tree_new_empty_statement(Tree *tree);
 ImportStatement *tree_new_import_statement(Tree *tree, String name, String collection, String pathname, Bool is_using);
 ExpressionStatement *tree_new_expression_statement(Tree *tree, Expression *expression);
 BlockStatement *tree_new_block_statement(Tree *tree, BlockFlag flags, Array(Statement*) statements);
-AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, ListExpression *lhs, ListExpression *rhs);
-DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, ListExpression *values, Bool is_using);
+AssignmentStatement *tree_new_assignment_statement(Tree *tree, AssignmentKind assignment, TupleExpression *lhs, TupleExpression *rhs);
+DeclarationStatement *tree_new_declaration_statement(Tree *tree, Type *type, Array(Identifier*) names, TupleExpression *values, Bool is_using);
 IfStatement *tree_new_if_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, BlockStatement *elif);
 WhenStatement *tree_new_when_statement(Tree *tree, Expression *cond, BlockStatement *body, BlockStatement *elif);
 ForStatement *tree_new_for_statement(Tree *tree, Statement *init, Expression *cond, BlockStatement *body, Statement *post);
 SwitchStatement *tree_new_switch_statement(Tree *tree, Statement *init, Expression *cond, Array(CaseClause*) clauses);
-ReturnStatement *tree_new_return_statement(Tree *tree, Array(Expression*) results);
+ReturnStatement *tree_new_return_statement(Tree *tree, TupleExpression *result);
 DeferStatement *tree_new_defer_statement(Tree *tree, Statement *stmt);
 BranchStatement *tree_new_branch_statement(Tree *tree, KeywordKind branch, Identifier *label);
 ForeignBlockStatement *tree_new_foreign_block_statement(Tree *tree, Identifier *name, BlockStatement *body);
 ForeignImportStatement *tree_new_foreign_import_statement(Tree *tree, String name, Array(String) sources);
-UsingStatement *tree_new_using_statement(Tree *tree, ListExpression *list);
+UsingStatement *tree_new_using_statement(Tree *tree, TupleExpression *list);
 PackageStatement *tree_new_package_statement(Tree *tree, String package);
 
 // Types
@@ -720,14 +727,14 @@ MatrixType *tree_new_matrix_type(Tree *tree, Expression *rows, Expression *colum
 DistinctType *tree_new_distinct_type(Tree *tree, Type *type);
 EnumType *tree_new_enum_type(Tree *tree, Type *base_type, Array(Field*) fields);
 ExpressionType *tree_new_expression_type(Tree *tree, Expression *expression);
-ConcreteStructType *tree_new_concrete_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) fields, ListExpression *where_clauses);
-GenericStructType *tree_new_generic_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) parameters, Array(Field*) fields, ListExpression *where_clauses);
-ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Type*) variants, ListExpression *where_clauses);
-GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Field*) parameters, Array(Type*) variants, ListExpression *where_clauses);
+ConcreteStructType *tree_new_concrete_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) fields, TupleExpression *where_clauses);
+GenericStructType *tree_new_generic_struct_type(Tree *tree, StructFlag flags, Expression *align, Array(Field*) parameters, Array(Field*) fields, TupleExpression *where_clauses);
+ConcreteUnionType *tree_new_concrete_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Type*) variants, TupleExpression *where_clauses);
+GenericUnionType *tree_new_generic_union_type(Tree *tree, UnionFlag flags, Expression *align, Array(Field*) parameters, Array(Type*) variants, TupleExpression *where_clauses);
 PolyType *tree_new_poly_type(Tree *tree, Type *type, Type *specialization);
 
 Field *tree_new_field(Tree *tree, Type *type, Identifier *name, Expression *value, String tag, FieldFlag flags);
 Identifier *tree_new_identifier(Tree *tree, String contents, Bool poly);
-CaseClause *tree_new_case_clause(Tree *tree, ListExpression *expressions, Array(Statement*) statements);
+CaseClause *tree_new_case_clause(Tree *tree, TupleExpression *expressions, Array(Statement*) statements);
 
 #endif // CODIN_TREE_H
